@@ -1,0 +1,35 @@
+kind,key,name,assessment,expected_branch,source_token,note
+type,1,SNOW,approximate,yes,,vertical motion uses a port-specific coefficient; DX9 pool parity unverified
+type,2,FIRE,approximate,yes,,vertical motion uses a port-specific coefficient; DX9 pool parity unverified
+type,3,BLAST,approximate,yes,,radial distance uses a port-specific coefficient
+type,4,RIPPLE,partial,yes,,ground quad and optional nested model; not DX9 parity
+type,5,MODEL,partial,yes,,nested .eff and geometry supported; emitter and life may differ
+type,6,STRIP,partial,yes,,nested .eff present; direct controller CMPStrip is separate
+type,7,WIND,approximate,yes,,ribbon approximation
+type,8,ARRAW,generic_fallback,no,,no specific branch; reaches generic quad
+type,9,ROUND,approximate,yes,,ribbon approximation
+type,10,BLAST2,approximate,yes,,ground quad approximation
+type,11,BLAST3,approximate,yes,,radial displacement approximation
+type,12,SHRINK,partial,yes,,staggered births and inward motion; visual parity unverified
+type,13,SHADE,missing_specialization,yes,,model resolver skips SHADE; runtime uses generic fallback
+type,14,RANGE,generic_fallback,no,,no specific branch; reaches generic quad
+type,15,RANGE2,generic_fallback,no,,no specific branch; reaches generic quad
+type,16,DUMMY,approximate,yes,,ground quad instead of full dummy controller
+type,17,LINE_SINGLE,approximate,yes,,ground quad instead of original line geometry
+type,18,LINE_ROUND,approximate,yes,,ribbon approximation
+feature,billboard,billboard,source_inspection,,profile.billboard,parsed but correct DX9 orientation is unverified
+feature,model,nested effect model,source_inspection,,profile.modelName,not every particle type uses nested geometry
+feature,path,CEffPath points,source_inspection,,profile.pathPoints,execution not proof of original path timing
+feature,delay,delay time,source_inspection,,profile.delayTime,check timing against DX9
+feature,play,controller stop time,source_inspection,,profile.playTime,MODEL and STRIP have special stop rules
+feature,offset,authored offset,source_inspection,,profile.offset,check coordinate-system conversion
+feature,step,emission step,source_inspection,,profile.step,individual particle birth cycle needs review
+feature,direction,direction vector,source_inspection,,profile.direction,check transform and units
+feature,acceleration,acceleration vector,source_inspection,,profile.acceleration,check actual acceleration integration
+feature,range,spawn range,source_inspection,,profile.range,check distributions and RNG
+feature,path_velocity,path speed,source_inspection,,profile.pathVelocity,only relevant when hasPath
+feature,curves,size colour rotation keys,source_inspection,,profile.sizes,keys consumed but parity unverified
+feature,model_range,model range data,source_inspection,,profile.modelRangeName,serialized but runtime model-range semantics incomplete
+feature,shade_flag,shade flag,source_inspection,,profile.shade,serialized but runtime SHADE mode incomplete
+feature,hit_effect,hit-effect dependency,source_inspection,,profile.hitEffect,serialized event may not be scheduled
+feature,filters,min mag texture filters,source_inspection,,profile.minFilter,serialization reads but no per-particle filtering in GL
