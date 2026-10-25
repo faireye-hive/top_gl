@@ -12,10 +12,10 @@ int main(){
     setenv("TOP_HISTORICAL_PARTICLE_MOTION","1",1);CHECK(enabled());
     setenv("TOP_HISTORICAL_PARTICLE_MOTION","0",1);CHECK(!enabled());
     const V3 none{{0,0,0}}, x{{1,0,0}}, up{{0,0,1}};
-    auto fire0=at(2,none,V3{{3,4,0}},none,999.f,0.f,4,0);
-    auto fire2=at(2,none,V3{{3,4,0}},none,999.f,2.f,4,0);
-    CHECK(near(fire2.position[0]-fire0.position[0],1.2f));
-    CHECK(near(fire2.position[1]-fire0.position[1],1.6f));
+    auto fire0=at(2,none,V3{{3,4,0}},none,2.f,0.f,4,0);
+    auto fire2=at(2,none,V3{{3,4,0}},none,2.f,2.f,4,0);
+    CHECK(near(fire2.position[0]-fire0.position[0],2.4f));
+    CHECK(near(fire2.position[1]-fire0.position[1],3.2f));
     CHECK(near(fire2.position[2],0.f));
     // DX Randf(range) spawns in [0,range], not [-range/2,+range/2].
     auto fireR=at(2,V3{{2,3,4}},none,none,1.f,0.f,7,3);

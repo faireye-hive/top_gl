@@ -46,7 +46,7 @@ int main(){
     auto src=fx::readSource("sources/Engine/src/top/EffectSystem.cpp");
     CHECK(src.valid);
     CHECK(!fx::findType(src,2).outside.empty());
-    CHECK(fx::findType(src,8).outside.empty());
+    CHECK(!fx::findType(src,8).outside.empty());
     const auto tmp=fs::temp_directory_path()/"top_fx_coverage_test_SK214";
     fs::remove_all(tmp);fs::create_directories(tmp/"Client/effect");
     par(tmp/"Client/effect/fire.par",2);
@@ -75,7 +75,7 @@ int main(){
     // the renderer adds genuine two-dummy CMPStrip geometry.
     CHECK(read(opts.output/"fx_gap_ranking.csv").find("partial_anchor_dependent")!=std::string::npos);
     CHECK(read(opts.output/"fx_missing_dependencies.csv").find("absent.par")!=std::string::npos);
-    CHECK(read(opts.output/"fx_type_coverage.csv").find("8,ARRAW,1,1,1,generic_fallback")!=std::string::npos);
+    CHECK(read(opts.output/"fx_type_coverage.csv").find("8,ARRAW,1,1,1,approximate")!=std::string::npos);
     opts.strict=true;
     std::ostringstream strictLog;
     CHECK(fx::run(opts,strictLog)==0);

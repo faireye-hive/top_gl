@@ -1,0 +1,636 @@
+diff --git a/sources/CMakeLists.txt b/sources/CMakeLists.txt
+index 87f796a..9fe7a73 100644
+--- a/sources/CMakeLists.txt
++++ b/sources/CMakeLists.txt
+@@ -1139,3 +1139,20 @@ if(TOP_BUILD_UI_TESTS)
+     target_include_directories(top_ui05sk217a_random_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Engine/include)
+     add_test(NAME ui05sk217a_particle_random_divisor COMMAND top_ui05sk217a_random_tests)
+ endif()
++
++# SK2.17-B: deterministic extended historical particle trajectories (DX9 Z-up).
++if(TOP_BUILD_UI_TESTS)
++    add_executable(top_ui05sk217b_extended_tests tests/SK217BExtendedParticleTests.cpp)
++    target_include_directories(top_ui05sk217b_extended_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Engine/include)
++    add_test(NAME ui05sk217b_extended_particle_modes COMMAND top_ui05sk217b_extended_tests)
++endif()
++
++# SK2.17-B: verify historical positions and emissions reach EffectSystem batches.
++if(TOP_BUILD_UI_TESTS)
++    add_executable(top_ui05sk217b_integration_tests tests/SK217BParticleIntegrationTests.cpp
++        Engine/src/top/EffectSystem.cpp Engine/src/top/TexturePaths.cpp
++        Engine/src/top/ModelFile.cpp Engine/src/top/MapFile.cpp)
++    target_include_directories(top_ui05sk217b_integration_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Engine/include)
++    target_link_libraries(top_ui05sk217b_integration_tests PRIVATE z)
++    add_test(NAME ui05sk217b_extended_particle_integration COMMAND top_ui05sk217b_integration_tests)
++endif()
+diff --git a/sources/Engine/include/top/HistoricalParticleExtended.h b/sources/Engine/include/top/HistoricalParticleExtended.h
+new file mode 100644
+index 0000000..cdb484f
+--- /dev/null
++++ b/sources/Engine/include/top/HistoricalParticleExtended.h
+@@ -0,0 +1,117 @@
++#pragma once
++// SK2.17-B: opt-in deterministic positions/lifetimes for less common CMPPartSys
++// modes, transcribed from the creation and frame movement routines of the
++// original DX9 MPParticleSys.cpp. All local positions are DX9 (Z-up).
++// This is NOT full DX9 simulation: native RNG, per-frame wind/step cadence,
++// nested emitter orientation and RANGE2 collision callbacks remain different.
++#include "top/HistoricalParticlePool.h"
++#include <algorithm>
++#include <array>
++#include <cmath>
++#include <cstdint>
++#include <cstdlib>
++
++namespace top { namespace historical_particle_extended {
++using V3=std::array<float,3>;
++constexpr float pi=3.14159265358979323846f;
++inline bool enabled() {
++    const char* p=std::getenv("TOP_HISTORICAL_PARTICLE_EXTENDED");
++    return p && p[0]=='1' && p[1]=='\0';
++}
++inline bool supported(int type) {
++    return type==7 || type==8 || type==9 || type==11 || type==14 || type==15;
++}
++struct Sample {
++    bool alive=false;
++    float age=0.f;
++    float normalized=0.f;
++    V3 position{{0.f,0.f,0.f}};
++};
++inline float random01(std::uint32_t seed,int slot,int channel) {
++    return historical_particle_pool::rand01(seed ^ (0x9e3779b9u*std::uint32_t(slot+1)) ^
++                                             (0x85ebca6bu*std::uint32_t(channel+1)));
++}
++// All positional values below are LOCAL; the EffectSystem adds the effect
++// origin, authored offset and historical path exactly once.
++inline Sample at(int type,int slot,int count,float seconds,float life,float step,
++                 float stopAt,const V3& range,const V3& direction,
++                 const V3& acceleration,float speed,std::uint32_t seed) {
++    Sample s;
++    if(!supported(type) || count<=0 || slot<0 || slot>=count ||
++       !std::isfinite(seconds) || !std::isfinite(life) ||
++       !std::isfinite(speed) || !std::isfinite(step) ||
++       !std::isfinite(stopAt) || seconds<0.f || life<=0.f) return s;
++    // The old Play() creates ROUND, ARRAW, BLAST3 and RANGE immediately.
++    // WIND and RANGE2 instead advance _fCurTime until _fStep, emitting
++    // one available slot at a time; the exact DX9 schedule depends on FPS.
++    const bool staggered=(type==7 || type==15);
++    // Zero step emits one per frame in DX9, not an infinite number at t=0.
++    // Use a nominal 60 Hz for repeatable inspection of this ambiguous case.
++    const float interval=std::max(step,1.f/60.f);
++    const float birth=staggered?interval*float(slot+1):0.f;
++    if(seconds<birth || (staggered && stopAt>=0.f && birth>=stopAt)) return s;
++    float age=seconds-birth;
++    if(staggered) {
++        // A dead slot is recycled in WIND; RANGE2 has a controller stop and
++        // collision-triggered death, which this static evaluator cannot see.
++        if(type==7) {
++            const float cycle=std::max(life,interval*float(count));
++            age=std::fmod(age,cycle);
++            if(age>=life) return s;
++            if(stopAt>=0.f && birth+std::floor((seconds-birth)/cycle)*cycle>=stopAt) return s;
++        } else if(age>=life) return s;
++    } else if(type==9 || type==8) {
++        // ROUND and ARRAW restart their size/color frames when they end.
++        age=std::fmod(age,life);
++    } else if(type==11 && age>=life) return s;
++    // RANGE retains its static positions throughout the active controller.
++    s.alive=true; s.age=age; s.normalized=std::clamp(age/life,0.f,1.f);
++    auto randomPosition=[&] {
++        for(int i=0;i<3;++i)s.position[i]=range[i]*random01(seed,slot,i);
++    };
++    switch(type) {
++    case 7: { // WIND: _CreateWind, _FrameMoveWind
++        randomPosition();
++        // m_vOldPos is the spawn position, m_vAccel.y/z grow linearly;
++        // its XY acceleration vector rotates by angular velocity _fVecl.
++        const float theta=speed*age;
++        const float ay=direction[1]*age;
++        s.position[0]-=ay*std::sin(theta);
++        s.position[1]+=ay*std::cos(theta);
++        s.position[2]+=direction[2]*age;
++        break;
++    }
++    case 8: // ARRAW (the original code calls it ARRAW)
++        for(int i=0;i<3;++i)s.position[i]=range[i]*.5f;
++        break;
++    case 9: { // ROUND: orbit rotating (0,range.y,0) around DX9 Z
++        const float theta=2.f*pi*float(slot)/float(count) + speed*seconds;
++        s.position[0]=range[0]*.5f-range[1]*std::sin(theta);
++        s.position[1]=range[1]*.5f+range[1]*std::cos(theta);
++        s.position[2]=range[2]*.5f;
++        break;
++    }
++    case 11: { // BLAST3: group born at once, radial vector plus _vDir
++        const float theta=2.f*pi*float(slot)/float(count);
++        const V3 velocity{{std::cos(theta)-std::sin(theta)+direction[0],
++                           std::sin(theta)+std::cos(theta)+direction[1],
++                           -1.f+direction[2]}};
++        for(int i=0;i<3;++i)
++            s.position[i]=speed*(velocity[i]*age+.5f*acceleration[i]*age*age);
++        break;
++    }
++    case 14: // RANGE: initial Randf(range), then position is held fixed
++        randomPosition();
++        break;
++    case 15: { // RANGE2: authored Z is fixed (not Randf); motion uses unit _vDir
++        s.position[0]=range[0]*random01(seed,slot,0);
++        s.position[1]=range[1]*random01(seed,slot,1);
++        s.position[2]=range[2];
++        float norm=std::sqrt(direction[0]*direction[0]+direction[1]*direction[1]+direction[2]*direction[2]);
++        if(norm>1e-8f)for(int i=0;i<3;++i)s.position[i]+=direction[i]*(speed*age/norm);
++        break;
++    }
++    }
++    return s;
++}
++}} // namespace top::historical_particle_extended
+diff --git a/sources/Engine/include/top/HistoricalParticleJitter.h b/sources/Engine/include/top/HistoricalParticleJitter.h
+new file mode 100644
+index 0000000..0ed2261
+--- /dev/null
++++ b/sources/Engine/include/top/HistoricalParticleJitter.h
+@@ -0,0 +1,35 @@
++#pragma once
++// SK2.17-B: the historical _FrameMoveFire/_FrameMoveSnow uses the same
++// randomly flipped acceleration vector for each frame, NOT a persistent
++// 0.5 * acceleration * age^2 force. The DX9 implementation adds +/-
++// _vAccel * dt directly to the per-frame displacement (NOT dt squared). This deterministic fixed-60Hz emulator
++// deliberately does not claim to reproduce the DX9 rand() sequence or FPS.
++#include "top/HistoricalParticlePool.h"
++#include <algorithm>
++#include <array>
++#include <cmath>
++#include <cstdint>
++namespace top { namespace historical_particle_jitter {
++using V3=std::array<float,3>;
++inline V3 offset(const V3& acceleration,float age,std::uint32_t seed,
++                 int slot,unsigned generation=0) {
++    V3 displacement{{0.f,0.f,0.f}};
++    if(!std::isfinite(age) || age<=0.f) return displacement;
++    constexpr float dt=1.f/60.f;
++    // Life spans in the original content are normally short. Prevent a
++    // malformed emitter with days of age from doing unbounded per-frame work.
++    const int ticks=std::min(1800,static_cast<int>(std::ceil(std::min(age,30.f)/dt)));
++    const std::uint32_t key=seed ^ (0x85ebca6bu*std::uint32_t(slot+1)) ^
++                            (0xc2b2ae35u*generation);
++    for(int i=0;i<ticks;++i) {
++        const float elapsed=dt*float(i);
++        const float step=std::min(dt,age-elapsed);
++        if(step<=0.f)break;
++        const bool plus=historical_particle_pool::rand01(key ^
++                                (0x9e3779b9u*std::uint32_t(i+1))) <.5f;
++        const float factor=(plus?1.f:-1.f)*step;
++        for(int c=0;c<3;++c) displacement[c]+=acceleration[c]*factor;
++    }
++    return displacement;
++}
++}} // namespace top::historical_particle_jitter
+diff --git a/sources/Engine/include/top/HistoricalParticleMotion.h b/sources/Engine/include/top/HistoricalParticleMotion.h
+index ee57fee..4eb3aef 100644
+--- a/sources/Engine/include/top/HistoricalParticleMotion.h
++++ b/sources/Engine/include/top/HistoricalParticleMotion.h
+@@ -49,9 +49,10 @@ inline Pose at(int type, const V3& range, const V3& direction,
+     for(unsigned c=0;c<3;++c)
+         p.position[c]=range[c]*sample(particleSeed,c);
+     if(type==2) {
+-        // _CreateFire normalizes _vDir; _FrameMoveFire translates by the
+-        // normalized direction, not velocity * 0.2 or a hardwired rise.
++        // _CreateFire normalizes _vDir; _FrameMoveFire translates by
++        // normalized direction * _fVecl * dt, plus random acceleration.
+         p.velocity=unit(direction);
++        for(float& value:p.velocity)value*=speed;
+     } else if(type==1) {
+         // _CreateSnow samples [speed/_iRoadom,speed] per axis, with a sign
+         // flip on horizontal axes. The divisor comes from the .par version.
+diff --git a/sources/Engine/src/top/EffectSystem.cpp b/sources/Engine/src/top/EffectSystem.cpp
+index 1097166..d715a29 100644
+--- a/sources/Engine/src/top/EffectSystem.cpp
++++ b/sources/Engine/src/top/EffectSystem.cpp
+@@ -11,6 +11,8 @@
+ #include "top/HistoricalParticlePool.h"
+ #include "top/HistoricalParticleMotion.h"
+ #include "top/HistoricalParticleRandom.h"
++#include "top/HistoricalParticleExtended.h"
++#include "top/HistoricalParticleJitter.h"
+ #include "top/LegacyEffectTextureSelection.h"
+ 
+ #include <algorithm>
+@@ -1586,10 +1588,14 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
+                 }
+             }
+             impactScale *= frozenArrowMultiplier(effect.variant,effect.visualId);
+-            const int count = singleModel ? 1 : std::min(profile.count, 24);
++            const int count = (singleModel || (historical_particle_extended::enabled() && profile.type==8))
++                ? 1 : std::min(profile.count, 24);
+             // SK2.16-A: evaluate births/deaths for SNOW/FIRE/BLAST separately.
+             // All other particle types, including the STRIP and MODEL fixes,
+             // keep their existing timeline and geometry paths.
++            const bool useExtended = historical_particle_extended::enabled() &&
++                (profile.type==7 || profile.type==8 || profile.type==9 ||
++                 profile.type==11 || profile.type==14 || profile.type==15);
+             const bool usePool = historical_particle_pool::enabled() &&
+                                  (profile.type == 1 || profile.type == 2 || profile.type == 3);
+             // Historical motion requires per-slot ages from SK2.16-A; neither
+@@ -1610,10 +1616,18 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
+                     profile.type,particle,count,particleAge,profile.life,
+                     profile.step,stopAt,effect.seed,profile.randomDivisor) : historical_particle_pool::Sample{};
+                 if (usePool && !individual.alive) continue;
++                const historical_particle_extended::Sample extra = useExtended ?
++                    historical_particle_extended::at(profile.type,particle,count,particleAge,
++                        profile.life,profile.step,stopAt,
++                        {{profile.range[0],profile.range[1],profile.range[2]}},
++                        {{profile.direction[0],profile.direction[1],profile.direction[2]}},
++                        {{profile.acceleration[0],profile.acceleration[1],profile.acceleration[2]}},
++                        profile.velocity,effect.seed) : historical_particle_extended::Sample{};
++                if (useExtended && !extra.alive) continue;
+                 const float age = usePool ? individual.age :
+                     particleAge + static_cast<float>(particle) * std::max(0.f, profile.step);
+-                float particleLocal = usePool ? individual.normalized : local;
+-                const legacyfx::CurveSample particleCurve = usePool ?
++                float particleLocal = useExtended ? extra.normalized : (usePool ? individual.normalized : local);
++                const legacyfx::CurveSample particleCurve = (usePool || useExtended) ?
+                     legacyfx::sample(profile.sizes,profile.colors,profile.rotations,
+                                      particleLocal) : curve;
+                 const float size = particleCurve.size * 0.12f * impactScale;
+@@ -1643,9 +1657,25 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
+                     x=baseX+pose.position[0];
+                     z=baseZ+pose.position[1];
+                     y=floor+.9f+pose.position[2];
++                    if (historical_particle_extended::enabled() &&
++                        (profile.type==1 || profile.type==2)) {
++                        // In DX9 FIRE/SNOW choose +/- acceleration per frame;
++                        // reproduce the rule on a repeatable nominal 60Hz
++                        // clock, without a fake persistent force.
++                        const auto jitter=historical_particle_jitter::offset(
++                            acceleration,age,effect.seed,particle,individual.generation);
++                        x+=jitter[0]; z+=jitter[1]; y+=jitter[2];
++                    }
++                }
++                if (useExtended) {
++                    // Historical extended modes are in DX9 coordinates;
++                    // X/Y remain horizontal and Z becomes OpenGL up.
++                    x=baseX+extra.position[0];
++                    z=baseZ+extra.position[1];
++                    y=floor+.9f+extra.position[2];
+                 }
+                 if(singleModel) {
+-                    // MoveTo subtracts range/2. MODEL adds it back in
++                    // MoveTo subtract range/2. MODEL adds it back in
+                     // _FrameMoveModel; STRIP deliberately retains that corner.
+                     const float corner=profile.type==6?.5f:0.f;
+                     x=baseX-profile.range[0]*corner;
+@@ -1703,7 +1733,7 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
+                         // child after one cycle for cast/hit type-6 systems.
+                         const float modelAge = legacy_strip_system::nestedModelAge(
+                             profile.type, effect.kind==EffectEvent::Flight,
+-                            usePool ? age : particleAge, track.cycleLength,
++                            (usePool ? age : (useExtended ? extra.age : particleAge)), track.cycleLength,
+                             legacy_strip_system::historicalCyclesEnabled());
+                         if (legacy_eff::framePhase(part, modelAge).finished) {
+                             if (traceIceNow) std::fprintf(stderr,
+diff --git a/sources/MIGRATION_SK2_17B_PARTICLE_EXTENDED.md b/sources/MIGRATION_SK2_17B_PARTICLE_EXTENDED.md
+new file mode 100644
+index 0000000..9d44988
+--- /dev/null
++++ b/sources/MIGRATION_SK2_17B_PARTICLE_EXTENDED.md
+@@ -0,0 +1,81 @@
++# SK2.17-B — Partículas históricas: FIRE/SNOW e modos adicionais
++
++**Base:** `sources_251146.zip` (SK2.17-A). Patch relativo à raiz do repositório,
++com caminhos iniciados por `sources/`.
++
++## Achados confirmados no DX9
++
++Origem: `fontes/Engine/src/MPParticleSys.cpp` e `MPParticleSys.h`.
++
++* `_FrameMoveFire`: deslocamento = `normalize(_vDir) * _fVecl * dt +
++  (sinal aleatório) * _vAccel * dt`. A SK2.16-B havia esquecido `_fVecl`
++  no modo experimental; agora é aplicado sem coeficientes arbitrários.
++* `_FrameMoveSnow`: impulso `+/- _vAccel * dt` é sorteado a cada quadro.
++  **Não** é uma aceleração balística constante.
++* `_FrameMoveBlast`: aceleração acumula na velocidade. A integração anterior
++  permanece; sua sequência exata de quadros e o gerador RNG ainda diferem.
++* `_CreateRound` / `_FrameMoveRound`: círculo com ângulos `2*pi*n/count`,
++  raio `_fRange[1]`, translação `range/2`, velocidade angular `_fVecl`.
++* `_CreateBlast3` / `_FrameMoveBlast3`: grupo lançado com vetor `(1,1,-1)`
++  rotacionado no plano horizontal, acrescido de `_vDir`, com `_fVecl`.
++* `_CreateWind` / `_FrameMoveWind`: emissão por `_fStep`, pontos de partida
++  em `Randf(range)`, rotação no eixo Z com `_fVecl` e deslocamentos Y/Z.
++* `_CreateRange`: posições fixas amostradas em `Randf(range)`.
++* `_CreateRange2`: Z inicial igual a `range[2]` e deslocamento por direção
++  normalizada com `_fVecl`; evento de impacto no terreno ainda pendente.
++* `_CreateArraw`: controlador com uma partícula na âncora `range/2`;
++  sua geometria de linha ainda não possui equivalência visual completa.
++
++## Como executar
++
++Todas as mudanças gráficas ficam **opt-in**. Para os novos modos:
++
++```bash
++TOP_HISTORICAL_BLEND=1 \
++TOP_HISTORICAL_MODEL_TEXTURE=1 \
++TOP_FROZEN_RESULT_GROUND=1 \
++TOP_HISTORICAL_PARTICLE_EXTENDED=1 \
++./build/top_gl --profile
++```
++
++Para incluir SNOW/FIRE/BLAST (SK2.16 + correções de FIRE/SNOW da SK2.17-B):
++
++```bash
++TOP_HISTORICAL_PARTICLE_POOL=1 \
++TOP_HISTORICAL_PARTICLE_MOTION=1 \
++TOP_HISTORICAL_PARTICLE_EXTENDED=1 \
++./build/top_gl --profile
++```
++
++Para comparação, reinicie o executável com `TOP_HISTORICAL_PARTICLE_EXTENDED=0`.
++O modo novo não modifica o código da SK2.16-D que seleciona a textura do
++Frozen Arrow. Para manter o gelo visível, preserve `TOP_HISTORICAL_MODEL_TEXTURE=1`
++e `TOP_FROZEN_RESULT_GROUND=1` durante testes visuais.
++
++## Testes
++
++```bash
++cmake -S sources -B build -DTOP_BUILD_UI_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
++cmake --build build -j$(nproc)
++ctest --test-dir build -R 'ui05sk2(14|15|16|17)' --output-on-failure
++```
++
++Com a base fornecida, os 13 testes selecionados passaram em Debug:
++* 2 novos: avaliação matemática dos modos e integração real ao `EffectSystem`;
++* 11 de auditoria, CMPStrip, filtros, vida, movimento, texturas e random divisor.
++
++## Limitações reais
++
++* O DX9 original depende de **FPS e RNG**. O jitter é uma aproximação
++  **determinística de 60 Hz**, não uma reprodução bit a bit de `rand()`.
++* O avaliador ainda não reproduz a ordem exata de reemissão dos slots
++  inativos em `_FrameMoveSnow`/`_FrameMoveFire`.
++* O modo BLAST2 (tipo 10) precisa reconstruir os estados de quique/deslocamento
++  lateral de `_FrameMoveBlast2` antes de ser considerado migrado.
++* Em RANGE2 faltam o teste de colisão no solo, emissão do efeito de impacto
++  e alguns vínculos com controladores aninhados.
++* Em WIND, ARRAW, ROUND e BLAST3, geometria e filhos `.eff` específicos ainda
++  precisam ser comparados ao DX9. Os modos novos cobrem trajetória e ciclo
++  de vida, **não equivalência visual total**.
++* A renderização OpenGL real deve ser validada pelo usuário no Ubuntu;
++  neste ambiente foram possíveis compilação headless, testes e regressões.
+diff --git a/sources/auditoria-historica/fx_port_coverage.csv b/sources/auditoria-historica/fx_port_coverage.csv
+index 882236b..21ed07e 100644
+--- a/sources/auditoria-historica/fx_port_coverage.csv
++++ b/sources/auditoria-historica/fx_port_coverage.csv
+@@ -1,19 +1,19 @@
+ kind,key,name,assessment,expected_branch,source_token,note
+-type,1,SNOW,approximate,yes,,vertical motion uses a port-specific coefficient; DX9 pool parity unverified
+-type,2,FIRE,approximate,yes,,vertical motion uses a port-specific coefficient; DX9 pool parity unverified
+-type,3,BLAST,approximate,yes,,radial distance uses a port-specific coefficient
++type,1,SNOW,approximate,yes,,opt-in historical velocity and stochastic 60Hz acceleration; DX9 RNG and emission cadence unverified
++type,2,FIRE,approximate,yes,,SK2.17-B opt-in authored speed and per-frame random acceleration; emitter cadence approximate
++type,3,BLAST,approximate,yes,,historical radial velocity and acceleration under opt-in mode; loop timing approximate
+ type,4,RIPPLE,partial,yes,,ground quad and optional nested model; not DX9 parity
+ type,5,MODEL,partial,yes,,nested .eff and geometry supported; emitter and life may differ
+ type,6,STRIP,partial,yes,,nested .eff present; direct controller CMPStrip is separate
+-type,7,WIND,approximate,yes,,ribbon approximation
+-type,8,ARRAW,generic_fallback,no,,no specific branch; reaches generic quad
+-type,9,ROUND,approximate,yes,,ribbon approximation
++type,7,WIND,approximate,yes,,SK2.17-B opt-in step stagger and rotated acceleration; original RNG and clock differ
++type,8,ARRAW,approximate,yes,,SK2.17-B opt-in center anchor and timeline; line geometry still approximate
++type,9,ROUND,approximate,yes,,SK2.17-B opt-in exact orbit formula; remaining geometry and controller callbacks approximate
+ type,10,BLAST2,approximate,yes,,ground quad approximation
+-type,11,BLAST3,approximate,yes,,radial displacement approximation
++type,11,BLAST3,approximate,yes,,SK2.17-B opt-in radial displacement; group life and frames approximate
+ type,12,SHRINK,partial,yes,,staggered births and inward motion; visual parity unverified
+ type,13,SHADE,missing_specialization,yes,,model resolver skips SHADE; runtime uses generic fallback
+-type,14,RANGE,generic_fallback,no,,no specific branch; reaches generic quad
+-type,15,RANGE2,generic_fallback,no,,no specific branch; reaches generic quad
++type,14,RANGE,approximate,yes,,SK2.17-B opt-in fixed seeded spawn; nested child behavior pending
++type,15,RANGE2,approximate,yes,,SK2.17-B opt-in normalized directed motion; terrain hit callback pending
+ type,16,DUMMY,approximate,yes,,ground quad instead of full dummy controller
+ type,17,LINE_SINGLE,approximate,yes,,ground quad instead of original line geometry
+ type,18,LINE_ROUND,approximate,yes,,ribbon approximation
+diff --git a/sources/tests/FxCoverageAuditTests.cpp b/sources/tests/FxCoverageAuditTests.cpp
+index 24650a5..e6b07cc 100644
+--- a/sources/tests/FxCoverageAuditTests.cpp
++++ b/sources/tests/FxCoverageAuditTests.cpp
+@@ -46,7 +46,7 @@ int main(){
+     auto src=fx::readSource("sources/Engine/src/top/EffectSystem.cpp");
+     CHECK(src.valid);
+     CHECK(!fx::findType(src,2).outside.empty());
+-    CHECK(fx::findType(src,8).outside.empty());
++    CHECK(!fx::findType(src,8).outside.empty());
+     const auto tmp=fs::temp_directory_path()/"top_fx_coverage_test_SK214";
+     fs::remove_all(tmp);fs::create_directories(tmp/"Client/effect");
+     par(tmp/"Client/effect/fire.par",2);
+@@ -75,7 +75,7 @@ int main(){
+     // the renderer adds genuine two-dummy CMPStrip geometry.
+     CHECK(read(opts.output/"fx_gap_ranking.csv").find("partial_anchor_dependent")!=std::string::npos);
+     CHECK(read(opts.output/"fx_missing_dependencies.csv").find("absent.par")!=std::string::npos);
+-    CHECK(read(opts.output/"fx_type_coverage.csv").find("8,ARRAW,1,1,1,generic_fallback")!=std::string::npos);
++    CHECK(read(opts.output/"fx_type_coverage.csv").find("8,ARRAW,1,1,1,approximate")!=std::string::npos);
+     opts.strict=true;
+     std::ostringstream strictLog;
+     CHECK(fx::run(opts,strictLog)==0);
+diff --git a/sources/tests/SK216BParticleMotionTests.cpp b/sources/tests/SK216BParticleMotionTests.cpp
+index c2a3960..17362a3 100644
+--- a/sources/tests/SK216BParticleMotionTests.cpp
++++ b/sources/tests/SK216BParticleMotionTests.cpp
+@@ -12,10 +12,10 @@ int main(){
+     setenv("TOP_HISTORICAL_PARTICLE_MOTION","1",1);CHECK(enabled());
+     setenv("TOP_HISTORICAL_PARTICLE_MOTION","0",1);CHECK(!enabled());
+     const V3 none{{0,0,0}}, x{{1,0,0}}, up{{0,0,1}};
+-    auto fire0=at(2,none,V3{{3,4,0}},none,999.f,0.f,4,0);
+-    auto fire2=at(2,none,V3{{3,4,0}},none,999.f,2.f,4,0);
+-    CHECK(near(fire2.position[0]-fire0.position[0],1.2f));
+-    CHECK(near(fire2.position[1]-fire0.position[1],1.6f));
++    auto fire0=at(2,none,V3{{3,4,0}},none,2.f,0.f,4,0);
++    auto fire2=at(2,none,V3{{3,4,0}},none,2.f,2.f,4,0);
++    CHECK(near(fire2.position[0]-fire0.position[0],2.4f));
++    CHECK(near(fire2.position[1]-fire0.position[1],3.2f));
+     CHECK(near(fire2.position[2],0.f));
+     // DX Randf(range) spawns in [0,range], not [-range/2,+range/2].
+     auto fireR=at(2,V3{{2,3,4}},none,none,1.f,0.f,7,3);
+diff --git a/sources/tests/SK217BExtendedParticleTests.cpp b/sources/tests/SK217BExtendedParticleTests.cpp
+new file mode 100644
+index 0000000..123f713
+--- /dev/null
++++ b/sources/tests/SK217BExtendedParticleTests.cpp
+@@ -0,0 +1,58 @@
++#include "top/HistoricalParticleExtended.h"
++#include "top/HistoricalParticleMotion.h"
++#include "top/HistoricalParticleJitter.h"
++#include <cmath>
++#include <iostream>
++#include <stdexcept>
++using namespace top;
++#define CHECK(x) do {if(!(x))throw std::runtime_error(#x);}while(false)
++static bool close(float x,float y){return std::fabs(x-y)<.001f;}
++int main(){
++    using namespace historical_particle_extended;
++    const V3 rng{{2.f,4.f,6.f}},zero{{0.f,0.f,0.f}},dir{{0.f,1.f,0.f}};
++    // ROUND: four equally spaced positions rotate at authored radians/sec.
++    auto r0=at(9,0,4,0.f,2.f,0.f,-1.f,rng,zero,zero,pi/2,1);
++    auto r1=at(9,1,4,0.f,2.f,0.f,-1.f,rng,zero,zero,pi/2,1);
++    auto r2=at(9,0,4,1.f,2.f,0.f,-1.f,rng,zero,zero,pi/2,1);
++    CHECK(r0.alive && r1.alive && r2.alive);
++    CHECK(close(r0.position[0],1.f) && close(r0.position[1],6.f));
++    CHECK(close(r1.position[0],-3.f) && close(r1.position[1],2.f));
++    CHECK(close(r2.position[0],r1.position[0]) && close(r2.position[1],r1.position[1]));
++    // BLAST3: DX9 rotated (1,1,-1) + direction, moves at authored speed.
++    auto b=at(11,0,4,.5f,1.f,0.f,-1.f,rng,zero,zero,2.f,5);
++    CHECK(b.alive && close(b.position[0],1.f) && close(b.position[1],1.f)
++          && close(b.position[2],-1.f));
++    CHECK(!at(11,0,4,1.5f,1.f,0.f,-1.f,rng,zero,zero,2.f,5).alive);
++    // RANGE keeps seeded spawn positions invariant across frames.
++    auto a=at(14,2,4,.1f,2.f,0.f,-1.f,rng,zero,zero,0.f,42);
++    auto c=at(14,2,4,1.3f,2.f,0.f,-1.f,rng,zero,zero,0.f,42);
++    CHECK(a.alive && c.alive && a.position==c.position);
++    for(int i=0;i<3;++i)CHECK(a.position[i]>=0.f && a.position[i]<rng[i]);
++    // WIND: staggered births, local seed, angular position + authored drift.
++    CHECK(!at(7,0,2,.05f,1.f,.1f,-1.f,rng,dir,zero,2.f,8).alive);
++    auto w=at(7,0,2,.2f,1.f,.1f,-1.f,rng,dir,zero,2.f,8);
++    CHECK(w.alive && close(w.age,.1f));
++    auto wEnd=at(7,1,2,.5f,1.f,.1f,.2f,rng,dir,zero,2.f,8);
++    CHECK(!wEnd.alive); // stopAt excludes next emission at .2 s
++    // ARRAW loops its timeline at one-life boundaries and centers range.
++    auto arrow=at(8,0,1,1.3f,1.f,0.f,-1.f,rng,zero,zero,1.f,1);
++    CHECK(arrow.alive && close(arrow.age,.3f) && close(arrow.position[2],3.f));
++    // RANGE2: fixed Z and normalized velocity, not random Z, no 0.12 factor.
++    const V3 upward{{0.f,0.f,3.f}};
++    auto range2=at(15,0,2,.6f,1.f,.1f,-1.f,rng,upward,zero,2.f,42);
++    CHECK(range2.alive && close(range2.position[2],6.f+2.f*.5f));
++    // Acceleration noise in DX9 FIRE/SNOW is per frame, not ballistic.
++    const top::historical_particle_jitter::V3 accel{{2.f,1.f,-3.f}};
++    const auto j1=top::historical_particle_jitter::offset(accel,.5f,123,1);
++    const auto j2=top::historical_particle_jitter::offset(accel,.5f,123,1);
++    CHECK(j1==j2);
++    CHECK(std::fabs(j1[0])<1.f && close(j1[1]*2.f,j1[0]));
++    CHECK(std::fabs(j1[0])>1e-7f);
++    // FIRE uses authored _fVecl after normalizing _vDir (DX9 _FrameMoveFire).
++    const top::historical_particle_motion::V3 rangeZero{{0.f,0.f,0.f}};
++    const top::historical_particle_motion::V3 fireDir{{3.f,0.f,0.f}};
++    auto fire=top::historical_particle_motion::at(2,rangeZero,fireDir,
++        rangeZero,4.f,.5f,11,0);
++    CHECK(close(fire.position[0],2.f) && close(fire.velocity[0],4.f));
++    std::cout<<"SK2.17-B extended ROUND/BLAST3/RANGE/WIND/ARRAW/RANGE2 rules OK\n";
++}
+diff --git a/sources/tests/SK217BParticleIntegrationTests.cpp b/sources/tests/SK217BParticleIntegrationTests.cpp
+new file mode 100644
+index 0000000..2ad1364
+--- /dev/null
++++ b/sources/tests/SK217BParticleIntegrationTests.cpp
+@@ -0,0 +1,113 @@
++// Integration regression: lifetime policy actually reaches EffectSystem batches.
++#include "top/EffectSystem.h"
++#include <array>
++#include <cstdint>
++#include <cstdlib>
++#include <filesystem>
++#include <fstream>
++#include <iostream>
++#include <stdexcept>
++#include <string>
++#include <vector>
++#include <unistd.h>
++namespace fs=std::filesystem;
++using namespace top;
++#define REQUIRE(x) do { if(!(x))throw std::runtime_error(#x); } while(0)
++template<class T> void put(std::ofstream& out,T x){out.write((const char*)&x,sizeof x);}
++void name(std::ofstream& out,const char* s) {char b[32]{};for(unsigned i=0;s[i]&&i<31;++i)b[i]=s[i];out.write(b,32);}
++void emitPar(const fs::path& p,int type) {
++    std::ofstream o(p,std::ios::binary);
++    put<unsigned>(o,2);name(o,"pool");put<int>(o,1);
++    put<int>(o,type);name(o,"sample");put<int>(o,4);
++    name(o,"glow.tga");name(o,"");
++    for(int i=0;i<3;++i)put<float>(o,1.f); // range
++    put<std::uint16_t>(o,2);put<float>(o,1.f);put<float>(o,2.f);
++    for(int i=0;i<6;++i)put<float>(o,0.f);
++    for(int i=0;i<2;++i)for(int j=0;j<4;++j)put<float>(o,1.f);
++    put<std::uint8_t>(o,1);
++    for(int v : {5,6,1,1})put<int>(o,v);
++    put<float>(o,.5f);put<float>(o,1.f);
++    // Historical DX9 X direction, no acceleration.
++    for(int i=0;i<6;++i)put<float>(o,i==0?1.f:0.f);
++    put<float>(o,.2f);
++}
++void effFile(const fs::path& path){
++    std::ofstream f(path,std::ios::binary);
++    put<unsigned>(f,6);put<int>(f,0);put<unsigned char>(f,0);name(f,"");
++    put<unsigned char>(f,0);name(f,"");put<unsigned char>(f,0);
++    for(int i=0;i<4;++i)put<float>(f,0.f);put<int>(f,1);
++    name(f,"layer");for(int v:{1,5,7})put<int>(f,v);
++    put<float>(f,5.f);put<unsigned short>(f,1);put<float>(f,5.f);
++    for(int i=0;i<3;++i)put<float>(f,2.f);
++    for(int i=0;i<6;++i)put<float>(f,0.f);
++    for(int i=0;i<4;++i)put<float>(f,1.f);
++    put<unsigned short>(f,4);put<unsigned short>(f,1);put<float>(f,1.f);
++    for(float uv:{0.f,1.f,0.f,0.f,1.f,0.f,1.f,1.f})put<float>(f,uv);
++    put<unsigned short>(f,0);put<float>(f,0.f);name(f,"glow.tga");name(f,"RectPlane");
++    put<unsigned char>(f,1);put<int>(f,1);put<int>(f,8);
++    put<float>(f,3.f);put<float>(f,1.f);put<float>(f,2.f);
++    put<unsigned short>(f,0);put<float>(f,0.f);put<float>(f,0.f);put<int>(f,0);
++    put<unsigned char>(f,0);for(int i=0;i<4;++i)put<float>(f,0.f);put<unsigned char>(f,0);
++}
++struct Drawn {std::size_t verts=0; float centroidX=0,centroidY=0;};
++Drawn draw(const fs::path& root,int skill,float seconds,bool pool,bool motion,bool extended) {
++    if(pool)setenv("TOP_HISTORICAL_PARTICLE_POOL","1",1);
++    else unsetenv("TOP_HISTORICAL_PARTICLE_POOL");
++    if(motion)setenv("TOP_HISTORICAL_PARTICLE_MOTION","1",1);
++    else unsetenv("TOP_HISTORICAL_PARTICLE_MOTION");
++    if(extended)setenv("TOP_HISTORICAL_PARTICLE_EXTENDED","1",1);
++    else unsetenv("TOP_HISTORICAL_PARTICLE_EXTENDED");
++    EffectSystem system;REQUIRE(system.open(root.string()));
++    EffectEvent event;event.kind=EffectEvent::Cast;event.variant=skill;
++    event.sourceIsPlayer=true;
++    system.emit(event);system.step(seconds);
++    MapFile map;system.build(map,1.f,0.f);
++    Drawn drawn;float sum=0.f,sumY=0.f;
++    for(const auto& batch:system.batches())
++        if(batch.texture.find("glow.tga.png")!=std::string::npos)
++            for(const auto& v:batch.verts){++drawn.verts;sum+=v.x;sumY+=v.y;}
++    if(drawn.verts){drawn.centroidX=sum/float(drawn.verts);drawn.centroidY=sumY/float(drawn.verts);}
++    return drawn;
++}
++int main(){
++    const fs::path tmp=fs::temp_directory_path()/("sk217b-"+std::to_string(getpid()));
++    fs::create_directories(tmp/"effect");fs::create_directories(tmp/"scripts/table");
++    fs::create_directories(tmp/"texture/effect");
++    {std::ofstream f(tmp/"texture/effect/glow.tga.png");f<<"fixture";}
++    effFile(tmp/"effect/glow.eff");
++    {std::ofstream f(tmp/"scripts/table/magicsingleinfo.txt");
++        f<<"38\tdefault\t1\tglow.eff\t10\t0\t0\t-1\t1\t0\t0\n";}
++    {std::ofstream f(tmp/"scripts/table/sceneffectinfo.txt");
++        f<<"382\tfire.par\tFire\n";}
++    {std::ofstream f(tmp/"scripts/table/skillinfo.txt");
++        std::vector<std::string> cols(74,"0");cols[0]="532";cols[51]="382";
++        for(std::size_t c=0;c<cols.size();++c)f<<(c?"\t":"")<<cols[c];f<<'\n';}
++    // ROUND: four quads still render, but their centroid must follow the
++    // authored orbit center instead of the generic velocity approximation.
++    emitPar(tmp/"effect/fire.par",9);
++    const auto oldRound=draw(tmp,532,.25f,false,false,false);
++    const auto round=draw(tmp,532,.25f,false,false,true);
++    REQUIRE(oldRound.verts==24 && round.verts==24);
++    REQUIRE(std::abs(round.centroidX-oldRound.centroidX)>.1f);
++    // WIND: _CreateWind emits one slot per step, unlike four legacy quads.
++    emitPar(tmp/"effect/fire.par",7);
++    const auto oldWind=draw(tmp,532,.25f,false,false,false);
++    const auto wind=draw(tmp,532,.25f,false,false,true);
++    REQUIRE(oldWind.verts==24 && wind.verts==6);
++    // BLAST3: group emits together and travels along the radial DX9 vectors.
++    emitPar(tmp/"effect/fire.par",11);
++    const auto oldBlast=draw(tmp,532,.4f,false,false,false);
++    const auto blast=draw(tmp,532,.4f,false,false,true);
++    REQUIRE(oldBlast.verts==24 && blast.verts==24);
++    REQUIRE(std::abs(oldBlast.centroidY-blast.centroidY)>.1f);
++    // The opt-in mode must not change previously validated FIRE unless both
++    // historical motion and pool are active.
++    emitPar(tmp/"effect/fire.par",2);
++    const auto fireBase=draw(tmp,532,.25f,false,false,false);
++    const auto fireExt=draw(tmp,532,.25f,false,false,true);
++    REQUIRE(fireBase.verts==fireExt.verts);
++    REQUIRE(std::abs(fireBase.centroidX-fireExt.centroidX)<1e-5f);
++    unsetenv("TOP_HISTORICAL_PARTICLE_EXTENDED");
++    fs::remove_all(tmp);
++    std::cout<<"SK2.17-B integration: DX9 ROUND, WIND, BLAST3 batches and FIRE fallback OK\n";
++}

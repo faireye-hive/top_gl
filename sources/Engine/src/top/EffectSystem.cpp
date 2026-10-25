@@ -11,6 +11,8 @@
 #include "top/HistoricalParticlePool.h"
 #include "top/HistoricalParticleMotion.h"
 #include "top/HistoricalParticleRandom.h"
+#include "top/HistoricalParticleExtended.h"
+#include "top/HistoricalParticleJitter.h"
 #include "top/LegacyEffectTextureSelection.h"
 
 #include <algorithm>
@@ -1586,10 +1588,14 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                 }
             }
             impactScale *= frozenArrowMultiplier(effect.variant,effect.visualId);
-            const int count = singleModel ? 1 : std::min(profile.count, 24);
+            const int count = (singleModel || (historical_particle_extended::enabled() && profile.type==8))
+                ? 1 : std::min(profile.count, 24);
             // SK2.16-A: evaluate births/deaths for SNOW/FIRE/BLAST separately.
             // All other particle types, including the STRIP and MODEL fixes,
             // keep their existing timeline and geometry paths.
+            const bool useExtended = historical_particle_extended::enabled() &&
+                (profile.type==7 || profile.type==8 || profile.type==9 ||
+                 profile.type==11 || profile.type==14 || profile.type==15);
             const bool usePool = historical_particle_pool::enabled() &&
                                  (profile.type == 1 || profile.type == 2 || profile.type == 3);
             // Historical motion requires per-slot ages from SK2.16-A; neither
@@ -1610,10 +1616,18 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                     profile.type,particle,count,particleAge,profile.life,
                     profile.step,stopAt,effect.seed,profile.randomDivisor) : historical_particle_pool::Sample{};
                 if (usePool && !individual.alive) continue;
+                const historical_particle_extended::Sample extra = useExtended ?
+                    historical_particle_extended::at(profile.type,particle,count,particleAge,
+                        profile.life,profile.step,stopAt,
+                        {{profile.range[0],profile.range[1],profile.range[2]}},
+                        {{profile.direction[0],profile.direction[1],profile.direction[2]}},
+                        {{profile.acceleration[0],profile.acceleration[1],profile.acceleration[2]}},
+                        profile.velocity,effect.seed) : historical_particle_extended::Sample{};
+                if (useExtended && !extra.alive) continue;
                 const float age = usePool ? individual.age :
                     particleAge + static_cast<float>(particle) * std::max(0.f, profile.step);
-                float particleLocal = usePool ? individual.normalized : local;
-                const legacyfx::CurveSample particleCurve = usePool ?
+                float particleLocal = useExtended ? extra.normalized : (usePool ? individual.normalized : local);
+                const legacyfx::CurveSample particleCurve = (usePool || useExtended) ?
                     legacyfx::sample(profile.sizes,profile.colors,profile.rotations,
                                      particleLocal) : curve;
                 const float size = particleCurve.size * 0.12f * impactScale;
@@ -1643,9 +1657,25 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                     x=baseX+pose.position[0];
                     z=baseZ+pose.position[1];
                     y=floor+.9f+pose.position[2];
+                    if (historical_particle_extended::enabled() &&
+                        (profile.type==1 || profile.type==2)) {
+                        // In DX9 FIRE/SNOW choose +/- acceleration per frame;
+                        // reproduce the rule on a repeatable nominal 60Hz
+                        // clock, without a fake persistent force.
+                        const auto jitter=historical_particle_jitter::offset(
+                            acceleration,age,effect.seed,particle,individual.generation);
+                        x+=jitter[0]; z+=jitter[1]; y+=jitter[2];
+                    }
+                }
+                if (useExtended) {
+                    // Historical extended modes are in DX9 coordinates;
+                    // X/Y remain horizontal and Z becomes OpenGL up.
+                    x=baseX+extra.position[0];
+                    z=baseZ+extra.position[1];
+                    y=floor+.9f+extra.position[2];
                 }
                 if(singleModel) {
-                    // MoveTo subtracts range/2. MODEL adds it back in
+                    // MoveTo subtract range/2. MODEL adds it back in
                     // _FrameMoveModel; STRIP deliberately retains that corner.
                     const float corner=profile.type==6?.5f:0.f;
                     x=baseX-profile.range[0]*corner;
@@ -1703,7 +1733,7 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                         // child after one cycle for cast/hit type-6 systems.
                         const float modelAge = legacy_strip_system::nestedModelAge(
                             profile.type, effect.kind==EffectEvent::Flight,
-                            usePool ? age : particleAge, track.cycleLength,
+                            (usePool ? age : (useExtended ? extra.age : particleAge)), track.cycleLength,
                             legacy_strip_system::historicalCyclesEnabled());
                         if (legacy_eff::framePhase(part, modelAge).finished) {
                             if (traceIceNow) std::fprintf(stderr,

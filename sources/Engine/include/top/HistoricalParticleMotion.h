@@ -49,9 +49,10 @@ inline Pose at(int type, const V3& range, const V3& direction,
     for(unsigned c=0;c<3;++c)
         p.position[c]=range[c]*sample(particleSeed,c);
     if(type==2) {
-        // _CreateFire normalizes _vDir; _FrameMoveFire translates by the
-        // normalized direction, not velocity * 0.2 or a hardwired rise.
+        // _CreateFire normalizes _vDir; _FrameMoveFire translates by
+        // normalized direction * _fVecl * dt, plus random acceleration.
         p.velocity=unit(direction);
+        for(float& value:p.velocity)value*=speed;
     } else if(type==1) {
         // _CreateSnow samples [speed/_iRoadom,speed] per axis, with a sign
         // flip on horizontal axes. The divisor comes from the .par version.

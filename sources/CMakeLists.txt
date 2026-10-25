@@ -1139,3 +1139,20 @@ if(TOP_BUILD_UI_TESTS)
     target_include_directories(top_ui05sk217a_random_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Engine/include)
     add_test(NAME ui05sk217a_particle_random_divisor COMMAND top_ui05sk217a_random_tests)
 endif()
+
+# SK2.17-B: deterministic extended historical particle trajectories (DX9 Z-up).
+if(TOP_BUILD_UI_TESTS)
+    add_executable(top_ui05sk217b_extended_tests tests/SK217BExtendedParticleTests.cpp)
+    target_include_directories(top_ui05sk217b_extended_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Engine/include)
+    add_test(NAME ui05sk217b_extended_particle_modes COMMAND top_ui05sk217b_extended_tests)
+endif()
+
+# SK2.17-B: verify historical positions and emissions reach EffectSystem batches.
+if(TOP_BUILD_UI_TESTS)
+    add_executable(top_ui05sk217b_integration_tests tests/SK217BParticleIntegrationTests.cpp
+        Engine/src/top/EffectSystem.cpp Engine/src/top/TexturePaths.cpp
+        Engine/src/top/ModelFile.cpp Engine/src/top/MapFile.cpp)
+    target_include_directories(top_ui05sk217b_integration_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Engine/include)
+    target_link_libraries(top_ui05sk217b_integration_tests PRIVATE z)
+    add_test(NAME ui05sk217b_extended_particle_integration COMMAND top_ui05sk217b_integration_tests)
+endif()

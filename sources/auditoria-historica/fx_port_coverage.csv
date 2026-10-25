@@ -1,19 +1,19 @@
 kind,key,name,assessment,expected_branch,source_token,note
-type,1,SNOW,approximate,yes,,vertical motion uses a port-specific coefficient; DX9 pool parity unverified
-type,2,FIRE,approximate,yes,,vertical motion uses a port-specific coefficient; DX9 pool parity unverified
-type,3,BLAST,approximate,yes,,radial distance uses a port-specific coefficient
+type,1,SNOW,approximate,yes,,opt-in historical velocity and stochastic 60Hz acceleration; DX9 RNG and emission cadence unverified
+type,2,FIRE,approximate,yes,,SK2.17-B opt-in authored speed and per-frame random acceleration; emitter cadence approximate
+type,3,BLAST,approximate,yes,,historical radial velocity and acceleration under opt-in mode; loop timing approximate
 type,4,RIPPLE,partial,yes,,ground quad and optional nested model; not DX9 parity
 type,5,MODEL,partial,yes,,nested .eff and geometry supported; emitter and life may differ
 type,6,STRIP,partial,yes,,nested .eff present; direct controller CMPStrip is separate
-type,7,WIND,approximate,yes,,ribbon approximation
-type,8,ARRAW,generic_fallback,no,,no specific branch; reaches generic quad
-type,9,ROUND,approximate,yes,,ribbon approximation
+type,7,WIND,approximate,yes,,SK2.17-B opt-in step stagger and rotated acceleration; original RNG and clock differ
+type,8,ARRAW,approximate,yes,,SK2.17-B opt-in center anchor and timeline; line geometry still approximate
+type,9,ROUND,approximate,yes,,SK2.17-B opt-in exact orbit formula; remaining geometry and controller callbacks approximate
 type,10,BLAST2,approximate,yes,,ground quad approximation
-type,11,BLAST3,approximate,yes,,radial displacement approximation
+type,11,BLAST3,approximate,yes,,SK2.17-B opt-in radial displacement; group life and frames approximate
 type,12,SHRINK,partial,yes,,staggered births and inward motion; visual parity unverified
 type,13,SHADE,missing_specialization,yes,,model resolver skips SHADE; runtime uses generic fallback
-type,14,RANGE,generic_fallback,no,,no specific branch; reaches generic quad
-type,15,RANGE2,generic_fallback,no,,no specific branch; reaches generic quad
+type,14,RANGE,approximate,yes,,SK2.17-B opt-in fixed seeded spawn; nested child behavior pending
+type,15,RANGE2,approximate,yes,,SK2.17-B opt-in normalized directed motion; terrain hit callback pending
 type,16,DUMMY,approximate,yes,,ground quad instead of full dummy controller
 type,17,LINE_SINGLE,approximate,yes,,ground quad instead of original line geometry
 type,18,LINE_ROUND,approximate,yes,,ribbon approximation
