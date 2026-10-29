@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <string>
 
 namespace top {
@@ -17,6 +18,22 @@ namespace {
 std::string lowerSkillText(std::string text) {
     std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return text;
+}
+inline constexpr bool historicalItemEffectKeyframesEnabled() { return true; }
+std::vector<int> itemEffectCallbackFrames(int actionKeyFrame,
+                                           const std::vector<int>& itemKeyFrames) {
+    std::vector<int> frames;
+    auto add=[&](int frame) {
+        if(frame < -2 || frame > 0) return;
+        if(std::find(frames.begin(),frames.end(),frame)==frames.end())frames.push_back(frame);
+    };
+    add(actionKeyFrame);
+    for(int frame:itemKeyFrames)add(frame);
+    return frames;
+}
+EffectEvent::Kind castCallbackKind(int frame) {
+    return frame==-1?EffectEvent::CastBegin:frame==-2?EffectEvent::CastEnd:
+        EffectEvent::CastAction;
 }
 } // namespace
 
@@ -57,7 +74,8 @@ void Play::executeSkill(int slot) {
         return;
     }
     if (skill.id == 0) return;
-    if (historical != skillRules_.end() && historical->second.type == 2) {
+    if (historical != skillRules_.end() && (historical->second.type == 2 ||
+        (!historical->second.passiveFormula.empty() && historical->second.effectFormula=="0"))) {
         say(historical->second.name + " e uma habilidade passiva e permanece ativa.");
         return;
     }
@@ -176,7 +194,19 @@ void Play::executeSkill(int slot) {
         else effectDelay = std::clamp(effectDelay, 0.f, castingFor_);
         EffectEvent event{EffectEvent::Cast, hereX_, hereY_, hereX_, hereY_, skill.id};
         event.sourceIsPlayer = true;
-        if (effectDelay <= 0.f) effectEvents_.push_back(event);
+        const bool splitItemCallbacks=historicalItemEffectKeyframesEnabled() &&
+            historical!=skillRules_.end() && keyFrame>=-2 && keyFrame<=0;
+        if(splitItemCallbacks) {
+            const auto frames=itemEffectCallbackFrames(keyFrame,
+                historical->second.itemEffectKeyFrames);
+            for(int callbackFrame:frames) {
+                EffectEvent callback=event;callback.kind=castCallbackKind(callbackFrame);
+                const float callbackDelay=callbackFrame==-1?0.f:
+                    callbackFrame==-2?castingFor_:effectDelay;
+                if(callbackDelay<=0.f)effectEvents_.push_back(callback);
+                else scheduledEffects_.push_back({callbackDelay,callback,-1,attackSequence_});
+            }
+        } else if (effectDelay <= 0.f) effectEvents_.push_back(event);
         else scheduledEffects_.push_back({effectDelay, event, -1, attackSequence_});
         // CHitRepresent::ActionExec also runs for self/buff casts. Cast and
         // target/ground/water effects use independent authored callbacks.
@@ -190,6 +220,7 @@ void Play::executeSkill(int slot) {
                     rule.hitKeyFrame==-2?castingFor_:
                     std::clamp(nativeImpact/std::max(.05f,castingPlaybackRate_),0.f,castingFor_);
                 EffectEvent hit{EffectEvent::SkillHit,hereX_,hereY_,hereX_,hereY_,skill.id};
+                hit.targetActorIndex=-1;
                 if(hitDelay<=0.f)effectEvents_.push_back(hit);
                 else scheduledEffects_.push_back({hitDelay,hit,-1,attackSequence_});
             }
@@ -204,7 +235,7 @@ bool Play::fireBoatCannon(float px, float py) {
     float best = 12.f * 12.f;
     for (int i = 0; i < static_cast<int>(foes_.size()); ++i) {
         const Foe& foe = foes_[static_cast<std::size_t>(i)];
-        if (foe.hp <= 0) continue;
+        if (foe.hp <= 0 || foe.followsPlayer) continue;
         const float dx = foe.x - px;
         const float dy = foe.y - py;
         const float d2 = dx * dx + dy * dy;
@@ -223,7 +254,9 @@ bool Play::fireBoatCannon(float px, float py) {
     foe.lastSeenX = px; foe.lastSeenY = py;
     boatCannonCd_ = 1.8f;
     pops_.push_back({foe.x, foe.y, 1.1f, 1.f, .55f, .15f, std::to_string(damage)});
-    effectEvents_.push_back({EffectEvent::SkillHit, px, py, foe.x, foe.y, 900});
+    EffectEvent cannonHit{EffectEvent::SkillHit, px, py, foe.x, foe.y, 900};
+    cannonHit.targetActorIndex=target;
+    effectEvents_.push_back(cannonHit);
     say("Canhao: " + std::to_string(damage) + " de dano.");
     if (foe.hp == 0) {
         foe.deadFor = .01f;
@@ -275,8 +308,15 @@ void Play::assignSkill(int skillId) {
 }
 
 void Play::onKill(const Foe& foe) {
-    const int gain = foe.expReward >= 0 ? foe.expReward : 6 + foe.level * 4;
-    exp_ = std::min(1000000000, exp_ + std::max(0, gain));
+    const int baseGain = foe.expReward >= 0 ? foe.expReward : 6 + foe.level * 4;
+    const bool monsterExperienceDisabled = std::any_of(bag_.begin(), bag_.end(), [](const Stack& stack) {
+        return stack.id == 9621 && stack.count > 0 && stack.expDisableFlag == 1;
+    });
+    const int multiplier = experienceBoost_.remaining > 0.f ?
+        std::max(100, experienceBoost_.multiplierPercent) : 100;
+    const int gain = monsterExperienceDisabled ? 0 : static_cast<int>(std::min<long long>(1000000000LL,
+        std::max(0LL,static_cast<long long>(baseGain)) * multiplier / 100LL));
+    exp_ = std::min(1000000000, exp_ + gain);
     gold_ += foe.level * 3;
     char line[96];
     std::snprintf(line, sizeof line, "%s caiu. +%d exp", foe.name.c_str(), gain);
@@ -338,8 +378,11 @@ void Play::landPlayerAttack(float px, float py) {
     if (historical_stats::misses(player_.hit, foe.dodge, roll(1000))) {
         // The airborne slash still reaches its target when damage misses.
         // Never duplicate the impact on a successful strike below.
-        if (skillSlot >= 0 && skillSlot < 8 && skills_[skillSlot].id == 81)
-            effectEvents_.push_back({EffectEvent::SkillHit, px, py, foe.x, foe.y, 81});
+        if (skillSlot >= 0 && skillSlot < 8 && skills_[skillSlot].id == 81) {
+            EffectEvent hit{EffectEvent::SkillHit, px, py, foe.x, foe.y, 81};
+            hit.targetActorIndex=index;
+            effectEvents_.push_back(hit);
+        }
         pops_.push_back({foe.x, foe.y, .75f, .85f, .85f, 1.f, "MISS"});
         return;
     }
@@ -530,8 +573,10 @@ void Play::landPlayerAttack(float px, float py) {
     foe.lastSeenX = px; foe.lastSeenY = py;
     pops_.push_back({foe.x, foe.y, 1.1f, 1.f, .92f, .35f,
                      (crit ? "CRIT " : "") + std::to_string(dmg)});
-    effectEvents_.push_back({skillHit ? EffectEvent::SkillHit : EffectEvent::Hit, px, py, foe.x, foe.y,
-                             skillHit ? skills_[skillSlot].id : 0});
+    EffectEvent impact{skillHit ? EffectEvent::SkillHit : EffectEvent::Hit, px, py, foe.x, foe.y,
+                       skillHit ? skills_[skillSlot].id : 0};
+    if (skillHit) impact.targetActorIndex=index;
+    effectEvents_.push_back(impact);
     if (skillRadius > 0.f) {
         for (std::size_t areaIndex = 0; areaIndex < foes_.size(); ++areaIndex) {
             Foe& area = foes_[areaIndex];
@@ -545,8 +590,10 @@ void Play::landPlayerAttack(float px, float py) {
             area.lostSightFor = 0.f;
             area.lastSeenX = px; area.lastSeenY = py;
             pops_.push_back({area.x, area.y, 1.1f, .7f, .85f, 1.f, std::to_string(areaDamage)});
-            effectEvents_.push_back({EffectEvent::SkillHit, px, py, area.x, area.y,
-                                     skillHit ? skills_[skillSlot].id : 0});
+            EffectEvent areaHit{EffectEvent::SkillHit, px, py, area.x, area.y,
+                                skillHit ? skills_[skillSlot].id : 0};
+            if (skillHit) areaHit.targetActorIndex=static_cast<int>(areaIndex);
+            effectEvents_.push_back(areaHit);
             if (area.hp == 0) {
                 area.deadFor = .01f;
                 onKill(area);
@@ -566,6 +613,26 @@ void Play::resolve(float dt, float px, float py, MapFile* map) {
     // still owned by executeSkill()/the existing attack timeline.
     hereX_ = px;
     hereY_ = py;
+    hereSafeZone_ = map && (map->regionAt(px, py) & 0x0002) != 0;
+    for (Foe& foe : foes_) {
+        if (!foe.summoned || foe.summonRemaining <= 0.f) continue;
+        foe.summonRemaining = std::max(0.f, foe.summonRemaining - dt);
+        if (foe.summonRemaining <= 0.f) {
+            foe.hp = 0;
+            foe.deadFor = std::max(foe.deadFor, 2.f);
+            foe.moving = false;
+        }
+    }
+    // Summons are appended after the region's historical spawn list. Removing
+    // only expired tail entries keeps every remaining ActorSkin slot stable.
+    while (!foes_.empty() && foes_.back().summoned && foes_.back().summonRemaining <= 0.f) {
+        const int last = static_cast<int>(foes_.size()) - 1;
+        if (target_ == last) target_ = -1;
+        if (pendingTarget_ == last) { pendingTarget_ = -1; pendingAttack_ = 0.f; pendingSkill_ = -1; }
+        scheduledEffects_.erase(std::remove_if(scheduledEffects_.begin(), scheduledEffects_.end(),
+            [last](const ScheduledEffect& effect) { return effect.owner == last; }), scheduledEffects_.end());
+        foes_.pop_back();
+    }
     if (requestedSkill_ >= 0 && requestedSkill_ < 8 &&
         target_ >= 0 && target_ < static_cast<int>(foes_.size()) &&
         skillCd_[requestedSkill_] <= 0.f && player_.cdLeft <= 0.f &&
@@ -628,6 +695,17 @@ void Play::resolve(float dt, float px, float py, MapFile* map) {
         hardenFor_ = std::max(0.f, hardenFor_ - dt);
         if (hardenFor_ <= 0.f) hardenDefense_ = 0;
     }
+    if (itemHardenFor_ > 0.f) {
+        itemHardenFor_ = std::max(0.f, itemHardenFor_ - dt);
+        if (itemHardenFor_ <= 0.f) itemHardenDefense_ = 0;
+    }
+    if (itemEtherCloverFor_ > 0.f) {
+        itemEtherCloverFor_ = std::max(0.f, itemEtherCloverFor_ - dt);
+        if (itemEtherCloverFor_ <= 0.f && itemEtherCloverDodge_ > 0) {
+            player_.dodge = std::max(0, player_.dodge - itemEtherCloverDodge_);
+            itemEtherCloverDodge_ = 0;
+        }
+    }
     if (willOfSteelFor_ > 0.f) {
         willOfSteelFor_ = std::max(0.f, willOfSteelFor_ - dt);
         if (willOfSteelFor_ <= 0.f) willOfSteelDefense_ = 0;
@@ -642,6 +720,7 @@ void Play::resolve(float dt, float px, float py, MapFile* map) {
             player_.hp = player_.maxHp;
             player_.homeY = player_.homeX;
             deadFor_ = 0.f;
+            ++respawnSerial_;
             sitting_ = false;
             say("Voce caiu. O HP voltou.");
             save(savePath());
@@ -653,8 +732,10 @@ void Play::resolve(float dt, float px, float py, MapFile* map) {
         playerPoisonFor_ = std::max(0.f, playerPoisonFor_ - dt);
         playerPoisonTick_ -= active;
         while (player_.hp > 0 && playerPoisonTick_ <= 0.f) {
-            player_.hp = std::max(0, player_.hp - 160);
-            pops_.push_back({hereX_, hereY_, 1.1f, .5f, .3f, .9f, "POISON 160"});
+            if (itemBlessedPotionFor_ <= 0.f) {
+                player_.hp = std::max(0, player_.hp - 160);
+                pops_.push_back({hereX_, hereY_, 1.1f, .5f, .3f, .9f, "POISON 160"});
+            }
             playerPoisonTick_ += 1.f;
             if (player_.hp == 0) {
                 deadFor_ = .01f;
@@ -716,11 +797,7 @@ void Play::resolve(float dt, float px, float py, MapFile* map) {
         const float dy = foe.y - py;
         const float dist = std::sqrt(dx * dx + dy * dy);
         if (foe.hp > 0 && dist <= attackReach(foe)) {
-            const float rate = berserkFor_ > 0.f
-                ? 1.f / (1.f + std::max(0.f, berserkAttackSpeedBonus_)) : 1.f;
-            const float numbAttackPenalty = playerNumbFor_ > 0.f
-                ? 1.f + .1f + .03f * playerNumbLevel_ : 1.f;
-            player_.cdLeft = player_.cd * rate * numbAttackPenalty;
+            player_.cdLeft = effectiveAttackInterval();
             // Sincronizar golpe/impacto ao intervalo de ASPD, sem permitir
             // que a animacao longa de 30 FPS limite a frequencia das espadas.
             pendingTarget_ = target_;
@@ -799,6 +876,8 @@ void Play::resolve(float dt, float px, float py, MapFile* map) {
 
                     EffectEvent flight{EffectEvent::Flight, px, py, foe.x, foe.y,
                                        skills_[pendingSkill_].id, flightDuration};
+                    flight.targetActorIndex=target_;
+                    flight.sourceIsPlayer=true;
                     if (flightDelay <= 0.f) effectEvents_.push_back(flight);
                     else scheduledEffects_.push_back({flightDelay, flight, -1, attackSequence_ + 1u});
                 }
@@ -808,7 +887,18 @@ void Play::resolve(float dt, float px, float py, MapFile* map) {
                 EffectEvent cast{EffectEvent::Cast, px, py, px, py,
                                  skills_[pendingSkill_].id};
                 cast.sourceIsPlayer = true;
-                if (actionDelay <= 0.f) effectEvents_.push_back(cast);
+                const bool splitItemCallbacks=historicalItemEffectKeyframesEnabled() &&
+                    skillRule!=skillRules_.end() && actionKeyFrame>=-2 && actionKeyFrame<=0;
+                if(splitItemCallbacks) {
+                    const auto frames=itemEffectCallbackFrames(actionKeyFrame,
+                        skillRule->second.itemEffectKeyFrames);
+                    for(int callbackFrame:frames) {
+                        EffectEvent callback=cast;callback.kind=castCallbackKind(callbackFrame);
+                        const float callbackDelay=keyFrameDelay(callbackFrame);
+                        if(callbackDelay<=0.f)effectEvents_.push_back(callback);
+                        else scheduledEffects_.push_back({callbackDelay,callback,-1,attackSequence_+1u});
+                    }
+                } else if (actionDelay <= 0.f) effectEvents_.push_back(cast);
                 else scheduledEffects_.push_back({actionDelay, cast, -1, attackSequence_ + 1u});
             } else {
                 const float duration = actionDurations_[attackActionBase_] > 0.f
@@ -902,16 +992,14 @@ void Play::resolve(float dt, float px, float py, MapFile* map) {
                 const int attackRoll = roll(97);
                 const int sampledAttack = sampleAttack(effectiveMinAtk, effectiveMaxAtk, foe.level, attackRoll);
                 int dmg = damageOf(effectiveMinAtk, effectiveMaxAtk, foe.level,
-                                         playerDefenseWithStates(player_.def, hardenDefense_,
-                                                                 genericBuffDefense_, willOfSteelDefense_),
+                                         effectiveDefense(),
                                          attackRoll, player_.resist);
                 bool applyGarner2Stun = false;
                 if (skillRule != skillRules_.end()) {
                     const SkillRule& rule = skillRule->second;
                     const int skillLevel = 1; // characterinfo gives monsters a skill ID/rate, not a learned level
                     const int leveledDamage = attackDamageLevelScale(dmg, foe.level, foe.level - player_.level);
-                    const int defenderDefense = playerDefenseWithStates(player_.def, hardenDefense_,
-                                                                         genericBuffDefense_, willOfSteelDefense_);
+                    const int defenderDefense = effectiveDefense();
                     if (rule.damageFormula == SkillRule::DamageFormula::PhysicalLinear) {
                         dmg = physicalSkillDamage(leveledDamage, skillLevel,
                                                   rule.damageScaleBase, rule.damageScalePerLevel);
@@ -958,14 +1046,15 @@ void Play::resolve(float dt, float px, float py, MapFile* map) {
                     historical_stats::critical(foe.crit, foe.level, player_.level, roll(1000));
                 const int finalDamage = critical ? static_cast<int>(std::min(100000000LL, 2LL * dmg)) : dmg;
                 int poisonApplicationDamage = 0;
-                if (committedSkill == 291 && playerPoisonLevel_ < 1) {
+                if (committedSkill == 291 && playerPoisonLevel_ < 1 && itemBlessedPotionFor_ <= 0.f) {
                     // State_wldb_Add runs on AddState and repeats every second for 10 s.
                     poisonApplicationDamage = 160;
                     playerPoisonFor_ = 10.f;
                     playerPoisonTick_ = 1.f;
                     playerPoisonLevel_ = 1;
                 }
-                player_.hp -= finalDamage + poisonApplicationDamage;
+                if (itemBlessedPotionFor_ <= 0.f)
+                    player_.hp -= finalDamage + poisonApplicationDamage;
                 if (applyGarner2Stun) {
                     playerStunFor_ = 1.f;
                     playerNumbFor_ = 0.f;
@@ -986,9 +1075,12 @@ void Play::resolve(float dt, float px, float py, MapFile* map) {
                 effectEvents_.push_back({EffectEvent::Hurt, foe.x, foe.y, px, py});
                 // 05-Q: o visual do impacto usa o skill ID, o catalogo de
                 // EffectSystem resolve os IDs .eff/.par sem adivinhar nomes.
-                if (committedSkill > 0 && committedSkill != 25)
-                    effectEvents_.push_back({EffectEvent::SkillHit, foe.x, foe.y, px, py,
-                                             committedSkill});
+                if (committedSkill > 0 && committedSkill != 25) {
+                    EffectEvent impact{EffectEvent::SkillHit, foe.x, foe.y, px, py,
+                                       committedSkill};
+                    impact.targetActorIndex=-1;
+                    effectEvents_.push_back(impact);
+                }
                 if (player_.hp <= 0) {
                     player_.hp = 0;
                     deadFor_ = .01f;
@@ -1054,13 +1146,28 @@ void Play::resolve(float dt, float px, float py, MapFile* map) {
             foe.attackPending = std::max(.001f, castDelay);
             if (chosen && chosen->id != 25 && skillIt != skillRules_.end()) {
                 EffectEvent cast{EffectEvent::Cast, foe.x, foe.y, px, py, chosen->id};
-                if (castDelay <= 0.f) effectEvents_.push_back(cast);
+                cast.sourceActorIndex=static_cast<int>(&foe-foes_.data());
+                const bool splitItemCallbacks=historicalItemEffectKeyframesEnabled() &&
+                    skillIt->second.actionKeyFrame>=-2 && skillIt->second.actionKeyFrame<=0;
+                if(splitItemCallbacks) {
+                    const auto frames=itemEffectCallbackFrames(skillIt->second.actionKeyFrame,
+                        skillIt->second.itemEffectKeyFrames);
+                    for(int callbackFrame:frames) {
+                        EffectEvent callback=cast;callback.kind=castCallbackKind(callbackFrame);
+                        const float callbackDelay=keyDelay(callbackFrame);
+                        const int owner=static_cast<int>(&foe-foes_.data());
+                        if(callbackDelay<=0.f)effectEvents_.push_back(callback);
+                        else scheduledEffects_.push_back({callbackDelay,callback,owner,foe.actionCycle});
+                    }
+                } else if (castDelay <= 0.f) effectEvents_.push_back(cast);
                 else scheduledEffects_.push_back({castDelay, cast, static_cast<int>(&foe - foes_.data()), foe.actionCycle});
                 if (skillIt->second.flightEffectId > 0 && chosen->projectileSpeed > 0.f) {
                     const float flightDelay = keyDelay(skillIt->second.flightActionKeyFrame);
                     const float flightDuration = dist / chosen->projectileSpeed;
                     foe.attackPending = std::max(.001f, flightDelay + flightDuration);
                     EffectEvent flight{EffectEvent::Flight, foe.x, foe.y, px, py, chosen->id, flightDuration};
+                    flight.targetActorIndex=-1;
+                    flight.sourceActorIndex=static_cast<int>(&foe-foes_.data());
                     if (flightDelay <= 0.f) effectEvents_.push_back(flight);
                     else scheduledEffects_.push_back({flightDelay, flight, static_cast<int>(&foe - foes_.data()), foe.actionCycle});
                 }
@@ -1220,6 +1327,28 @@ void Play::moveFoes(float dt, MapFile* map, float px, float py) {
             }
             continue;
         }
+        if (foe.followsPlayer) {
+            // Historical SetChaTarget(new, role): keep the summoned pet near
+            // its owner without entering the hostile monster combat loop.
+            foe.provoked = false;
+            foe.goingHome = false;
+            foe.attackPending = 0.f;
+            foe.pendingSkillId = 0;
+            foe.pendingReach = 0.f;
+            foe.homeX = px;
+            foe.homeY = py;
+            const float followX = px + .05f;
+            const float followY = py + .05f;
+            if (monster_ai::distance(foe.x, foe.y, followX, followY) > 1.15f)
+                travel(foe, followX, followY, 5);
+            else {
+                foe.moving = false;
+                foe.route.clear();
+                foe.routeIndex = 0;
+                foe.routeMode = 0;
+            }
+            continue;
+        }
         const float dx = px - foe.x;
         const float dy = py - foe.y;
         const float dist = std::sqrt(dx * dx + dy * dy);
@@ -1358,7 +1487,79 @@ void Play::moveFoes(float dt, MapFile* map, float px, float py) {
 void Play::step(float dt, MapFile* map, float px, float py) {
     if (!std::isfinite(dt) || dt < 0.f) return;
     if (dt > 0.05f) dt = 0.05f;
+    if(sheetReady_ && learnedSkills_!=appliedSkillAttributes_)applyAttrs(false);
     worldClock_ += dt;
+    updateFairyAutoFeed();
+    updateFairySystem(dt);
+    for (auto cooldown = itemCooldownRemaining_.begin(); cooldown != itemCooldownRemaining_.end();) {
+        cooldown->second = std::max(0.f, cooldown->second - dt);
+        if (cooldown->second <= 0.f) cooldown = itemCooldownRemaining_.erase(cooldown);
+        else ++cooldown;
+    }
+    if (itemBoatSpeedFor_ > 0.f)
+        itemBoatSpeedFor_ = std::max(0.f, itemBoatSpeedFor_ - dt);
+    if (itemBlessedPotionFor_ > 0.f)
+        itemBlessedPotionFor_ = std::max(0.f, itemBlessedPotionFor_ - dt);
+    if (itemForgeBoostFor_ > 0.f) {
+        itemForgeBoostFor_ = std::max(0.f, itemForgeBoostFor_ - dt);
+        if (itemForgeBoostFor_ <= 0.f) itemForgeBoostLevel_ = 0;
+    }
+    if (itemCombineBoostFor_ > 0.f) {
+        itemCombineBoostFor_ = std::max(0.f, itemCombineBoostFor_ - dt);
+        if (itemCombineBoostFor_ <= 0.f) itemCombineBoostLevel_ = 0;
+    }
+    bool foodStateExpired = false;
+    if (itemInnocenceState_.remaining > 0.f) {
+        itemInnocenceState_.remaining = std::max(0.f, itemInnocenceState_.remaining - dt);
+        if (itemInnocenceState_.remaining <= 0.f) {
+            itemInnocenceState_ = ItemAllAttributeState{};
+            foodStateExpired = true;
+        }
+    }
+    for (FoodState& state : foodStates_) {
+        if (state.level <= 0 || state.remaining <= 0.f) continue;
+        state.remaining = std::max(0.f, state.remaining - dt);
+        if (state.remaining <= 0.f) {
+            state = FoodState{};
+            foodStateExpired = true;
+        }
+    }
+    for (ItemAttributeState* state : {&itemStrengthState_, &itemConstitutionState_,
+                                      &itemAgilityState_, &itemAccuracyState_, &itemSpiritState_,
+                                      &itemPotionStrengthState_, &itemPotionAgilityState_,
+                                      &itemPotionConstitutionState_, &itemPotionAccuracyState_,
+                                      &itemPotionSpiritState_, &itemPotionMspdState_,
+                                      &itemPotionAttackState_,
+                                      &itemPotionAspdState_, &itemPotionHitState_,
+                                      &itemPotionMaxHpState_, &itemKaraVictoryState_, &itemLotteryDefenseState_,
+                                      &itemLanternDefenseState_, &itemFairyMarchState_,
+                                      &itemMaliciousHornState_}) {
+        if (state->remaining <= 0.f) continue;
+        state->remaining = std::max(0.f, state->remaining - dt);
+        if (state->remaining <= 0.f) {
+            *state = ItemAttributeState{};
+            foodStateExpired = true;
+        }
+    }
+    if (itemBodyStateFor_ > 0.f) {
+        itemBodyStateFor_ = std::max(0.f, itemBodyStateFor_ - dt);
+        if (itemBodyStateFor_ <= 0.f) {
+            itemBodyStateId_ = 0;
+            itemBodyMoveSpeedBonus_ = 0.f;
+            itemBodyAttackBonus_ = 0;
+            itemBodyDefenseBonus_ = 0;
+            foodStateExpired = true;
+        }
+    }
+    if (foodStateExpired) {
+        if (sheetReady_) applyAttrs(false);
+        else recomputeGear();
+    }
+    for (ItemBoostState* boost : {&experienceBoost_, &dropRateBoost_, &fairyGrowthBoost_}) {
+        if (boost->remaining <= 0.f) continue;
+        boost->remaining = std::max(0.f, boost->remaining - dt);
+        if (boost->remaining <= 0.f) *boost = ItemBoostState{};
+    }
     hereX_ = px;
     hereY_ = py;
     if (shopOpen_) {

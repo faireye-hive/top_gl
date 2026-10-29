@@ -45,7 +45,21 @@ void Play::syncActionTiming(const ActorSkin& actors) {
 }
 
 void Play::pushActors(ActorSkin& actors) {
-    actors.setEquipment(worn_);
+    std::unordered_map<int, int> visualWorn = worn_;
+    for (const auto& equipped : wornUid_) {
+        const auto wornItem = worn_.find(equipped.first);
+        if (wornItem == worn_.end()) continue;
+        const auto item = std::find_if(bag_.begin(), bag_.end(), [&](const Stack& stack) {
+            return stack.uid == equipped.second && stack.id == wornItem->second;
+        });
+        if (item != bag_.end() && item->fuseId > 0)
+            visualWorn[equipped.first] = item->fuseId;
+    }
+    // Hairstyle is a persisted appearance choice from hairs.txt, not an
+    // equipment item: a worn head item still takes visual precedence.
+    if (hairStyleItemId_>0 && !visualWorn.count(0))
+        visualWorn[0]=hairStyleItemId_;
+    actors.setEquipment(visualWorn);
     syncActionTiming(actors);
     const float hp01 = player_.maxHp > 0 ? static_cast<float>(player_.hp) / static_cast<float>(player_.maxHp) : 0.f;
     const float spMax = std::max(1.f, player_.homeX);
@@ -64,24 +78,25 @@ void Play::pushActors(ActorSkin& actors) {
     actors.setLiveLine(2, std::to_string(player_.hp) + "/" + std::to_string(player_.maxHp));
     actors.setLiveLine(3, std::to_string(static_cast<int>(player_.homeY)) + "/" + std::to_string(static_cast<int>(player_.homeX)));
     const auto equipmentBonus = gearBonuses();
-    actors.setLiveLine(4, std::to_string(bstr_ + equipmentBonus.str));
-    actors.setLiveLine(5, std::to_string(bagi_ + equipmentBonus.agi));
-    actors.setLiveLine(6, std::to_string(bdex_ + equipmentBonus.dex));
-    actors.setLiveLine(7, std::to_string(bcon_ + equipmentBonus.con));
-    actors.setLiveLine(8, std::to_string(bsta_ + equipmentBonus.sta));
+    const auto primary=effectivePrimaryAttributes();
+    actors.setLiveLine(4, std::to_string(primary[0]));
+    actors.setLiveLine(5, std::to_string(primary[2]));
+    actors.setLiveLine(6, std::to_string(primary[3]));
+    actors.setLiveLine(7, std::to_string(primary[1]));
+    actors.setLiveLine(8, std::to_string(primary[4]));
     actors.setLiveLine(10, jobName(job_));
     char expLine[32];
     std::snprintf(expLine, sizeof expLine, "%d/%d", exp_, expNext_);
     actors.setLiveLine(11, expLine);
     actors.setLiveLine(12, std::to_string(ap_));
     actors.setLiveLine(13, std::to_string(tp_));
-    actors.setLiveLine(14, std::to_string(player_.minAtk));
-    actors.setLiveLine(15, std::to_string(player_.maxAtk));
+    actors.setLiveLine(14, std::to_string(player_.minAtk+genericBuffAttack_));
+    actors.setLiveLine(15, std::to_string(player_.maxAtk+genericBuffAttack_));
     actors.setLiveLine(16, std::to_string(hit_));
-    actors.setLiveLine(17, std::to_string(flee_));
-    actors.setLiveLine(18, std::to_string(player_.def));
+    actors.setLiveLine(17, std::to_string(player_.dodge));
+    actors.setLiveLine(18, std::to_string(effectiveDefense()));
     char aspdLine[24];
-    std::snprintf(aspdLine,sizeof(aspdLine),"%.2f/s",1.f/std::max(.01f,player_.cd));
+    std::snprintf(aspdLine,sizeof(aspdLine),"%.2f/s",1.f/std::max(.01f,effectiveAttackInterval()));
     actors.setLiveLine(19, aspdLine);
     for (int i = 0; i < static_cast<int>(foes_.size()); ++i) {
         const Foe& foe = foes_[static_cast<std::size_t>(i)];
@@ -103,7 +118,7 @@ void Play::pushActors(ActorSkin& actors) {
         const float bar = showBar && foe.maxHp > 0
                               ? static_cast<float>(foe.hp) / static_cast<float>(foe.maxHp)
                               : -1.f;
-        actors.setMonster(i, foe.x, foe.y, foe.yaw, foe.moving, pose, hide, bar,
+        actors.setMonster(foe.actorSlot >= 0 ? foe.actorSlot : i, foe.x, foe.y, foe.yaw, foe.moving, pose, hide, bar,
                           foe.action, foe.playbackRate, foe.actionCycle);
     }
     // 05-AB: historical item inspection. The values originate from iteminfo,
@@ -127,6 +142,10 @@ void Play::pushActors(ActorSkin& actors) {
         if (info->def > 0) add("Defense: " + std::to_string(info->def));
         if (stack.quality > 0)
             add("Quality: " + std::to_string(stack.quality),TL::Kind::Gem);
+        if (stack.id == 9604 && stack.cloakLevel > 0)
+            add("Admiral Cloak level: " + std::to_string(stack.cloakLevel) + "/5", TL::Kind::Gem);
+        if (stack.equipmentUpgradeLevel > 0)
+            add("Effectiveness level: " + std::to_string(stack.equipmentUpgradeLevel) + "/10", TL::Kind::Gem);
         if (stack.maxDurability > 0 && stack.maxDurability < 25000)
             add("Durability: " + std::to_string(stack.durability / 50) + "/" +
                 std::to_string(stack.maxDurability / 50),TL::Kind::Muted);
@@ -248,7 +267,9 @@ void Play::pushActors(ActorSkin& actors) {
     std::vector<int> catalog;
     for (const auto& entry : skillRules_) {
         const SkillRule& rule = entry.second;
-        if (learnedSkills_.count(rule.id)) catalog.push_back(rule.id);
+        const bool professional = lifeSkillIds_.count(rule.id) != 0;
+        if (skillTestMode_ || learnedSkills_.count(rule.id) || (professional && lifeSkills_.count(rule.id)))
+            catalog.push_back(rule.id);
     }
     for (const SkillDef& skill : skills_) if (skill.id > 0 && learnedSkills_.count(skill.id) &&
         std::find(catalog.begin(), catalog.end(), skill.id) == catalog.end()) catalog.push_back(skill.id);
@@ -259,12 +280,18 @@ void Play::pushActors(ActorSkin& actors) {
         const SkillRule& rule = found->second;
         ActorSkin::SkillView view;
         view.id = id;
-        view.name = rule.name + " Lv" + std::to_string(learnedSkills_.at(id)) + ((rule.spFormulaMissing || rule.cooldownFormulaMissing) ? " [fallback]" : "");
-        const int learnedLevel = std::max(1, learnedSkills_.count(id) ? learnedSkills_.at(id) : 1);
+        view.professional = lifeSkillIds_.count(id) != 0;
+        const bool isLearned = view.professional ? lifeSkills_.count(id) != 0 : learnedSkills_.count(id) != 0;
+        const int learnedLevel = isLearned ?
+            (view.professional ? lifeSkills_.at(id) : learnedSkills_.at(id)) : 0;
+        view.name = rule.name + " Lv" + std::to_string(learnedLevel) +
+            ((!view.professional && (rule.spFormulaMissing || rule.cooldownFormulaMissing)) ? " [fallback]" : "");
         view.level = learnedLevel;
-        view.sp = rule.type == 2 ? 0 : std::max(0, static_cast<int>(std::floor(
+        view.sp = view.professional || rule.type == 2 ? 0 : std::max(0, static_cast<int>(std::floor(
             rule.spBase + rule.spPerLevel * learnedLevel)));
-        view.learned = learnedSkills_.count(id) != 0;
+        view.learned = isLearned || skillTestMode_;
+        view.upgradeable = skillTestMode_ ? learnedLevel < 10 :
+            (!view.professional && isLearned && learnedLevel < 10);
         view.icon = rule.icon;
         for (int slot = 0; slot < 8; ++slot) if (skills_[slot].id == id) {
             view.hotkey = slot;
@@ -298,7 +325,7 @@ void Play::pushActors(ActorSkin& actors) {
     }
     actors.setShortcutIcons(std::move(barIcons));
     actors.setSkills(std::move(skillLines));
-    actors.setSkillView(std::move(skillViews), tp_);
+    actors.setSkillView(std::move(skillViews), tp_, skillTestMode_);
     // 05-AV: montagem do diario no dominio mission; sem regras na UI/GL.
     MissionJournalView journal=missionJournalView();
     actors.setQuests(std::move(journal.lines));
@@ -313,19 +340,20 @@ void Play::pushActors(ActorSkin& actors) {
 
 void Play::pushHud(ActorSkin& actors, const float* mvp, int screenW, int screenH) const {
     const char* raceNames[] = {"", "Lance", "Carsise", "Phyllis", "Ami"};
-    std::vector<std::string> status(24);
+    std::vector<std::string> status(25);
     status[0] = player_.id > 0 && player_.id < 5 ? raceNames[player_.id] : player_.name;
     status[1] = std::to_string(player_.level);
     status[2] = std::to_string(player_.hp) + "/" + std::to_string(player_.maxHp);
     status[3] = std::to_string(static_cast<int>(player_.homeY)) + "/" + std::to_string(static_cast<int>(player_.homeX));
     const auto equipmentBonus = gearBonuses();
-    status[4] = std::to_string(bstr_ + equipmentBonus.str);
-    status[5] = std::to_string(bcon_ + equipmentBonus.con);
+    const auto primary=effectivePrimaryAttributes();
+    status[4] = std::to_string(primary[0]);
+    status[5] = std::to_string(primary[1]);
     // CharacterStatusUI's historical field order is STR, CON, DEX (ACC),
     // AGI, SPR. Keep indices aligned with those fixed label positions.
-    status[6] = std::to_string(bdex_ + equipmentBonus.dex);
-    status[7] = std::to_string(bagi_ + equipmentBonus.agi);
-    status[8] = std::to_string(bsta_ + equipmentBonus.sta);
+    status[6] = std::to_string(primary[3]);
+    status[7] = std::to_string(primary[2]);
+    status[8] = std::to_string(primary[4]);
     status[9] = std::to_string(std::max(0, baseLuck_ + equipmentBonus.luk));
     status[10] = jobName(job_);
     status[11] = std::to_string(exp_) + "/" + std::to_string(expNext_);
@@ -333,19 +361,20 @@ void Play::pushHud(ActorSkin& actors, const float* mvp, int screenW, int screenH
     status[13] = std::to_string(tp_);
     // Status precisa mostrar os valores finais usados pelo combate, não a
     // diferença entre classes que serve apenas para montar o baseline do save.
-    status[14] = std::to_string(player_.minAtk);
-    status[15] = std::to_string(player_.maxAtk);
-    status[16] = std::to_string(player_.def);
+    status[14] = std::to_string(player_.minAtk+genericBuffAttack_);
+    status[15] = std::to_string(player_.maxAtk+genericBuffAttack_);
+    status[16] = std::to_string(effectiveDefense());
     status[17] = std::to_string(hit_);
-    status[18] = std::to_string(flee_);
+    status[18] = std::to_string(player_.dodge);
     char attacksPerSecond[24];
     std::snprintf(attacksPerSecond, sizeof attacksPerSecond, "%.2f/s",
-                  1.f / std::max(.01f, player_.cd));
+                  1.f / std::max(.01f, effectiveAttackInterval()));
     status[19] = attacksPerSecond;
     status[20] = std::to_string(player_.crit) + "%";
     status[21] = std::to_string(player_.resist);
     status[22] = std::to_string(hrecGain_);
     status[23] = std::to_string(srecGain_);
+    status[24] = std::to_string(static_cast<int>(std::lround(moveSpeed()*100.f)))+" cm/s";
     actors.setStatusLines(std::move(status), job_);
     std::vector<HudNote> notes;
     char head[160];

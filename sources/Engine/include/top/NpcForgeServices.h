@@ -1,6 +1,6 @@
 #pragma once
 // 05-AE: extracao conservadora dos servicos do NPC a partir dos menus Lua.
-// Nao executa o script: somente chamadas Text(..., OpenForge/OpenUnite/OpenMilling)
+// Nao executa o script: somente chamadas Text(..., OpenForge/OpenUnite/OpenMilling/OpenRepair/OpenGetStone)
 // com a acao como TERCEIRO argumento podem habilitar uma aba da bancada.
 #include <algorithm>
 #include <cctype>
@@ -10,7 +10,8 @@
 
 namespace top {
 enum NpcForgeService : unsigned {
-    kNpcForge = 1u, kNpcCombine = 2u, kNpcSocket = 4u
+    kNpcForge = 1u, kNpcCombine = 2u, kNpcSocket = 4u, kNpcRepair = 16u,
+    kNpcExtractGem = 32u, kNpcTiChun = 64u, kNpcUpgrade = 128u
 };
 
 namespace npc_forge_detail {
@@ -132,6 +133,10 @@ inline unsigned serviceFromTextCall(const std::vector<Token>& ts, std::size_t at
     if (action.value == "OpenForge") return kNpcForge;
     if (action.value == "OpenUnite") return kNpcCombine;
     if (action.value == "OpenMilling") return kNpcSocket;
+    if (action.value == "OpenRepair") return kNpcRepair;
+    if (action.value == "OpenGetStone") return kNpcExtractGem;
+    if (action.value == "OpenItemTiChun") return kNpcTiChun;
+    if (action.value == "OpenUpgrade") return kNpcUpgrade;
     return 0;
 }
 } // namespace npc_forge_detail

@@ -12,10 +12,8 @@ struct Choice {
     std::string path;
     Origin origin = Origin::None;
 };
-inline bool historicalEnabled() {
-    const char* value = std::getenv("TOP_HISTORICAL_MODEL_TEXTURE");
-    return value && value[0] == '1' && value[1] == '\0';
-}
+// SK2.18-L: historical behavior is part of normal execution.
+inline constexpr bool historicalEnabled() { return true; }
 inline Choice choose(const std::string& effectTexture,
                      const std::string& materialTexture,
                      const std::string& animatedFrame,

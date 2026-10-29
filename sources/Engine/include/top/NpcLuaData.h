@@ -20,14 +20,25 @@ struct NpcLuaData {
         bool close = false;
         int triggerId = 0;
         bool teamStarTransfer = false;
+        std::string directAction;
+        int actionParameter = 0;
+        std::string actionTarget;
     };
     struct DialogPage {
         std::string text;
         std::vector<DialogOption> options;
     };
+    struct ExchangeRule {
+        int inputId = 0;
+        int inputCount = 0;
+        int outputId = 0;
+        int outputCount = 0;
+        int event = 0;
+    };
     std::string firstTalk;
     std::vector<int> missionIds;
     std::vector<int> tradeItems;
+    std::vector<ExchangeRule> exchangeRules;
     bool bankService = false;
     std::map<int, DialogPage> dialogPages;
 };
@@ -86,7 +97,7 @@ inline bool readNpcLuaData(const std::string& lua, const std::string& functionNa
     if (functionName.empty() || functionName.size() > 128) return false;
     const auto ts = npc_forge_detail::tokenize(lua);
     std::vector<char> blocks;
-    bool target = false, trade = false;
+    bool target = false, trade = false, exchange = false;
     int nestedFunctions = 0;
     NpcLuaData data;
     using namespace npc_lua_detail;
@@ -112,13 +123,26 @@ inline bool readNpcLuaData(const std::string& lua, const std::string& functionNa
                 else { out = std::move(data); return true; }
             }
         } else if (target && nestedFunctions == 0) {
-            if (t.value != "Talk" && t.value != "Text" && t.value != "InitTrade" && t.value != "TriggerAction" &&
+            if (t.value != "Talk" && t.value != "Text" && t.value != "InitTrade" &&
+                t.value != "InitExchangeX" && t.value != "ExchangeDataX" && t.value != "TriggerAction" &&
                 t.value != "AddNpcMission" && t.value != "Weapon" &&
                 t.value != "Defence" && t.value != "Other" && t.value != "Boat" &&
                 t.value != "Pet" && t.value != "Item") continue;
             std::vector<std::pair<std::size_t,std::size_t>> args;
             if (!arguments(ts, i, args)) continue;
             if (t.value == "InitTrade" && args.empty()) { trade = true; continue; }
+            if (t.value == "InitExchangeX" && args.empty()) { exchange = true; continue; }
+            if (exchange && t.value == "ExchangeDataX" && args.size() == 5 && data.exchangeRules.size() < 4096) {
+                int values[5]{};
+                bool valid = true;
+                for (int field = 0; field < 5; ++field)
+                    valid = valid && singlePositiveInteger(ts, args[static_cast<std::size_t>(field)].first,
+                                                           args[static_cast<std::size_t>(field)].second,
+                                                           values[field]);
+                if (valid && values[1] <= 1000000 && values[3] <= 1000000)
+                    data.exchangeRules.push_back({values[0], values[1], values[2], values[3], values[4]});
+                continue;
+            }
             if (t.value == "TriggerAction" && args.size() >= 2 &&
                 args.back().second == args.back().first + 1 &&
                 ts[args.back().first].identifier && ts[args.back().first].value == "OpenBank") {
@@ -154,6 +178,18 @@ inline bool readNpcLuaData(const std::string& lua, const std::string& functionNa
                         data.dialogPages[pageId].options.push_back({displayText(ts[args[1].first].literal), -1, false, nextPage, false});
                     } else if (action == "Transfer_TeamStar") {
                         data.dialogPages[pageId].options.push_back({displayText(ts[args[1].first].literal), -1, false, 0, true});
+                    } else if ((action == "GetChaName_4" || action == "GetChaName_5" || action == "TransferDiamond") && args.size() >= 4) {
+                        int parameter = 0;
+                        if (singlePositiveInteger(ts, args.back().first, args.back().second, parameter)) {
+                            data.dialogPages[pageId].options.push_back(
+                                {displayText(ts[args[1].first].literal), -1, false, 0, false, action, parameter});
+                        }
+                    } else if ((action == "Teleport" || action == "SetSpawnPos") && args.size() >= 4 &&
+                               ts[args.back().first].value == "<string>" &&
+                               !ts[args.back().first].literal.empty()) {
+                        data.dialogPages[pageId].options.push_back(
+                            {displayText(ts[args[1].first].literal), -1, false, 0, false, action, 0,
+                             displayText(ts[args.back().first].literal)});
                     }
                 }
             } else if (t.value == "AddNpcMission" && args.size() == 1 && data.missionIds.size() < 2048) {
@@ -183,6 +219,7 @@ inline void readNpcLuaDataIndex(const std::string& lua,
     std::string current;
     int nestedFunctions = 0;
     bool trade = false;
+    bool exchange = false;
     NpcLuaData data;
     for (std::size_t i = 0; i < ts.size(); ++i) {
         const Token& t = ts[i];
@@ -193,6 +230,7 @@ inline void readNpcLuaDataIndex(const std::string& lua,
                 current = ts[i+1].value;
                 data = NpcLuaData{};
                 trade = false;
+                exchange = false;
                 nestedFunctions = 0;
             } else if (!current.empty()) {
                 ++nestedFunctions;
@@ -212,16 +250,30 @@ inline void readNpcLuaDataIndex(const std::string& lua,
                     output.emplace(current, std::move(data));
                     current.clear();
                     trade = false;
+                    exchange = false;
                 }
             }
         } else if (!current.empty() && nestedFunctions == 0) {
-            if (t.value != "Talk" && t.value != "Text" && t.value != "InitTrade" && t.value != "TriggerAction" &&
+            if (t.value != "Talk" && t.value != "Text" && t.value != "InitTrade" &&
+                t.value != "InitExchangeX" && t.value != "ExchangeDataX" && t.value != "TriggerAction" &&
                 t.value != "AddNpcMission" && t.value != "Weapon" &&
                 t.value != "Defence" && t.value != "Other" && t.value != "Boat" &&
                 t.value != "Pet" && t.value != "Item") continue;
             std::vector<std::pair<std::size_t,std::size_t>> args;
             if (!arguments(ts, i, args)) continue;
             if (t.value == "InitTrade" && args.empty()) { trade = true; continue; }
+            if (t.value == "InitExchangeX" && args.empty()) { exchange = true; continue; }
+            if (exchange && t.value == "ExchangeDataX" && args.size() == 5 && data.exchangeRules.size() < 4096) {
+                int values[5]{};
+                bool valid = true;
+                for (int field = 0; field < 5; ++field)
+                    valid = valid && singlePositiveInteger(ts, args[static_cast<std::size_t>(field)].first,
+                                                           args[static_cast<std::size_t>(field)].second,
+                                                           values[field]);
+                if (valid && values[1] <= 1000000 && values[3] <= 1000000)
+                    data.exchangeRules.push_back({values[0], values[1], values[2], values[3], values[4]});
+                continue;
+            }
             if (t.value == "TriggerAction" && args.size() >= 2 &&
                 args.back().second == args.back().first + 1 &&
                 ts[args.back().first].identifier && ts[args.back().first].value == "OpenBank") {
@@ -257,6 +309,18 @@ inline void readNpcLuaDataIndex(const std::string& lua,
                         data.dialogPages[pageId].options.push_back({displayText(ts[args[1].first].literal), -1, false, nextPage, false});
                     } else if (action == "Transfer_TeamStar") {
                         data.dialogPages[pageId].options.push_back({displayText(ts[args[1].first].literal), -1, false, 0, true});
+                    } else if ((action == "GetChaName_4" || action == "GetChaName_5" || action == "TransferDiamond") && args.size() >= 4) {
+                        int parameter = 0;
+                        if (singlePositiveInteger(ts, args.back().first, args.back().second, parameter)) {
+                            data.dialogPages[pageId].options.push_back(
+                                {displayText(ts[args[1].first].literal), -1, false, 0, false, action, parameter});
+                        }
+                    } else if ((action == "Teleport" || action == "SetSpawnPos") && args.size() >= 4 &&
+                               ts[args.back().first].value == "<string>" &&
+                               !ts[args.back().first].literal.empty()) {
+                        data.dialogPages[pageId].options.push_back(
+                            {displayText(ts[args[1].first].literal), -1, false, 0, false, action, 0,
+                             displayText(ts[args.back().first].literal)});
                     }
                 }
             } else if (t.value == "AddNpcMission" && args.size() == 1 && data.missionIds.size() < 2048) {

@@ -5,7 +5,13 @@
 namespace top::item_instantiation {
 
 enum class Origin : int { Shop = 0, MonsterDrop = 1, PlayerCombine = 2, Quest = 3 };
-enum class HistoricalEvent : int { PlayerXsBox = 11, QuestAwardScBox = 95 };
+enum class HistoricalEvent : int {
+    PlayerCombine = 2, QuestAward2 = 4, PlayerXsBox = 11,
+    PlayerCcfsBoxA = 12, PlayerCcfsBoxB = 13, PlayerCcfsBoxC = 14,
+    PlayerCcfsBoxD = 15, PlayerCcfsBoxE = 16, PlayerCcfsBoxF = 17,
+    PlayerCcfsBoxG = 18, PlayerCcfsBoxH = 19, PlayerCcfsBoxI = 20,
+    QuestAwardScBox = 95
+};
 
 struct Defaults {
     int maxDurability = 0;
@@ -51,9 +57,9 @@ struct GeneratedInstance {
 Result initialize(Origin origin, int maxDurability, int maxEnergy,
                   bool tradable = true, long expiration = 0);
 
-// Reproduces SetItemQua/CreateItemAttrCount for the two starter-box events.
-// Rolls are the historical Lua math.random outputs (1..100); attribute-set
-// selection and application to item instance fields remain separate steps.
+// Reproduces SetItemQua/CreateItemAttrCount for the implemented historical
+// events. Rolls are the historical Lua math.random outputs (1..100) where the
+// source event actually rolls; TiChun's events 2 and 12..20 are deterministic.
 GeneratedQuality resolveQuality(HistoricalEvent event, int qualityRoll,
                                 int attributeCountRoll, int itemType);
 
@@ -68,9 +74,8 @@ equipment_stats::Bonus affixBonusDelta(const GeneratedAffix& affix,
                                       const equipment_stats::Bonus& minimum,
                                       const equipment_stats::Bonus& maximum);
 
-// Gera uma instância repetível a partir do UID persistente. O escopo inclui
-// os tipos usados pelo Newbie Chest 443 (armas 1..4/7/9 e armaduras 22); tipos
-// ainda não reproduzidos falham explicitamente, sem consumir a caixa.
+// Gera uma instância repetível a partir do UID persistente. O escopo inclui os
+// tipos dos eventos portados; tipos ainda não reproduzidos falham explicitamente.
 GeneratedInstance materialize(HistoricalEvent event, int itemType, int itemLevel,
                               int uid, const equipment_stats::Bonus& minimum,
                               const equipment_stats::Bonus& maximum,

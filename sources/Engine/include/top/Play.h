@@ -18,6 +18,12 @@
 #include "top/MissionEligibility.h"
 #include "top/MissionEvents.h"
 #include "top/MissionJournal.h"
+#include "top/ItemRandomRewardRules.h"
+#include "top/ItemAmplifierRules.h"
+#include "top/ItemStatRules.h"
+#include "top/ItemProductionRules.h"
+#include "top/ItemGemVoucherRules.h"
+#include "top/ItemChestRules.h"
 
 #include <algorithm>
 #include <array>
@@ -26,6 +32,8 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace top {
@@ -43,15 +51,31 @@ public:
     static bool selfTest();
     static bool selfTestExplicitCombat();
     static bool selfTestHistoricalSkillExecution();
+    static bool selfTestPetStats();
+    // Isolated screenshot scenarios may change RAM, but cannot write saves.
+    void setReadOnlyPreview(bool enabled) { readOnlyPreview_=enabled; }
+    bool configureStatPreview(const std::string& scenario);
+    int equippedFairyItemId() const;
+    float effectiveAttackInterval() const;
+    int effectiveDefense() const;
+    std::array<int,5> effectivePrimaryAttributes() const; // STR, CON, AGI, DEX, SPR
+    std::string statDiagnostic() const;
     // profileId separates save identity from the characterinfo race/model ID.
     // Zero preserves the legacy one-save-per-race behavior.
     bool bind(const std::string& clientRoot, const ActorSkin& actors,
               int profileId = 0, const std::string& profileName = {});
     int profileId() const { return profileId_ > 0 ? profileId_ : player_.id; }
     const std::string& profileName() const { return player_.name; }
+    int level() const { return player_.level; }
+    std::uint64_t respawnSerial() const { return respawnSerial_; }
     // Recria somente a população visível. O estado persistente do personagem
     // é salvo antes e restaurado pelo bind, permitindo streaming por região.
     bool rebindWorld(const ActorSkin& actors);
+    // PERF-01: no save/rebind on a routine 32m spawn update. New foes use
+    // the same historical stat factory as the initial bind.
+    bool refreshPopulation(const ActorSkin& actors);
+    bool hasTransientSummons() const;
+
     // Registrar mudanca de mapa ANTES de recriar a populacao de actores.
     void setWorldMap(const std::string& mapName);
     void pick(float x, float y);
@@ -64,13 +88,45 @@ public:
     int bagItemId(int index) const;
     int bagItemUid(int index) const;
     std::string bagItemName(int index) const;
+    bool hasBagItem(int id) const { return bagCount(id) > 0; }
     bool increaseSkill(int id);
+    bool testIncreaseSkill(int id);
+    bool processNpcRecipe(const std::vector<std::pair<int,int>>& inputs, int goldCost,
+                          const std::vector<std::pair<int,int>>& outputs, const std::string& label,
+                          bool requireEmptySlotBefore = false, int historicalItemEvent = 0,
+                          int historicalRecordToSet = 0);
+    bool redeemNpcFameReward(int fameCost, int rewardItemId, int rewardCount, const std::string& label);
+    int fame() const { return fame_; }
+    bool applyHistoricalHairStyle(int modelItemId, const std::vector<std::pair<int,int>>& inputs,
+                                  int goldCost);
+    int hairStyleItemId() const { return hairStyleItemId_; }
+    bool processNpcRecipeAnyInput(const std::vector<int>& inputItemIds, int goldCost,
+                                  const std::vector<std::pair<int,int>>& outputs, const std::string& label,
+                                  bool requireEmptySlotBefore = false);
+    bool redeemNpcDiamondVoucher(int level);
+    bool cleanWithNpcWasher();
+    bool receiveNpcHealing(int goldCost, int hpAmount, bool restoreAll);
+    bool hasActiveHistoricalMission(int missionId) const;
+    bool hasHistoricalRecord(int recordId) const;
+    bool hasNewcomerHealingEntitlement() const;
+    bool claimArgentWelcomeGift();
+    bool grantMarriamPkTest();
+    void setSkillTestMode(bool enabled) { skillTestMode_=enabled; }
+    bool skillTestMode() const { return skillTestMode_; }
     void gmAddExperience(int amount);
     void gmHeal();
     bool gmGiveItem(int id, int count=1);
     // 05-Z: trabalho offline usando tres indices da bolsa (equipamento, gema, refiner).
     struct WorkbenchPreview { bool valid=false; int cost=0, chance=0; std::string message; };
     WorkbenchPreview previewWorkbench(int mode,int a,int b,int c) const;
+    int repairItemCost(int index) const;
+    bool repairBagItem(int index);
+    int gemExtractionCost(int equipmentIndex,int plierIndex) const;
+    bool extractSocketGem(int equipmentIndex,int plierIndex);
+    int tiChunCost(int equipmentIndex,int catalystIndex) const;
+    bool upgradeEquipmentTiChun(int equipmentIndex,int catalystIndex);
+    int equipmentUpgradeCost(int equipmentIndex) const;
+    bool upgradeEquipmentEffectiveness(int scrollIndex,int equipmentIndex,int crystalIndex);
     int forgeCost(int bagIndex) const;
     // Perfuração histórica: equipamento + estabilizador 890 + catalisador 891.
     int socketCost(int equipmentIndex) const;
@@ -78,7 +134,25 @@ public:
     bool forgeBag(int equipmentIndex,int gemIndex,int refinerIndex);
     bool combineGems(int scrollIndex,int leftIndex,int rightIndex);
     bool gmOpenSockets(int equipmentIndex,int sockets);
+    // PORT-04: preview and execute the historical blueprint machine using
+    // fairy, blueprint, and optional tool bag indices. The dice minigame and
+    // native MakeItem stat rolls are explicitly approximate offline.
+    struct ProductionPreview {
+        bool valid=false;
+        int productId=0;
+        int fee=0;
+        std::array<int,3> materialIds{};
+        std::array<int,3> materialCounts{};
+        int successChance=0;
+        std::string message;
+    };
+    ProductionPreview previewProduction(int fairyIndex,int blueprintIndex,int toolIndex) const;
+    bool processProduction(int fairyIndex,int blueprintIndex,int toolIndex);
     void gmAddGold(int amount);
+    // NpcSdk.lua::Teleport charges 500G above level 40. The caller preflights
+    // the fare, performs the map transition, then commits the charge only if it succeeds.
+    bool historicalNpcTeleportFareReady() const;
+    bool payHistoricalNpcTeleportFare();
     // 1 monstro, 2 loot, 0 o resto. Nao muda o alvo.
     int cursorOver(float x, float y) const;
     bool skillArmed() const;
@@ -90,8 +164,13 @@ public:
     int playerPose() const;
     float moveSpeed() const {
         const float base = player_.speed > 0.f ? player_.speed : 4.8f;
-        const float slow = playerNumbFor_ > 0.f ? std::max(.1f, 1.f - .2f - .03f * playerNumbLevel_) : 1.f;
-        return base * slow;
+        // Mspd_final adds state coefficients before applying the historical
+        // 30% floor. Windwalk and numb must not multiply each other.
+        const float slow = std::max(.3f,1.f+passiveBonuses().moveCoefficient-
+            (playerNumbFor_>0.f?.2f+.03f*playerNumbLevel_:0.f));
+        const float potion = itemPotionMspdState_.remaining > 0.f
+            ? 1.f + static_cast<float>(itemPotionMspdState_.bonus) / 100.f : 1.f;
+        return (base * slow + itemBodyMoveSpeedBonus_) * potion;
     }
     // 0..3 correspondem a F1..F4 / teclas 1..4.
     void castSkill(int slot = 0);
@@ -156,10 +235,11 @@ public:
     // Somente o frontend confirma depois de conseguir carregar o mapa.
     struct TicketTravel { int uid=0,itemId=0; std::string city,map; float x=0.f,y=0.f; };
     void setTicketBoatMode(bool usingBoat) { usingTicketBoat_ = usingBoat; }
+    float boatItemSpeedMultiplier() const { return itemBoatSpeedFor_ > 0.f ? 1.15f : 1.f; }
     std::optional<TicketTravel> takeTicketTravelRequest();
     bool consumeTicketAfterTravel(int itemUid,int itemId);
     void reportTicketTravelFailed();
-    void clickBag(int index);
+    void clickBag(int index, ActorSkin* actors = nullptr);
     // Tira o que estiver no slot de equipamento (o mesmo clique da grade).
     void clickEquip(int slot);
     // A bolsa temporária guarda uma pilha e devolve com outro clique.
@@ -180,6 +260,30 @@ public:
     void spendAttr(int which);
     // 0 Newbie, 1 Swordsman, 2 Hunter, 4 Explorer. A troca pede nivel 10.
     void setJob(int job);
+    // Argent test-trainer action: immediate class switch for offline QA.
+    bool testSetJob(int job);
+    struct BoatBuildOption {
+        int id = 0;
+        std::string name;
+        int requiredLevel = 0;
+        int cost = 0;
+        int maxHp = 0;
+        int maxSp = 0;
+        std::vector<int> allowedJobs;
+    };
+    void loadBoatBuildCatalog(const std::string& clientRoot);
+    const std::vector<BoatBuildOption>& boatBuildOptions() const { return boatBuildOptions_; }
+    const std::vector<int>& ownedBoatIds() const { return ownedBoatIds_; }
+    bool ownsBoat(int id) const;
+    bool buildHistoricalBoat(int id);
+    int boatHp(int id) const;
+    int boatMaxHp(int id) const;
+    int boatSp(int id) const;
+    int boatMaxSp(int id) const;
+    int boatRepairCost(int id) const;
+    int boatSupplyCost(int id) const;
+    bool repairOwnedBoat(int id);
+    bool refuelOwnedBoat(int id);
     void toggleSit();
     bool sitting() const { return sitting_; }
     void step(float dt, MapFile* map, float px, float py);
@@ -257,6 +361,10 @@ private:
         bool wandering = false;
         bool retreating = false; // 05-P: AI_ATK_FLEE nao acerta enquanto recua.
         bool moving = false;
+        bool summoned = false;
+        bool followsPlayer = false; // item pets use SetChaTarget(role) as a follow order
+        float summonRemaining = 0.f;
+        int actorSlot = -1;
         // 05-N: memoria breve do ultimo alvo visto e caminho A* limitado.
         float lastSeenX = 0.f, lastSeenY = 0.f;
         float lostSightFor = 3.f;
@@ -271,6 +379,8 @@ private:
         };
         std::vector<Drop> drops;
     };
+    Foe createWorldFoe(const MonsterSlot& slot, const ActorSkin& actors, int ordinal);
+    void ensureWorldFoeRow(int id);
     struct ItemInfo {
         int id = 0;
         std::string name;
@@ -295,6 +405,21 @@ private:
         equipment_stats::Bonus statsMaximum; // segundo extremo dos ranges ItemInfo para instancias
         int healHp = 0;
         int healSp = 0;
+        double healHpPercent = 0.0;
+        double healSpPercent = 0.0;
+        int healCooldownSeconds = 0;
+        int healStateId = 0;
+        int healStateLevel = 0;
+        int healStateSeconds = 0;
+        int fairyRationAmount = 0; // Server.Fairy.Ration; runtime recovers amount * 50 stamina
+        int fairyEggTargetId = 0; // Server.Fairy.Egg item output
+        int fairySkillId = 0; // Server.Fairy.Skill item mapping
+        int fairySkillLevel = 0;
+        int learnedSkillId = 0; // AddFairyBody/AddFunnySkill character-skill mapping
+        int learnedSkillLevel = 0;
+        int fairyFruitAttribute = -1; // Server.Fairy.Fruit ATTR as STR/CON/AGI/DEX/STA index
+        int fairyFruitLevels = 0; // Server.Fairy.Fruit LV
+        bool fairyFruitImproved = false;
         bool medkit = false;
         std::string scriptAction; // iteminfo coluna 86: nome do callback historico, nao executado como Lua
         std::vector<int> races;
@@ -320,7 +445,39 @@ private:
         int maxDurability = 0;
         int energy = 0;
         int maxEnergy = 0;
+        // PORT-04: VAL_STA fracionario e Part2/4/6 dos blueprints gerados pelo
+        // callback historico; permanecem separados do nivel de forja Y1.
+        int itemValStaTenths = 0;
+        std::array<int, 3> blueprintParts{};
+        // Historical fairy forge-param parts 2..7: three skill ID/level pairs.
+        std::array<int, 6> fairySkills{};
+        // Fairy item attributes and FairyCoins tick; kept separate from gear
+        // bonuses so pet growth cannot silently modify character stats.
+        std::array<int, 5> fairyStats{}; // STR, CON, AGI, DEX, STA
+        int fairySystemTick = 0;
+        int expDisableFlag = 0; // item 9621 ITEMATTR 55; 1 disables monster EXP
+        int altarSacrifice = 0; // Black Dragon Altar ITEMATTR_VAL_STA tribute selection
+        int cloakLevel = 0; // Admiral Cloak ITEMATTR 55 / SetItemLv; starts at level 1
+        int fuseId = 0; // ApparelConverter FuseID: visual source equipment, not its stats.
+        int equipmentUpgradeLevel = 0; // VAL_LEVEL: historical OpenUpgrade level, 0..10.
         bool tradable = true;
+    };
+    struct FoodState {
+        int level = 0;
+        float remaining = 0.f;
+    };
+    struct ItemBoostState {
+        int multiplierPercent = 100;
+        float remaining = 0.f;
+        int sourceItemId = 0;
+    };
+    struct ItemAttributeState {
+        int bonus = 0;
+        float remaining = 0.f;
+    };
+    struct ItemAllAttributeState {
+        std::array<int, 5> bonuses{}; // FOR, AGI, CON, DEX, STA
+        float remaining = 0.f;
     };
     struct Loot {
         int id = 0;
@@ -358,11 +515,22 @@ private:
     void resolve(float dt, float px, float py, MapFile* map = nullptr);
     void moveFoes(float dt, MapFile* map, float px, float py);
     bool save(const std::string& path);
+    void grantItemExperience(int amount);
     std::string savePath(const std::string& root = {}) const;
     void load(const std::string& path);
     void loadItems(const std::string& path, const std::vector<int>& ids);
+    bool ensureApparelInfo(int apparelId, int sourceEquipmentId);
     void loadHeals(const std::string& path);
+    void loadFairyRations(const std::string& path);
+    void loadFairyEggs(const std::string& path);
+    void loadFairySkills(const std::string& path);
+    void loadFairyTrainingBooks(const std::string& path);
+    void loadFairyFruits(const std::string& path);
+    void updateFairyAutoFeed();
+    void updateFairySystem(float dt);
     void loadSkillBooks(const std::string& path);
+    void resolveNamedSkillBooks();
+    void loadLifeSkillBooks(const std::string& path);
     void loadSkillRules(const std::string& path);
     equipment_stats::Bonus gearBonuses() const;
     void recomputeGear();
@@ -391,6 +559,13 @@ private:
     void gather(float px, float py);
     void collectRequested(float px, float py);
     int roll(int span);
+    bool summonHistoricalMonster(ActorSkin* actors);
+    bool summonAriesGuardian(ActorSkin* actors);
+    bool summonGoddessGuardian(ActorSkin* actors);
+    bool summonMedicalReportCreature(ActorSkin* actors);
+    bool createHistoricalSummon(int id, int respawnSeconds, int lifetimeSeconds,
+                                ActorSkin* actors, bool followsPlayer = false,
+                                float spawnOffsetX = 0.f, float spawnOffsetY = 0.f);
     void say(const std::string& text);
     void completeHistoricalMission();
     void completeHistoricalMission(HistoricalProgress& mission);
@@ -398,10 +573,15 @@ private:
     void snapshotWorldMonsters();
     bool usingTicketBoat_ = false;
     std::optional<TicketTravel> pendingTicketTravel_;
+    int pendingAltarMaterialUid_ = 0; // two-click item-on-item use (Black Dragon Altar)
+    int pendingCloakUpgradeUid_ = 0; // two-click item-on-item use (Admiral Cloak Upgrade)
+    int pendingApparelConverterUid_ = 0; // two-click item-on-item use (historical apparel conversion)
     std::string worldMap_;
     double worldClock_ = 0.;
     monster_lifecycle::Registry worldMonsters_;
+    std::unordered_map<int, std::vector<std::string>> summonMonsterRows_;
     std::string root_;
+    bool readOnlyPreview_ = false;
     int profileId_ = 0;
     std::string profileName_;
     struct SkillDef {
@@ -439,6 +619,7 @@ private:
         bool spFormulaMissing = false;
         bool cooldownFormulaMissing = false;
         std::string effectFormula;
+        std::string passiveFormula; // skillinfo column 30 (Use), not skill type
         DamageFormula damageFormula = DamageFormula::Generic;
         double damageScaleBase = 1.0;
         double damageScalePerLevel = 0.0;
@@ -450,6 +631,7 @@ private:
         float impactOffset = 0.f;      // quadro-chave de impacto da acao
         std::vector<float> actionDurations;
         std::vector<float> actionImpacts;
+        std::vector<int> itemEffectKeyFrames; // skillinfo Item/ItemExtra channels, columns 54/55
         int actionKeyFrame = -3; // skillinfo sActionKeyFrame: -1 begin, -2 end, >=0 keyed frame
         int harmMode = 0; // column 45: 1=action callback, 2=flight arrival
         int hitKeyFrame = -3; // column 64: CHitRepresent action callback
@@ -458,12 +640,37 @@ private:
         int flightEffectId = 0;      // coluna 59: Path of Flight Effect
         float flightSpeed = 0.f;    // coluna 60: velocidade do projetil em cm/s -> m/s
     };
+    struct LifeSkillBookRule {
+        int itemId = 0;
+        int skillId = 0;
+        int addLevel = 0;
+        int expectedLevel = 0;
+        int prerequisiteSkill = 0;
+        int prerequisiteLevel = 0;
+        int rewardItem = 0;
+    };
     SkillDef skills_[8]{};
     int nextSkillSlot_ = 0;
     bool hotbarLoaded_ = false;
     std::unordered_map<int, int> skillBooks_;
+    std::unordered_set<int> inferredSkillBooks_;
+    std::unordered_map<int, LifeSkillBookRule> lifeSkillBooks_;
+    std::unordered_set<int> lifeSkillIds_;
     std::unordered_map<int, SkillRule> skillRules_;
+    struct PassiveBonuses {
+        int hp=0,sp=0,hit=0,dodge=0,hpRegen=0,spRegen=0,resistance=0;
+        float moveCoefficient=0.f;
+    };
+    PassiveBonuses passiveBonuses() const;
+    std::unordered_map<int,int> appliedSkillAttributes_;
+    std::vector<BoatBuildOption> boatBuildOptions_;
+    std::vector<int> ownedBoatIds_;
+    std::unordered_map<int, int> ownedBoatHp_;
+    std::unordered_map<int, int> ownedBoatSp_;
+    std::unordered_set<int> historicalRecords_;
     std::unordered_map<int, int> learnedSkills_;
+    std::unordered_map<int, int> lifeSkills_;
+    int lifeSkillPoints_ = 0;
     Foe player_;
     std::vector<Foe> foes_;
     Quest quests_[3]{};
@@ -471,8 +678,12 @@ private:
     int requestedLoot_ = -1;
     int exp_ = 0;
     int expNext_ = 25;
+    int fame_ = 0; // ATTR_FAME; versioned FM1 optional save field
+    int fairyCoinChestDay_ = 0;
+    int fairyCoinChestOpened_ = 0;
     historical_stats::Experience experience_;
     int gold_ = 0;
+    int hairStyleItemId_ = 0; // cosmetic model selected through the historical salon table
     int baseMin_ = 0;
     int baseMax_ = 0;
     int baseDef_ = 0;
@@ -585,7 +796,9 @@ private:
     static constexpr std::size_t kMaxSavedExtraMissions = 128;
     float hereX_ = 0.f;
     float hereY_ = 0.f;
+    bool hereSafeZone_ = false;
     float deadFor_ = 0.f;
+    std::uint64_t respawnSerial_ = 0;
     float swing_ = 0.f;
     float swingPlaybackRate_ = 1.f;
     float attackWindup_ = 7.f / 30.f;
@@ -606,6 +819,7 @@ private:
     bool swingIsSkill_ = false;
     bool playerFightArea_ = true;
     float skillCd_[8]{};
+    bool skillTestMode_ = false;
     int armedSkill_ = -1; // committed offensive skill waiting for hit timeline
     int requestedSkill_ = -1; // hotkey pressed; waiting for enemy/range; no SP spent
     // A target selection is not an attack command. Click issues one basic
@@ -615,6 +829,17 @@ private:
     float berserkAttackSpeedBonus_ = 0.f;
     float hardenFor_ = 0.f;
     int hardenDefense_ = 0;
+    float itemHardenFor_ = 0.f;
+    int itemHardenDefense_ = 0;
+    float itemEtherCloverFor_ = 0.f;
+    int itemEtherCloverDodge_ = 0;
+    float itemBoatSpeedFor_ = 0.f;
+    int itemBodyStateId_ = 0; // 1 Weightless, 2 Battle Array, 3 Full Body Armor
+    float itemBodyStateFor_ = 0.f;
+    float itemBlessedPotionFor_ = 0.f;
+    float itemBodyMoveSpeedBonus_ = 0.f;
+    int itemBodyAttackBonus_ = 0;
+    int itemBodyDefenseBonus_ = 0;
     float willOfSteelFor_ = 0.f;
     int willOfSteelDefense_ = 0;
     float genericBuffFor_ = 0.f;
@@ -626,6 +851,53 @@ private:
     std::vector<Pop> pops_;
     std::vector<ScheduledEffect> scheduledEffects_;
     std::unordered_map<int, ItemInfo> items_;
+    int fairyAutoFeedSlot_ = 2; // Lua item slot 3 (zero-based inventory index)
+    int fairyAutoFeedNormalId_ = 2312;
+    int fairyAutoFeedGreatId_ = 6842;
+    double fairyAutoFeedThreshold_ = 0.5;
+    float fairySystemTimer_ = 0.f;
+    int fairySystemUid_ = 0;
+    int fairyMaximumLevel_ = 42;
+    int fairyNormalFruitMaximum_ = 42;
+    int fairyImprovedFruitMaximum_ = 62;
+    int fairyExperienceRate_ = 1;
+    std::unordered_map<int, float> itemCooldownRemaining_;
+    // Os estados de comidas 165..167 são separados dos buffs temporários de
+    // skills para que o porte dos consumíveis não altere efeitos já prontos.
+    std::array<FoodState, 3> foodStates_{};
+    ItemAttributeState itemStrengthState_{};
+    ItemAttributeState itemConstitutionState_{};
+    ItemAttributeState itemAgilityState_{};
+    ItemAttributeState itemAccuracyState_{};
+    ItemAttributeState itemSpiritState_{};
+    ItemAttributeState itemPotionStrengthState_{};
+    ItemAttributeState itemPotionAgilityState_{};
+    ItemAttributeState itemPotionConstitutionState_{};
+    ItemAttributeState itemPotionAccuracyState_{};
+    ItemAttributeState itemPotionSpiritState_{};
+    ItemAttributeState itemPotionMspdState_{};
+    ItemAttributeState itemPotionAttackState_{};
+    ItemAttributeState itemPotionAspdState_{};
+    ItemAttributeState itemPotionHitState_{};
+    ItemAttributeState itemPotionMaxHpState_{};
+    ItemAttributeState itemKaraVictoryState_{};
+    ItemAttributeState itemLotteryDefenseState_{};
+    ItemAttributeState itemLanternDefenseState_{};
+    ItemAttributeState itemFairyMarchState_{};
+    ItemAttributeState itemMaliciousHornState_{};
+    ItemAllAttributeState itemInnocenceState_{};
+    float itemForgeBoostFor_ = 0.f;
+    int itemForgeBoostLevel_ = 0;
+    float itemCombineBoostFor_ = 0.f;
+    int itemCombineBoostLevel_ = 0;
+    ItemBoostState experienceBoost_{};
+    ItemBoostState dropRateBoost_{};
+    ItemBoostState fairyGrowthBoost_{};
+    item_random_rewards::Rules itemRandomRewards_;
+    item_stat_rules::Rules itemStatRules_;
+    item_production::Rules itemProductionRules_;
+    item_gem_vouchers::Rules itemGemVoucherRules_;
+    item_chests::DataRules historicalChestRules_;
     std::vector<Stack> bag_;
     int bagCapacity_ = 24; // initial 24; historical items 3088..3093 expand by four
     std::vector<Stack> temp_;

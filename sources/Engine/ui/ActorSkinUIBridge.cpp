@@ -177,6 +177,12 @@ void ActorSkin::setNpcDialogOptions(std::vector<std::string> options, bool tutor
 int ActorSkin::npcDialogOptionHit(int x, int y, int sw, int sh) const {
     return ui_.npc.dialogOptionHit(x, y, sw, sh);
 }
+int ActorSkin::npcDialogOptionPageHit(int x, int y, int sw, int sh) const {
+    return ui_.npc.dialogOptionPageHit(x, y, sw, sh);
+}
+void ActorSkin::changeNpcDialogOptionPage(int delta) {
+    ui_.npc.changeDialogOptionPage(delta);
+}
 int ActorSkin::npcTutorialGuideHit(int x, int y, int sw, int sh) const {
     return ui_.npc.tutorialGuideHit(x, y, sw, sh);
 }
@@ -241,8 +247,8 @@ void ActorSkin::showShopInventory(int width) {
     ui_.windows.invX_ = std::max(0.f, shop.x - 205.f);
     ui_.windows.invY_ = shop.y;
 }
-void ActorSkin::setSkillView(std::vector<SkillView> skills, int points) {
-    ui_.skills.setView(std::move(skills), points);
+void ActorSkin::setSkillView(std::vector<SkillView> skills, int points, bool testMode) {
+    ui_.skills.setView(std::move(skills), points, testMode);
 }
 void ActorSkin::setSkillDragIcon(const std::string& icon, int x, int y, bool active) {
     skillIconDragging_ = active && !icon.empty();
@@ -253,6 +259,10 @@ void ActorSkin::setSkillDragIcon(const std::string& icon, int x, int y, bool act
 void ActorSkin::toggleForgeWorkbench(int screenW,int screenH) {
     if (ui_.forge.visible()) { ui_.forge.close(); return; }
     openForgeWorkbench(screenW,screenH,7u);
+}
+void ActorSkin::toggleProductionWorkbench(int screenW,int screenH) {
+    if (ui_.forge.visible()) { ui_.forge.close(); return; }
+    openForgeWorkbench(screenW,screenH,8u);
 }
 void ActorSkin::openForgeWorkbench(int screenW,int screenH,unsigned allowedModes) {
     ui_.forge.open(allowedModes);
@@ -282,7 +292,7 @@ bool ActorSkin::forgeWorkbenchSelect(int inventoryHit,int targetSlot) {
 }
 void ActorSkin::forgeWorkbenchClearSlot(int slot){ui_.forge.clearSlot(slot);}
 void ActorSkin::forgeWorkbenchMode(int mode){
-    if(mode>=0&&mode<=2)ui_.forge.setMode(ui::ForgeWorkbenchUI::Mode(mode));
+    if(mode>=0&&mode<=7)ui_.forge.setMode(ui::ForgeWorkbenchUI::Mode(mode));
 }
 void ActorSkin::forgeWorkbenchReset(){ui_.forge.clear();}
 void ActorSkin::forgeWorkbenchPreview(bool valid,int price,int chance,const std::string& text){
@@ -291,6 +301,15 @@ void ActorSkin::forgeWorkbenchPreview(bool valid,int price,int chance,const std:
 void ActorSkin::setItemConfirm(const std::string& text) { itemConfirmText_ = text; }
 int ActorSkin::skillUpgradeHit(int x, int y, int screenW) const {
     return ui_.skills.upgradeHit(x, y, screenW, ui_.windows);
+}
+bool ActorSkin::skillTestModeHit(int x, int y, int screenW) const {
+    return ui_.skills.testModeHit(x, y, screenW, ui_.windows);
+}
+int ActorSkin::skillPageHit(int x, int y, int screenW) const {
+    return ui_.skills.pageHit(x, y, screenW, ui_.windows);
+}
+void ActorSkin::changeSkillPage(int delta) {
+    ui_.skills.changePage(delta);
 }
 int ActorSkin::skillHit(int x, int y, int screenW) const {
     return ui_.skills.hit(x, y, screenW, ui_.windows);
@@ -327,6 +346,16 @@ void ActorSkin::setLiveLine(int index, const std::string& text) {
 
 void ActorSkin::togglePanel(int which) {
     ui_.toggle(which);
+}
+
+void ActorSkin::showSkillPanel() {
+    ui_.windows.showSkill_=true;
+    ui_.windows.skillDrag_=false;
+}
+
+void ActorSkin::hideSkillPanel() {
+    ui_.windows.showSkill_=false;
+    ui_.windows.skillDrag_=false;
 }
 
 bool ActorSkin::uiBlocks(int x, int y, int screenW, int screenH) const {
@@ -787,7 +816,7 @@ void ActorSkin::buildHud(int width, int height) {
     if (w.showSkill_) {
         const PanelRect b=skillRect(w.skillX_,w.skillY_,width);
         panel([&](ui::UIRenderer& r) {
-            ui::GameHUD::drawSkills(r,b.x,b.y,ui_.skills.page(),int(ui_.skills.rows().size()));
+            ui::GameHUD::drawSkills(r,b.x,b.y,ui_.skills.page(),ui_.skills.rows(),{},ui_.skills.testMode());
         },[&](ui::HudDrawList& d) {
             ui_.skills.appendSprites(d,w,width);
             ui_.skills.appendText(d,w,width,font_.line());

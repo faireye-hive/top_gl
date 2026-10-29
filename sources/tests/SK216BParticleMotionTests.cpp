@@ -8,9 +8,9 @@ using namespace top::historical_particle_motion;
 #define CHECK(c) do { if (!(c)) throw std::runtime_error(#c); } while (0)
 static bool near(float a,float b,float eps=0.0001f){return std::fabs(a-b)<eps;}
 int main(){
-    unsetenv("TOP_HISTORICAL_PARTICLE_MOTION"); CHECK(!enabled());
+    unsetenv("TOP_HISTORICAL_PARTICLE_MOTION"); CHECK(enabled());
     setenv("TOP_HISTORICAL_PARTICLE_MOTION","1",1);CHECK(enabled());
-    setenv("TOP_HISTORICAL_PARTICLE_MOTION","0",1);CHECK(!enabled());
+    setenv("TOP_HISTORICAL_PARTICLE_MOTION","0",1);CHECK(enabled());
     const V3 none{{0,0,0}}, x{{1,0,0}}, up{{0,0,1}};
     auto fire0=at(2,none,V3{{3,4,0}},none,2.f,0.f,4,0);
     auto fire2=at(2,none,V3{{3,4,0}},none,2.f,2.f,4,0);

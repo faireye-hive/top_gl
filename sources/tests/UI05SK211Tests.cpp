@@ -17,7 +17,7 @@ void eff(const fs::path& path) {
     for(int i=0;i<4;++i)put<float>(f,0);
     put<int>(f,2);
     for(int layer=0;layer<2;++layer) {
-        name(f,"layer");for(int v:{1,5,6})put<int>(f,v);
+        name(f,"layer");for(int v:{2,5,6})put<int>(f,v);
         put<float>(f,.1f);put<unsigned short>(f,1); // stale metadata: timeline must use key durations
         put<float>(f,layer==0?.25f:1.f);
         for(int i=0;i<3;++i)put<float>(f,i==1?2.f:1.f);

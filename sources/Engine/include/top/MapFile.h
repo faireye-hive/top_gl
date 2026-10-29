@@ -51,6 +51,15 @@ public:
     Tile at(int x, int y);
     // Mesmo corte em dois triangulos de MPMap::GetHeight.
     float heightAt(float x, float y) const;
+    // Altura object/subgrid armazenada em btBlock[0], consultada por RANGE2
+    // no DX9 em GetGridHeight(int(x) * 2, int(y) * 2).
+    float range2GroundHeightAt(int x, int y) const;
+    // CGameScene::GetGridHeight: int(world * 2), then MPMap's four
+    // btBlock height quadrants; no triangle interpolation or block filtering.
+    float sceneGridHeightAt(float x, float y) const;
+    // Altura do vértice SHADE: compara cHeight com o quadrante btBlock e
+    // preserva o ajuste de amostra nas bordas da grade CMPShadeMap.
+    float shadeGroundHeightAt(float x, float y, bool edgeX, bool edgeY) const;
     std::uint16_t regionAt(float x, float y) const;
     bool blockedAt(float x, float y) const;
     bool sailableAt(float x, float y) const;

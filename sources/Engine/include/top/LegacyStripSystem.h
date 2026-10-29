@@ -9,15 +9,7 @@
 
 namespace top { namespace legacy_strip_system {
 
-inline bool historicalCyclesEnabled() {
-    // Emergency visual-regression comparison without rolling back the patch.
-    // Read once; changing the variable requires restarting top_gl.
-    static const bool enabled = [] {
-        const char* env = std::getenv("TOP_STRIP_NESTED_LOOP");
-        return !env || !(env[0] == '0' && env[1] == '\0');
-    }();
-    return enabled;
-}
+inline constexpr bool historicalCyclesEnabled() { return true; }
 
 inline float nestedModelAge(int particleType, bool isFlight, float age,
                             float groupCycleLength, bool historicStrip = true) {

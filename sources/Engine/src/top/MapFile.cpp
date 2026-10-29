@@ -189,6 +189,82 @@ float MapFile::heightAt(float x, float y) const {
     return h3 + (1.f - fx) * (h2 - h3) + (1.f - fy) * (h1 - h3);
 }
 
+float MapFile::range2GroundHeightAt(int x, int y) const {
+    if (x < 0 || y < 0 || x >= width_ || y >= height_) return 0.f;
+    Section& block = const_cast<MapFile*>(this)->section(x / kSection, y / kSection);
+    // MPMap's default MPTile has btBlock[0] == 0, so the historical
+    // GetGridHeight result for an empty section is zero, not cHeight (-2 m).
+    if (block.state == Section::State::Empty) return 0.f;
+    if (block.state != Section::State::Present) return 0.f;
+    const int local = (y % kSection) * kSection + (x % kSection);
+    const std::uint8_t encoded = block.raw[static_cast<std::size_t>(local) * kTileBytes + 11];
+    float height = static_cast<float>(encoded & 63u);
+    height *= 5.0f;
+    if (encoded & 64u) return height / 100.0f * -1.0f;
+    return height / 100.0f;
+}
+
+float MapFile::sceneGridHeightAt(float x, float y) const {
+    if (!file_ || !std::isfinite(x) || !std::isfinite(y)) return 0.f;
+    const float scaledX = x * 2.f, scaledY = y * 2.f;
+    // CGameScene converts after multiplying: small negative coordinates
+    // truncate to grid zero. Check limits before converting to an integer.
+    if (!std::isfinite(scaledX) || !std::isfinite(scaledY) ||
+        scaledX <= -1.f || scaledY <= -1.f ||
+        scaledX >= static_cast<double>(width_) * 2.0 ||
+        scaledY >= static_cast<double>(height_) * 2.0) return 0.f;
+    const auto gridX = static_cast<std::int64_t>(scaledX);
+    const auto gridY = static_cast<std::int64_t>(scaledY);
+    const int tileX = static_cast<int>(gridX / 2);
+    const int tileY = static_cast<int>(gridY / 2);
+    Section& block = const_cast<MapFile*>(this)->section(tileX / kSection, tileY / kSection);
+    if (block.state != Section::State::Present) return 0.f;
+    const int local = (tileY % kSection) * kSection + (tileX % kSection);
+    const int quadrant = static_cast<int>((gridY % 2) * 2 + gridX % 2);
+    const std::uint8_t encoded = block.raw[static_cast<std::size_t>(local) * kTileBytes + 11 + quadrant];
+    float height = static_cast<float>(encoded & 63u);
+    height *= 5.f;
+    return (encoded & 64u) ? height / 100.f * -1.f : height / 100.f;
+}
+
+float MapFile::shadeGroundHeightAt(float x, float y, bool edgeX, bool edgeY) const {
+    if (!std::isfinite(x) || !std::isfinite(y) || !file_ ||
+        x < 0.f || y < 0.f || x >= width_ || y >= height_) return 0.f;
+    const int tileX = static_cast<int>(x);
+    const int tileY = static_cast<int>(y);
+    Tile tile = const_cast<MapFile*>(this)->at(tileX, tileY);
+    if (!tile.valid) return 0.f;
+    const float tileHeight = tile.height;
+
+    std::int64_t gridX = static_cast<std::int64_t>(x * 2.0);
+    std::int64_t gridY = static_cast<std::int64_t>(y * 2.0);
+    if (edgeX) --gridX;
+    if (edgeY) --gridY;
+    // MPMap::IsGridBlock returns blocked outside its loaded grid window;
+    // GetGridHeight and GetTileHeight both return zero there.
+    if (gridX < 0 || gridY < 0 || gridX >= static_cast<std::int64_t>(width_) * 2 ||
+        gridY >= static_cast<std::int64_t>(height_) * 2)
+        return tileHeight;
+
+    const int subTileX = static_cast<int>(gridX / 2);
+    const int subTileY = static_cast<int>(gridY / 2);
+    Section& block = const_cast<MapFile*>(this)->section(subTileX / kSection,
+                                                        subTileY / kSection);
+    std::uint8_t encoded = 0;
+    if (block.state == Section::State::Present) {
+        const int local = (subTileY % kSection) * kSection + (subTileX % kSection);
+        const int quadrant = static_cast<int>((gridY % 2) * 2 + (gridX % 2));
+        encoded = block.raw[static_cast<std::size_t>(local) * kTileBytes + 11 + quadrant];
+    } else if (block.state != Section::State::Empty) {
+        return tileHeight;
+    }
+
+    float gridHeight = static_cast<float>(encoded & 63u) * .05f;
+    if (encoded & 64u) gridHeight = -gridHeight;
+    const bool gridBlocked = (encoded & 128u) != 0;
+    return gridHeight > tileHeight && !gridBlocked ? gridHeight : tileHeight;
+}
+
 std::uint16_t MapFile::regionAt(float x, float y) const {
     if (!std::isfinite(x) || !std::isfinite(y) || x < 0.f || y < 0.f || x >= width_ || y >= height_) return 0;
     const Tile tile = const_cast<MapFile*>(this)->at(static_cast<int>(std::floor(x)), static_cast<int>(std::floor(y)));

@@ -466,6 +466,27 @@ void SceneWorld::build(MapFile& map, float centerX, float centerY, float radius,
             const std::uint16_t typeId = ru16(rec);
             const int kind = typeId >> 14;
             const int id = typeId & 0x3fff;
+            const std::uint32_t nx = ru32(rec + 4);
+            const std::uint32_t ny = ru32(rec + 8);
+            const float mx = (static_cast<std::uint32_t>(sec.x * sectionW_ * 100) + nx) / 100.f;
+            const float my = (static_cast<std::uint32_t>(sec.y * sectionH_ * 100) + ny) / 100.f;
+            if (std::fabs(mx - centerX) > radius || std::fabs(my - centerY) > radius) continue;
+            if (kind == 1) {
+                if (pass != Pass::Animated && historical_map_scene_effects::enabled() && id > 0) {
+                    const std::int16_t heightOff = ri16(rec + 12);
+                    const std::int16_t yaw = ri16(rec + 14);
+                    MapSceneEffectPlacement placement;
+                    placement.key = (static_cast<std::uint64_t>(secNo) << 32) |
+                                    static_cast<std::uint32_t>(i);
+                    placement.effectId = id;
+                    placement.x = mx;
+                    placement.y = my;
+                    placement.height = groundHeight(map, mx, my) + static_cast<float>(heightOff) / 100.f;
+                    placement.yaw = static_cast<float>(yaw) / 100.f;
+                    out.mapEffects.push_back(placement);
+                }
+                continue;
+            }
             if (kind != 0) continue;
             if (id < 0 || id >= static_cast<int>(records_.size()) || records_[static_cast<std::size_t>(id)].file.empty()) {
                 ++out.modelFail;
@@ -475,11 +496,6 @@ void SceneWorld::build(MapFile& map, float centerX, float centerY, float radius,
             // 1 sentar, 2 passagem, 3 luz e 6 som sao volumes do editor.
             // Desenha-los cobre o mapa de cubos verde, vermelho e azul.
             const bool helper = info.kind != 0;
-            const std::uint32_t nx = ru32(rec + 4);
-            const std::uint32_t ny = ru32(rec + 8);
-            const float mx = (static_cast<std::uint32_t>(sec.x * sectionW_ * 100) + nx) / 100.f;
-            const float my = (static_cast<std::uint32_t>(sec.y * sectionH_ * 100) + ny) / 100.f;
-            if (std::fabs(mx - centerX) > radius || std::fabs(my - centerY) > radius) continue;
             bool failed = false;
             const Model* model = modelFor(info.file, failed);
             if (!model) {

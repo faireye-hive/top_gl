@@ -78,12 +78,22 @@ inline int forgingChancePer10000(int nextGemLevel) {
     static constexpr int rates[]={0,10000,10000,10000,4500,3500,2500,1500,500,200};
     return nextGemLevel>=1&&nextGemLevel<=9?rates[nextGemLevel]:0;
 }
+inline int forgingChanceWithFruitPer10000(int nextGemLevel,int bonusFruitLevel) {
+    const int base=forgingChancePer10000(nextGemLevel);
+    if(base<=0)return 0;
+    return std::min(10000,base+std::max(0,bonusFruitLevel)*1000); // Lua: stateLv * 0.1
+}
 inline int combiningChancePer10000(int currentLevel,int type) {
     // forge.lua Combine_Success_Rate: tipo 49 normal; tipo 50 refiner.
     static constexpr int common[]={10000,9000,8000,7000,6000,5000,4000,3000,2000};
     static constexpr int refiner[]={10000,10000,10000,9500,9000,8500,8000,7500,7000};
     if(currentLevel<1||currentLevel>9)return 0;
     return type==49?common[currentLevel-1]:type==50?refiner[currentLevel-1]:0;
+}
+inline int combiningChanceWithFruitPer10000(int currentLevel,int type,int bonusFruitLevel) {
+    const int base=combiningChancePer10000(currentLevel,type);
+    if(base<=0)return 0;
+    return std::min(10000,base+std::max(0,bonusFruitLevel)*1000); // Lua: stateLv * 0.1
 }
 inline bool validSockets(int count,const std::array<int,3>& gems,const std::array<int,3>& levels){
     if(count<0||count>3)return false;

@@ -1,4 +1,6 @@
 #include "top/EffectSystem.h"
+#include "top/HistoricalRange2Ground.h"
+#include "top/HistoricalShrink.h"
 #include "top/TexturePaths.h"
 #include "top/LegacyParticleCurves.h"
 #include "top/LegacyEffectInspector.h"
@@ -13,7 +15,16 @@
 #include "top/HistoricalParticleRandom.h"
 #include "top/HistoricalParticleExtended.h"
 #include "top/HistoricalParticleJitter.h"
+#include "top/HistoricalRange2Collision.h"
+#include "top/HistoricalFireHit.h"
+#include "top/HistoricalParticleCount.h"
+#include "top/HistoricalShadeMesh.h"
+#include "top/HistoricalStripAlpha.h"
+#include "top/HistoricalBlastMotion.h"
+#include "top/HistoricalModelPosition.h"
+#include "top/HistoricalModelLifetime.h"
 #include "top/LegacyEffectTextureSelection.h"
+#include "top/EffectBindingTrace.h"
 
 #include <algorithm>
 #include <cmath>
@@ -60,6 +71,26 @@ bool sameEffectFilter(const EffectBatch& batch, int min, int mag) {
     return historical_filter::same({batch.minFilter, batch.magFilter},
                                    historical_filter::effective(min, mag));
 }
+bool historicalRawEffModelParams() {
+    const char* value = std::getenv("TOP_HISTORICAL_EFF_RAW_MODEL_PARAMS");
+    return value && value[0] == '1' && value[1] == '\0';
+}
+
+constexpr bool historicalItemDummyBindingEnabled() { return true; }
+
+constexpr bool historicalItemEffectRequireDummyEnabled() { return true; }
+
+constexpr bool historicalTargetDummyBindingEnabled() { return true; }
+
+constexpr bool historicalPartTraceEnabled() { return true; }
+
+constexpr bool historicalBoundBillboardCenterEnabled() { return true; }
+
+constexpr bool historicalBoundModelMatrixEnabled() { return true; }
+
+constexpr bool historicalMagicResultStartsOnArrival() { return true; }
+
+constexpr bool historicalFshadeFrameCountEnabled() { return true; }
 
 // Temporary visual calibration for Frozen Arrow's historical flight meshes.
 // Applies to all its authored models, not to unrelated spells. The asset's
@@ -86,7 +117,7 @@ bool effectModelName(const std::string& name) {
 
 bool readLegacy(const std::string& path, std::vector<std::string>& names) {
     LegacyEffectSummary parsed;
-    if (!inspectLegacyEff(path, parsed)) return false;
+    if (!inspectLegacyEff(path, parsed, historicalRawEffModelParams())) return false;
     if (parsed.structured) {
         names = parsed.verifiedResources;
     } else {
@@ -159,6 +190,8 @@ bool loadParticles(const std::string& path, const std::string& root, std::vector
     std::vector<EffectSystem::ParticleProfile> decoded;
     for (int system = 0; system < systems; ++system) {
         EffectSystem::ParticleProfile profile;
+        profile.sourceSystem=static_cast<std::size_t>(system);
+        profile.sourceParticle=path.substr(path.find_last_of("/\\")+1);
         std::string systemName, textureName, modelName, unusedModelRangeName;
         unsigned short frames = 0;
         if (!in.get(profile.type) || !in.name(systemName) || !in.get(profile.count) || !in.name(textureName) ||
@@ -211,7 +244,7 @@ bool loadParticles(const std::string& path, const std::string& root, std::vector
             }
         }
         if (version > 9 && !in.get(flag)) return false;
-        if (version > 10 && !in.skip(32)) return false;
+        if (version > 10 && !in.name(profile.hitEffect)) return false;
         if (version > 11 && modelRange) {
             unsigned short points = 0;
             if (!in.get(points) || !in.skip(static_cast<std::size_t>(points) * 12)) return false;
@@ -220,8 +253,14 @@ bool loadParticles(const std::string& path, const std::string& root, std::vector
         if (version > 12 && !in.get(serializedDivisor)) return false;
         profile.randomDivisor = historical_particle_random::decodedDivisor(
             version, profile.type, serializedDivisor);
-        if (version > 13 && !in.skip(1)) return false;
-        if (version > 14 && !in.skip(1)) return false;
+        if (version > 13) {
+            if (!in.get(flag)) return false;
+            profile.modelDirection = flag != 0;
+        }
+        if (version > 14) {
+            if (!in.get(flag)) return false;
+            profile.mediayEff = flag != 0;
+        }
         // Rejeitar sequencias NaN/infinitas antes de liberar dados para
         // a renderizacao. A leitura deve ser atomica: nunca devolver metade
         // de um controlador truncado como se ele estivesse valido.
@@ -372,6 +411,21 @@ void groundQuad(EffectBatch& batch, float x, float y, float z, float size, float
     batch.verts.insert(batch.verts.end(), {a, e, d, e, c, d});
 }
 
+void groundQuadRotated(EffectBatch& batch, float x, float y, float z, float halfSize,
+                       float angle, float r, float g, float b, float alpha) {
+    const float c=std::cos(angle), s=std::sin(angle);
+    auto point=[&](float localX,float localZ,float u,float v) {
+        // DX9's row-vector Z rotation maps to GL world X/Z at this boundary.
+        return vertex(x+localX*c-localZ*s,y,z+localX*s+localZ*c,
+                      r,g,b,alpha,u,v);
+    };
+    const MeshVertex a=point(-halfSize,-halfSize,0.f,1.f);
+    const MeshVertex e=point( halfSize,-halfSize,1.f,1.f);
+    const MeshVertex d=point(-halfSize, halfSize,0.f,0.f);
+    const MeshVertex c1=point(halfSize,halfSize,1.f,0.f);
+    batch.verts.insert(batch.verts.end(),{a,e,d,e,c1,d});
+}
+
 void ribbon(EffectBatch& batch, float x0, float y0, float z0, float x1, float y1, float z1, float width,
             float r, float g, float b, float alpha) {
     const MeshVertex a = vertex(x0, y0 - width, z0, r, g, b, alpha, 0.f, 1.f);
@@ -392,10 +446,12 @@ bool EffectSystem::open(const std::string& clientRoot) {
     root_ = clientRoot;
     texture_.clear(); // open() repetido nao deve reutilizar textura do mapa anterior
     resourceCache_.clear();
+    namedResourceCache_.clear();
     magicEffects_.load(root_ + "/scripts/table/magicsingleinfo.txt");
     magicGroups_.load(root_ + "/scripts/table/magicgroupinfo.txt");
     sceneEffects_.load(root_ + "/scripts/table/sceneffectinfo.txt");
     live_.clear();
+    mapSceneClock_ = 0.f;
     batches_.clear();
     report_ = {};
     castParticles_.clear();
@@ -482,7 +538,8 @@ const EffectSystem::VisualResource& EffectSystem::resourceFor(int visualId) {
         for (const std::string& model : definition->models) {
             if (!MagicEffectCatalog::safeName(model)) continue;
             LegacyEffectSummary parsed;
-            if (!inspectLegacyEff(root_ + "/effect/" + model, parsed)) continue;
+            if (!inspectLegacyEff(root_ + "/effect/" + model, parsed,
+                                  historicalRawEffModelParams())) continue;
             std::vector<std::string> refs;
             if (parsed.structured) {
                 refs = parsed.verifiedResources;
@@ -495,15 +552,12 @@ const EffectSystem::VisualResource& EffectSystem::resourceFor(int visualId) {
                     // require the separate DX model geometry converter.
                     if (part.keys.empty()) continue;
                     const bool native = !part.billboard && legacy_mesh::recognized(part.model);
-                    if (part.billboard && resolved.billboards.size() >= 16) continue;
-                    if (native && resolved.nativeMeshes.size() >= 16) continue;
                     // External effect models are lwGeomObjInfo .lgo files.
                     // Only load existing, valid meshes from model/effect.
                     const bool external = !part.billboard && !native &&
                         !legacy_external::filename(part.model).empty();
                     if (!part.billboard && !native && !external) continue;
                     if (external) {
-                        if (resolved.externalMeshes.size() >= 8) continue;
                         Model decoded;
                         if (!legacy_external::load(root_, part.model, decoded)) continue;
                         std::vector<std::string> frames;
@@ -544,7 +598,8 @@ const EffectSystem::VisualResource& EffectSystem::resourceFor(int visualId) {
             // The table can list several *simultaneous* .eff models for one
             // magic ID (for example Frozen Arrow and Black Dragon's Breath).
             // The previous early break discarded every model after the first.
-            // Each track vector has an independent hard cap above.
+            // Compatibility track caps remain opt-out; the historical path
+            // consumes all children accepted by the existing bounded decoder.
         }
         auto tryPart = [&](const std::string& name) {
             if (!MagicEffectCatalog::safeName(name)) return;
@@ -567,6 +622,67 @@ const EffectSystem::VisualResource& EffectSystem::resourceFor(int visualId) {
     return resourceCache_.emplace(visualId, std::move(resolved)).first->second;
 }
 
+const EffectSystem::VisualResource& EffectSystem::resourceForName(const std::string& name) {
+    static const VisualResource empty;
+    if (name.empty() || !MagicEffectCatalog::safeName(name)) return empty;
+    std::string filename=name;
+    if (filename.size()<4 || filename.substr(filename.size()-4)!=".par") filename += ".par";
+    const auto cached=namedResourceCache_.find(filename);
+    if (cached!=namedResourceCache_.end()) return cached->second;
+    if (namedResourceCache_.size()>=64) namedResourceCache_.clear();
+    VisualResource resolved;
+    std::vector<ParticleProfile> particles;
+    if (loadParticles(root_+"/effect/"+filename,root_,particles,&resolved.directStrips)) {
+        for (auto& profile:particles) {
+            if (resolved.particles.size()>=64) break;
+            if (!profile.texture.empty() || (effectModelName(profile.modelName) &&
+                MagicEffectCatalog::safeName(profile.modelName))) {
+                if (resolved.texture.empty()) resolved.texture=profile.texture;
+                resolved.particles.push_back(std::move(profile));
+            }
+        }
+    }
+    resolveNestedModels(resolved);
+    return namedResourceCache_.emplace(filename,std::move(resolved)).first->second;
+}
+
+void EffectSystem::setMapSceneEffects(const std::vector<MapSceneEffectPlacement>& placements) {
+    std::set<std::uint64_t> wanted;
+    if (historical_map_scene_effects::enabled())
+        for (const auto& placement : placements) wanted.insert(placement.key);
+    for (std::size_t i = 0; i < live_.size();) {
+        if (live_[i].mapScene && wanted.find(live_[i].mapPlacementKey) == wanted.end())
+            live_.erase(live_.begin() + static_cast<std::ptrdiff_t>(i));
+        else ++i;
+    }
+    if (!historical_map_scene_effects::enabled()) return;
+    for (const auto& placement : placements) {
+        const bool alreadyLive = std::any_of(live_.begin(), live_.end(), [&](const Instance& effect) {
+            return effect.mapScene && effect.mapPlacementKey == placement.key;
+        });
+        if (alreadyLive) continue;
+        const SceneEffectDefinition* definition = sceneEffects_.find(placement.effectId);
+        if (!definition || definition->particle.empty()) continue;
+        const VisualResource& resource = resourceForName(definition->particle);
+        if (resource.particles.empty()) continue;
+        Instance effect;
+        effect.kind = EffectEvent::Cast;
+        effect.age = mapSceneClock_;
+        effect.life = std::numeric_limits<float>::infinity();
+        effect.expiresAfter = std::numeric_limits<float>::infinity();
+        effect.visualId = -placement.effectId;
+        effect.seed = static_cast<unsigned>(placement.key ^ (placement.key >> 32) ^ 0x9e3779b9u);
+        effect.namedResource = definition->particle;
+        effect.fixedPosition = true;
+        effect.absoluteHeight = true;
+        effect.fixedWorldPosition = {placement.x, placement.height, placement.y};
+        effect.mapScene = true;
+        effect.mapPlacementKey = placement.key;
+        effect.mapSceneYaw = placement.yaw;
+        live_.push_back(std::move(effect));
+    }
+}
+
 void EffectSystem::resolveNestedModels(VisualResource& resource) {
     // MindPower model-rendering .par systems embed an I_Effect, which can in turn
     // contain primitive geometry, billboards or external .lgo mesh tracks.
@@ -580,7 +696,8 @@ void EffectSystem::resolveNestedModels(VisualResource& resource) {
         const char* traceText = std::getenv("TOP_TRACE_SKILL_FX");
         const bool traceNested = traceText && traceText[0] && traceText[0] != '0';
         LegacyEffectSummary document;
-        if (!inspectLegacyEff(root_ + "/effect/" + profile.modelName, document) ||
+        if (!inspectLegacyEff(root_ + "/effect/" + profile.modelName, document,
+                              historicalRawEffModelParams()) ||
             !document.structured) {
             if (traceNested) std::fprintf(stderr,
                 "[skill-fx] nested-eff=%s status=missing_or_unreadable\n",
@@ -591,7 +708,6 @@ void EffectSystem::resolveNestedModels(VisualResource& resource) {
         for(const auto& part:document.document.parts)
             cycleLength=std::max(cycleLength,legacy_eff::duration(part));
         for (const auto& part : document.document.parts) {
-            if (profile.modelTracks.size() >= 8) break;
             if (part.keys.empty()) continue;
             const bool primitive = legacy_mesh::recognized(part.model);
             const std::string externalName = !part.billboard && !primitive ?
@@ -634,7 +750,8 @@ void EffectSystem::resolveNestedModels(VisualResource& resource) {
             if (traceNested && external) std::fprintf(stderr,
                 "[skill-fx] nested-eff=%s external=%s status=loaded geoms=%zu\n",
                 profile.modelName.c_str(), externalName.c_str(), external->geoms.size());
-            profile.modelTracks.push_back({part, tex, std::move(frames), std::move(external), cycleLength});
+            profile.modelTracks.push_back({part, tex, std::move(frames), std::move(external), cycleLength,
+                static_cast<std::size_t>(&part-document.document.parts.data())});
         }
         if (profile.type == 6 && !profile.modelTracks.empty()) {
             if (const char* trace = std::getenv("TOP_TRACE_STRIP_SYSTEM")) {
@@ -716,6 +833,15 @@ void EffectSystem::setPlayerDummyMatrices(
     playerDummyMatrices_ = std::move(matrices);
 }
 
+void EffectSystem::setTargetDummyMatrices(
+        std::unordered_map<int, std::unordered_map<int, std::array<float, 16>>> matrices) {
+    targetDummyMatrices_ = std::move(matrices);
+}
+
+void EffectSystem::setTargetActorRoots(std::unordered_map<int, std::array<float, 3>> roots) {
+    targetActorRoots_ = std::move(roots);
+}
+
 void EffectSystem::setPlayerStripBodyMatrices(
         std::unordered_map<int,std::array<float,16>> matrices){
     stripBodyMatrices_=std::move(matrices);
@@ -734,27 +860,111 @@ void EffectSystem::setPlayerCastAnchor(float worldX, float worldY, float feetHei
     playerCastFeet_ = feetHeight;
 }
 
-void EffectSystem::emit(const EffectEvent& event) {
+const std::unordered_map<int,std::array<float,16>>& EffectSystem::attachmentMatrices(int actor,bool item) const {
+    if(actor==-1)return item?stripItemMatrices_:playerDummyMatrices_;
+    const auto& owners=item?actorItemDummyMatrices_:targetDummyMatrices_;
+    const auto found=owners.find(actor);
+    static const std::unordered_map<int,std::array<float,16>> empty;
+    return found==owners.end()?empty:found->second;
+}
+
+bool EffectSystem::setPlayerAttachedEffect(int slot,int visualId,int dummy) {
+    if(slot<0)return false;
+    for(const auto& effect:live_)
+        if(effect.attachedSlot==slot && effect.visualId==visualId && effect.actorDummy==dummy)
+            return true;
+    live_.erase(std::remove_if(live_.begin(),live_.end(),[&](const auto& effect){
+        return effect.attachedSlot==slot;
+    }),live_.end());
+    if(visualId<=0)return true;
+    const auto& resource=resourceFor(visualId);
+    if(resource.particles.empty() && resource.billboards.empty() &&
+       resource.nativeMeshes.empty() && resource.externalMeshes.empty() && resource.directStrips.empty())
+        return false;
+    Instance effect;
+    effect.kind=EffectEvent::Cast;effect.visualId=visualId;effect.attachedSlot=slot;
+    effect.sourceActorIndex=-1;effect.actorCastFollow=true;effect.actorDummy=dummy;
+    effect.seed=serial_++*2654435761u;
+    effect.life=effect.expiresAfter=std::numeric_limits<float>::infinity();
+    effect.directTrails.resize(resource.directStrips.size());
+    live_.push_back(std::move(effect));
+    return true;
+}
+
+void EffectSystem::setActorItemDummyMatrices(
+    std::unordered_map<int,std::unordered_map<int,std::array<float,16>>> matrices) {
+    actorItemDummyMatrices_=std::move(matrices);
+}
+
+void EffectSystem::emit(const EffectEvent& supplied) {
+    EffectEvent event=supplied;
+    const int source=event.sourceIsPlayer?-1:event.sourceActorIndex;
+    const auto* authored=skillVisuals_.find(event.variant);
+    if(event.kind==EffectEvent::Flight && authored) {
+        // Character::SkyEffect: body dummy, then attack-item dummy, then root.
+        const std::array<float,16>* launch=nullptr;
+        for(const auto& channel:authored->channels)if(channel.kind==SkillVisualChannelKind::Flight) {
+            const auto& body=attachmentMatrices(source,false);
+            const auto b=body.find(channel.dummy);
+            if(channel.dummy>=0 && b!=body.end())launch=&b->second;
+            else {
+                const auto& item=attachmentMatrices(source,true);
+                const auto i=item.find(channel.itemDummy);
+                if(channel.itemDummy>=0 && i!=item.end())launch=&i->second;
+            }
+            break;
+        }
+        if(launch) {
+            event.fromX=(*launch)[12];event.fromY=(*launch)[13];event.fromHeight=(*launch)[14];
+        } else if(source==-1 && playerCastAnchorValid_) {
+            event.fromX=playerCastX_;event.fromY=playerCastY_;event.fromHeight=playerCastFeet_;
+        } else if(source>=0) {
+            const auto root=targetActorRoots_.find(source);
+            if(root!=targetActorRoots_.end()) {
+                event.fromX=root->second[0];event.fromY=root->second[2];event.fromHeight=root->second[1];
+            }
+        }
+        // STAttack uses sTargetDummyLink even if no target-effect ID exists.
+        const auto& target=attachmentMatrices(event.targetActorIndex,false);
+        const auto t=target.find(authored->targetDummy);
+        if(event.targetActorIndex!=-2 && authored->targetDummy>=0 && t!=target.end()) {
+            event.toX=t->second[12];event.toY=t->second[13];event.toHeight=t->second[14];
+        }
+    }
+
     // Skillinfo may declare multiple actor/item effects at cast and distinct
     // target/ground/water effects at impact. The historical table's channels
     // are authoritative, not the old single-ID castId()/hitId() fallback.
-    // The caller still schedules a single cast moment; timing individual
-    // item keyframes and attaching dummies are follow-up migration steps.
-    struct RequestedId { int id; bool surface; int dummy; bool actor = false; bool item = false; };
+    // The default path retains one cast moment. The opt-in callback field lets
+    // Play dispatch the channels whose authored callback matches this event.
+    struct RequestedId { int id; bool surface; int dummy; bool actor = false; bool item = false; bool target = false; };
     std::vector<RequestedId> ids; // Retain each actor channel's historic dummy.
     const SkillVisual* selectedSkill = skillVisuals_.find(event.variant);
     if (selectedSkill) {
         const SkillVisual* visual = selectedSkill;
-        if (event.kind == EffectEvent::Cast) {
-            for (const auto& channel : visual->channels) {
-                if (channel.kind == SkillVisualChannelKind::Actor ||
-                    channel.kind == SkillVisualChannelKind::Item ||
-                    channel.kind == SkillVisualChannelKind::ItemExtra)
-                    if (channel.effectId > 0) ids.push_back({channel.effectId,false,
-                        channel.kind==SkillVisualChannelKind::Actor ? channel.dummy : -1,
+        if (event.isCast()) {
+            if(event.castCallbackKeyFrame()!=-3) {
+                for(const auto& channel:visual->castChannels(event.castCallbackKeyFrame()))
+                    ids.push_back({channel.effectId,false,
+                        channel.kind==SkillVisualChannelKind::Actor ||
+                        channel.kind==SkillVisualChannelKind::Item ||
+                        channel.kind==SkillVisualChannelKind::ItemExtra ? channel.dummy : -1,
                         channel.kind==SkillVisualChannelKind::Actor,
                         channel.kind==SkillVisualChannelKind::Item ||
                         channel.kind==SkillVisualChannelKind::ItemExtra});
+            } else {
+                for (const auto& channel : visual->channels) {
+                    if (channel.kind == SkillVisualChannelKind::Actor ||
+                        channel.kind == SkillVisualChannelKind::Item ||
+                        channel.kind == SkillVisualChannelKind::ItemExtra)
+                        if (channel.effectId > 0) ids.push_back({channel.effectId,false,
+                            channel.kind==SkillVisualChannelKind::Actor ||
+                            channel.kind==SkillVisualChannelKind::Item ||
+                            channel.kind==SkillVisualChannelKind::ItemExtra ? channel.dummy : -1,
+                            channel.kind==SkillVisualChannelKind::Actor,
+                            channel.kind==SkillVisualChannelKind::Item ||
+                            channel.kind==SkillVisualChannelKind::ItemExtra});
+                }
             }
             if (ids.empty() && visual->channels.empty() && visual->castId() > 0)
                 ids.push_back({visual->castId(),false,-1});
@@ -763,7 +973,9 @@ void EffectSystem::emit(const EffectEvent& event) {
         } else if (event.kind == EffectEvent::SkillHit) {
             for (const auto& channel : visual->hitChannels(event.surface))
                 ids.push_back({channel.effectId, channel.kind==SkillVisualChannelKind::Ground ||
-                    channel.kind==SkillVisualChannelKind::Water,-1});
+                    channel.kind==SkillVisualChannelKind::Water,
+                    channel.kind==SkillVisualChannelKind::Target?channel.dummy:-1,
+                    false,false,channel.kind==SkillVisualChannelKind::Target});
             if (ids.empty() && visual->channels.empty() && visual->hitId() > 0)
                 ids.push_back({visual->hitId(),false,-1});
         } else if (visual->hitId() > 0) {
@@ -771,6 +983,8 @@ void EffectSystem::emit(const EffectEvent& event) {
             ids.push_back({visual->hitId(),false,-1});
         }
     }
+    if (ids.empty() && selectedSkill && event.isCast() &&
+        event.castCallbackKeyFrame()!=-3) return;
     if (ids.empty() && selectedSkill && event.kind == EffectEvent::SkillHit)
         return; // result of a magic projectile is scheduled separately at arrival
     if (ids.empty()) ids.push_back({0,false,-1}); // Historical missing-data fallback.
@@ -786,7 +1000,7 @@ void EffectSystem::emit(const EffectEvent& event) {
     const bool traceSkill = allSkillTrace && allSkillTrace[0] && allSkillTrace[0] != '0';
     const char* hiddenIdText = illusion ? std::getenv("TOP_ILLUSION_HIDE_EFFECT_ID") : nullptr;
     const int hiddenId = hiddenIdText ? std::atoi(hiddenIdText) : 0;
-    const char* eventName = event.kind == EffectEvent::Cast ? "cast" :
+    const char* eventName = event.isCast() ? "cast" :
         event.kind == EffectEvent::Flight ? "flight" :
         event.kind == EffectEvent::SkillHit ? "hit" : "other";
 
@@ -798,13 +1012,18 @@ void EffectSystem::emit(const EffectEvent& event) {
     // First resolve group magic (2000..2999) into their simple-magic members.
     // Part_sequence in the original DX9 client launches successive elements
     // at 0.2s intervals. Leaving ID 2002 unresolved rendered a fake effect.
-    struct ScheduledId {int id; float delay; bool groupMember; float fanAngle; bool surface; int dummy; bool actor; bool item;};
+    struct ScheduledId {int id; float delay; bool groupMember; float fanAngle; bool surface; int dummy; bool actor; bool item; bool target;};
     std::vector<ScheduledId> scheduled;
     for (const auto& requested : ids) {
+        // CCharacter::ItemEffect returns false for exactly dummy -1 before
+        // looking up the equipped item. Keep the historical rule opt-in.
+        if (historicalItemEffectRequireDummyEnabled() && requested.item &&
+            requested.dummy == -1) continue;
         const int id=requested.id;
         if (std::any_of(seen.begin(),seen.end(),[&](const RequestedId& other) {
                 return other.id==requested.id && other.surface==requested.surface &&
-                    other.dummy==requested.dummy && other.actor==requested.actor && other.item==requested.item;
+                    other.dummy==requested.dummy && other.actor==requested.actor &&
+                    other.item==requested.item && other.target==requested.target;
             })) continue;
         seen.push_back(requested);
         if (seen.size() > 8) break;
@@ -820,7 +1039,7 @@ void EffectSystem::emit(const EffectEvent& event) {
                             static_cast<float>(group->members.size()-1) : 0.f;
                     scheduled.push_back({1000 + group->members[i],
                         group->motion == 1 ? .2f*static_cast<float>(i) : 0.f,
-                        true,fanAngle,requested.surface,requested.dummy,requested.actor,requested.item});
+                        true,fanAngle,requested.surface,requested.dummy,requested.actor,requested.item,requested.target});
                 }
                 if (traceSkill) std::fprintf(stderr,
                     "[skill-fx] skill=%d kind=%s group=%d members=%zu motion=%d\n",
@@ -829,7 +1048,8 @@ void EffectSystem::emit(const EffectEvent& event) {
             // No invented tornado if group metadata is missing or invalid.
             continue;
         }
-        scheduled.push_back({id, 0.f, false, 0.f,requested.surface,requested.dummy,requested.actor,requested.item});
+        scheduled.push_back({id, 0.f, false, 0.f,requested.surface,requested.dummy,
+                             requested.actor,requested.item,requested.target});
     }
     for (const auto& scheduledId : scheduled) {
         const int id = scheduledId.id;
@@ -911,7 +1131,7 @@ void EffectSystem::emit(const EffectEvent& event) {
         }
 
         Instance effect;
-        effect.kind = event.kind;
+        effect.kind = event.isCast()?EffectEvent::Cast:event.kind;
         effect.age = -scheduledId.delay;
         effect.fromX = event.fromX;
         effect.fromY = event.fromY;
@@ -925,20 +1145,31 @@ void EffectSystem::emit(const EffectEvent& event) {
         }
         effect.variant = event.variant;
         effect.visualId = id;
+        if (event.kind == EffectEvent::Flight && event.targetActorIndex != -2)
+            effect.targetActorIndex = event.targetActorIndex;
         effect.groundAnchored=scheduledId.surface;
-        effect.playerActorCast = event.kind==EffectEvent::Cast && event.sourceIsPlayer &&
+        effect.sourceActorIndex=source;
+        effect.actorCastFollow = event.isCast() && source!=-2 &&
             scheduledId.actor;
-        effect.playerItemCast = event.kind==EffectEvent::Cast && event.sourceIsPlayer &&
+        effect.itemCastFollow = event.isCast() && source!=-2 &&
             scheduledId.item;
+        if (effect.itemCastFollow && scheduledId.dummy >= 0 && scheduledId.dummy <= 255)
+            effect.itemDummy = scheduledId.dummy;
+        if (scheduledId.target && event.targetActorIndex != -2) {
+            if (scheduledId.dummy >= 0 && scheduledId.dummy <= 255)
+                effect.targetDummy = scheduledId.dummy;
+            effect.targetActorIndex = event.targetActorIndex;
+            effect.targetActorFollow = true;
+        }
         // Bind only player-owned ACTOR cast channels. Dummies on items and
         // target monsters are different coordinate spaces and remain pending.
-        if (event.kind==EffectEvent::Cast && event.sourceIsPlayer &&
+        if (effect.actorCastFollow &&
             scheduledId.dummy>=0 && scheduledId.dummy<=255)
             effect.actorDummy=scheduledId.dummy;
         effect.seed = serial_++ * 2654435761u;
         effect.life = event.kind == EffectEvent::Flight ?
                           std::max(0.0001f, event.duration > 0.f ? event.duration : 0.28f) :
-                      event.kind == EffectEvent::Cast ? 0.75f :
+                      event.isCast() ? 0.75f :
                       event.kind == EffectEvent::SkillHit ? 0.55f :
                       event.kind == EffectEvent::Wake ? 0.8f : 0.45f;
         effect.expiresAfter = effect.life;
@@ -946,7 +1177,9 @@ void EffectSystem::emit(const EffectEvent& event) {
             effect.directTrails.resize(resource->directStrips.size());
             for (const ParticleProfile& profile : resource->particles) {
                 const float emission = profile.delayTime + std::max(0.f, profile.playTime);
-                effect.expiresAfter = std::max(effect.expiresAfter, emission + profile.life);
+                const float profileExpiry=historical_model_lifetime::expiry(
+                    emission+profile.life,profile.type,profile.delayTime,profile.playTime);
+                effect.expiresAfter = std::max(effect.expiresAfter, profileExpiry);
             }
             auto includeTracks = [&](const std::vector<VisualResource::BillboardTrack>& tracks) {
                 for (const auto& track : tracks)
@@ -979,6 +1212,11 @@ void EffectSystem::emit(const EffectEvent& event) {
                 const float planar = std::hypot(effect.toX-effect.fromX,effect.toY-effect.fromY);
                 effect.path.speed = event.duration>0.f && planar>1e-7f
                     ? planar/event.duration : magic->velocity;
+                effect.partTraceRequested = historicalPartTraceEnabled() &&
+                    effect.path.mode == 2 && effect.absoluteHeight &&
+                    effect.targetActorIndex != -2;
+                if (effect.partTraceRequested)
+                    effect.partTraceTimeline.reset(effect.path);
                 if(resource) {
                     for(const auto& t:resource->billboards) effect.path.clipLength=std::max(effect.path.clipLength,t.cycleLength);
                     for(const auto& t:resource->nativeMeshes) effect.path.clipLength=std::max(effect.path.clipLength,t.cycleLength);
@@ -986,7 +1224,10 @@ void EffectSystem::emit(const EffectEvent& event) {
                 }
                 if(effect.path.speed>0.f || effect.path.mode==5)
                     effect.life=std::max(.0001f,effect.path.duration());
-                else effect.path.mode=-1; // invalid stationary movement retains legacy fallback
+                else {
+                    effect.path.mode=-1; // invalid stationary movement retains legacy fallback
+                    effect.partTraceRequested=false;
+                }
                 // Stop() terminates every flight component before playing Result.
                 effect.expiresAfter=effect.life;
             }
@@ -995,16 +1236,290 @@ void EffectSystem::emit(const EffectEvent& event) {
     }
 }
 
-void EffectSystem::step(float dt) {
+void EffectSystem::step(float dt, const MapFile* map) {
     if (!std::isfinite(dt) || dt < 0.f) return;
+    mapSceneClock_ += dt;
     std::vector<Instance> arrivals;
     for (std::size_t i = 0; i < live_.size();) {
         Instance& flight = live_[i];
+        const float previousAge = flight.age;
         flight.age += dt;
+        if (flight.kind == EffectEvent::Flight && flight.partTraceRequested &&
+            !flight.partTraceFollowing) {
+            const auto target=targetActorRoots_.find(flight.targetActorIndex);
+            if (target!=targetActorRoots_.end()) {
+                flight.partTraceFollowing=true;
+                flight.expiresAfter=std::numeric_limits<float>::infinity();
+            }
+        }
+        if (flight.partTraceFollowing && !flight.partTraceFinished) {
+            auto target=flight.partTraceTimeline.oldTarget;
+            const auto actor=targetActorRoots_.find(flight.targetActorIndex);
+            if (actor!=targetActorRoots_.end())
+                target={actor->second[0],actor->second[1]+1.f,actor->second[2]};
+            flight.partTraceFinished=flight.partTraceTimeline.advance(
+                dt,target,map,flight.path.speed);
+            if (flight.partTraceFinished) {
+                flight.life=flight.age;
+                flight.expiresAfter=flight.age;
+                flight.partTraceRetirePending=true;
+            }
+        }
+        if (historicalFshadeFrameCountEnabled() &&
+            flight.kind == EffectEvent::Flight && flight.path.mode == historic_magic::kFshade)
+            flight.fshadeTimeline.advance(dt);
+        if (flight.mapScene || (historical_particle_pool::enabled() &&
+             historical_particle_pool::sharedEmitterTimerEnabled()) ||
+            historical_eff_timeline::enabled() ||
+            historical_eff_timeline::controllerClocksEnabled() ||
+            historical_eff_timeline::snowFireEnabled() ||
+            historical_model_timeline::enabled() ||
+            historical_shrink::timelineEnabled() ||
+            historical_blast_group::enabled() ||
+            historical_ripple::enabled() ||
+            (historical_particle_extended::enabled() &&
+             historical_blast3_timeline::enabled()) ||
+            (historical_particle_pool::enabled() && historical_particle_motion::enabled() &&
+             historical_blast_motion::actualDtEnabled()) ||
+            (historical_particle_extended::enabled() &&
+             historical_range2_collision::enabled() &&
+             historical_range2_collision::actualDtEnabled()) ||
+            (historical_arraw_timeline::enabled() &&
+             historical_particle_extended::enabled()) ||
+            (historical_particle_extended::enabled() &&
+             historical_round_timeline::enabled())) {
+            const std::vector<ParticleProfile>* profiles = nullptr;
+            if (!flight.namedResource.empty()) {
+                const auto found = namedResourceCache_.find(flight.namedResource);
+                if (found != namedResourceCache_.end()) profiles = &found->second.particles;
+            } else {
+                const auto found = resourceCache_.find(flight.visualId);
+                if (found != resourceCache_.end()) profiles = &found->second.particles;
+                else profiles = (flight.kind == EffectEvent::Cast ||
+                                 flight.kind == EffectEvent::Flight) ?
+                    &castParticles_ : &hitParticles_;
+            }
+            if (profiles && historical_particle_extended::enabled() &&
+                historical_range2_collision::enabled() &&
+                historical_range2_collision::actualDtEnabled() &&
+                std::any_of(profiles->begin(),profiles->end(),
+                    [](const ParticleProfile& profile){return profile.type==15;})) {
+                flight.range2FrameSteps.push_back({previousAge,flight.age,dt});
+                if (flight.range2Timelines.size()<profiles->size())
+                    flight.range2Timelines.resize(profiles->size());
+            }
+            if (profiles) {
+                if (flight.snowFireTimelines.size() < profiles->size())
+                    flight.snowFireTimelines.resize(profiles->size());
+                if (flight.snowFireEffTimelines.size() < profiles->size())
+                    flight.snowFireEffTimelines.resize(profiles->size());
+                if (flight.modelTimelines.size() < profiles->size())
+                    flight.modelTimelines.resize(profiles->size());
+                if (flight.modelEffTimelines.size() < profiles->size())
+                    flight.modelEffTimelines.resize(profiles->size());
+                if (flight.rippleTimelines.size() < profiles->size())
+                    flight.rippleTimelines.resize(profiles->size());
+                if (flight.rippleEffTimelines.size() < profiles->size())
+                    flight.rippleEffTimelines.resize(profiles->size());
+                if (flight.stripEffTimelines.size() < profiles->size())
+                    flight.stripEffTimelines.resize(profiles->size());
+                if (flight.arrawEffTimelines.size() < profiles->size())
+                    flight.arrawEffTimelines.resize(profiles->size());
+                if (flight.blast3Timelines.size() < profiles->size())
+                    flight.blast3Timelines.resize(profiles->size());
+                if (flight.blast3EffTimelines.size() < profiles->size())
+                    flight.blast3EffTimelines.resize(profiles->size());
+                if (flight.blastMotionTimelines.size() < profiles->size())
+                    flight.blastMotionTimelines.resize(profiles->size());
+                if (flight.blastGroupTimelines.size() < profiles->size())
+                    flight.blastGroupTimelines.resize(profiles->size());
+                if (flight.roundTimelines.size() < profiles->size())
+                    flight.roundTimelines.resize(profiles->size());
+                if (flight.roundEffTimelines.size() < profiles->size())
+                    flight.roundEffTimelines.resize(profiles->size());
+                if (flight.shrinkTimelines.size() < profiles->size())
+                    flight.shrinkTimelines.resize(profiles->size());
+                for (std::size_t profileIndex = 0; profileIndex < profiles->size(); ++profileIndex) {
+                    const ParticleProfile& profile = (*profiles)[profileIndex];
+                    if (profile.type != 1 && profile.type != 2 && profile.type != 3 && profile.type != 4 &&
+                        profile.type != 8 && profile.type != 9 && profile.type != 11 &&
+                        profile.type != 12 &&
+                        profile.type != 5 && profile.type != 6) continue;
+                    const float oldParticleAge = previousAge - profile.delayTime;
+                    const float newParticleAge = flight.age - profile.delayTime;
+                    const float activeDelta = std::max(0.f, newParticleAge) -
+                                              std::max(0.f, oldParticleAge);
+                    const bool useModelTimeline=profile.type==5 &&
+                        (flight.mapScene || historical_model_timeline::enabled());
+                    if (activeDelta <= 0.f && !useModelTimeline) continue;
+                    if (profile.type == 12) {
+                        if (historical_shrink::timelineEnabled()) {
+                            const int count=historical_particle_count::resolve(
+                                profile.type,profile.count,false,
+                                historical_particle_count::enabled());
+                            const float stopAt=profile.playTime>0.f?
+                                std::max(0.f,profile.playTime-profile.delayTime):-1.f;
+                            flight.shrinkTimelines[profileIndex].advance(
+                                count,activeDelta,
+                                {{profile.range[0],profile.range[1],profile.range[2]}},
+                                profile.velocity,profile.life,profile.step,
+                                profile.randomDivisor,profile.frameCount,flight.seed,
+                                stopAt<0.f||newParticleAge<stopAt);
+                        }
+                        continue;
+                    }
+                    if (profile.type == 3) {
+                        if (historical_blast_group::enabled()) {
+                            const int count=historical_particle_count::resolve(
+                                profile.type,profile.count,false,
+                                historical_particle_count::enabled());
+                            const bool mayRestart=profile.playTime<=0.f ||
+                                previousAge<profile.playTime;
+                            flight.blastGroupTimelines[profileIndex].advance(
+                                count,activeDelta,profile.life,profile.frameCount,
+                                profile.randomDivisor,flight.seed,true,mayRestart);
+                        }
+                        if (historical_particle_pool::enabled() &&
+                            historical_particle_motion::enabled() &&
+                            historical_blast_motion::actualDtEnabled()) {
+                            const int count=historical_particle_count::resolve(
+                                profile.type,profile.count,false,
+                                historical_particle_count::enabled());
+                            const float stopAt=profile.playTime>0.f?
+                                std::max(0.f,profile.playTime-profile.delayTime):-1.f;
+                            std::vector<historical_blast_motion::SlotSample> samples(
+                                static_cast<std::size_t>(count));
+                            const auto group=historical_blast_group::enabled()?
+                                flight.blastGroupTimelines[profileIndex].snapshot():
+                                historical_blast_group::SystemSample{};
+                            for(int particle=0;particle<count;++particle) {
+                                const auto sample=historical_blast_group::enabled()&&
+                                    static_cast<std::size_t>(particle)<group.slots.size()?
+                                    group.slots[static_cast<std::size_t>(particle)]:
+                                    historical_particle_pool::at(3,particle,count,newParticleAge,
+                                        profile.life,profile.step,stopAt,flight.seed,
+                                        profile.randomDivisor);
+                                samples[static_cast<std::size_t>(particle)]=
+                                    {sample.alive,sample.generation};
+                            }
+                            flight.blastMotionTimelines[profileIndex].advance(
+                                activeDelta,samples);
+                        }
+                        continue;
+                    }
+                    if (profile.type == 6) {
+                        if ((flight.mapScene || historical_eff_timeline::enabled() ||
+                             historical_eff_timeline::controllerClocksEnabled()) &&
+                            !profile.modelTracks.empty())
+                            flight.stripEffTimelines[profileIndex].advance(
+                                activeDelta, profile.modelTracks,
+                                legacy_strip_system::historicalCyclesEnabled() || flight.mapScene);
+                        continue;
+                    }
+                    if (profile.type == 5) {
+                        if (useModelTimeline) {
+                            const float frameDelta=historical_model_timeline::controllerDelta(
+                                previousAge,dt,profile.delayTime);
+                            flight.modelTimelines[profileIndex].advance(
+                                frameDelta,profile.life,
+                                static_cast<unsigned>(profile.frameCount));
+                            if ((flight.mapScene || historical_model_eff_timeline::enabled()) &&
+                                !profile.modelTracks.empty() &&
+                                !flight.modelTimelines[profileIndex].holdingLastFrame)
+                                flight.modelEffTimelines[profileIndex].advance(
+                                    frameDelta,profile.modelTracks,true);
+                        }
+                        continue;
+                    }
+                    if (profile.type == 8) {
+                        if (historical_arraw_timeline::enabled() &&
+                            historical_particle_extended::enabled()) {
+                            flight.modelTimelines[profileIndex].advance(
+                                activeDelta, profile.life,
+                                static_cast<unsigned>(profile.frameCount));
+                            if (!profile.modelTracks.empty())
+                                flight.arrawEffTimelines[profileIndex].advance(
+                                    activeDelta, profile.modelTracks, true);
+                        }
+                        continue;
+                    }
+                    if (profile.type == 9) {
+                        if (historical_particle_extended::enabled() &&
+                            historical_round_timeline::enabled()) {
+                            const int count=historical_particle_count::resolve(
+                                profile.type,profile.count,false,false);
+                            flight.roundTimelines[profileIndex].advance(
+                                count,activeDelta,profile.life,
+                                static_cast<unsigned>(profile.frameCount),profile.velocity);
+                            if (!profile.modelTracks.empty())
+                                flight.roundEffTimelines[profileIndex].advance(
+                                    activeDelta,profile.modelTracks,true);
+                        }
+                        continue;
+                    }
+                    if (profile.type == 11) {
+                        if (historical_particle_extended::enabled() &&
+                            historical_blast3_timeline::enabled()) {
+                            const int count=historical_particle_count::resolve(
+                                profile.type,profile.count,false,false);
+                            flight.blast3Timelines[profileIndex].advance(count,activeDelta,
+                                profile.life,profile.frameCount,profile.velocity,
+                                {{profile.direction[0],profile.direction[1],profile.direction[2]}},
+                                {{profile.acceleration[0],profile.acceleration[1],profile.acceleration[2]}});
+                            if(!profile.modelTracks.empty())
+                                flight.blast3EffTimelines[profileIndex].advance(
+                                    activeDelta,profile.modelTracks,true);
+                        }
+                        continue;
+                    }
+                    if (profile.type == 4) {
+                        if (flight.mapScene || historical_ripple::enabled()) {
+                            const int rippleCount=historical_particle_count::resolve(
+                                profile.type,profile.count,false,false);
+                            const float stopAt=!flight.mapScene&&profile.playTime>0.f?
+                                std::max(0.f,profile.playTime-profile.delayTime):-1.f;
+                            flight.rippleTimelines[profileIndex].advance(
+                                rippleCount,activeDelta,profile.life,profile.step,stopAt,
+                                flight.seed,profile.randomDivisor,profile.frameCount,
+                                stopAt<0.f||newParticleAge<stopAt);
+                            if (!profile.modelTracks.empty())
+                                flight.rippleEffTimelines[profileIndex].advance(
+                                    activeDelta,profile.modelTracks,true);
+                        }
+                        continue;
+                    }
+                    if ((profile.type == 1 || profile.type == 2) &&
+                        historical_eff_timeline::snowFireEnabled() &&
+                        !profile.mediayEff && !profile.modelTracks.empty())
+                        flight.snowFireEffTimelines[profileIndex].advance(
+                            activeDelta, profile.modelTracks, true);
+                    if (!historical_particle_pool::enabled() ||
+                        !historical_particle_pool::sharedEmitterTimerEnabled()) continue;
+                    float stopAt = profile.playTime > 0.f ?
+                        std::max(0.f, profile.playTime - profile.delayTime) : -1.f;
+                    if (profile.type == 2 && profileIndex < flight.fireHitStopTimes.size() &&
+                        flight.fireHitStopTimes[profileIndex] >= 0.f)
+                        stopAt = flight.fireHitStopTimes[profileIndex];
+                    const int count = historical_particle_count::resolve(
+                        profile.type, profile.count, false,
+                        historical_particle_count::enabled());
+                    const bool snowCanSpawn = profile.type != 1 ||
+                        (profile.direction[2] != 0.f && profile.velocity != 0.f);
+                    flight.snowFireTimelines[profileIndex].advance(
+                        profile.type, count, activeDelta, profile.life, profile.step,
+                        stopAt, flight.seed, profile.randomDivisor, profile.frameCount,
+                        snowCanSpawn, stopAt < 0.f || newParticleAge < stopAt,
+                        {{profile.acceleration[0], profile.acceleration[1],
+                          profile.acceleration[2]}},
+                        historical_particle_jitter::frameAccelerationEnabled());
+                }
+            }
+        }
         // DirectX CMagicCtrl::Stop() fires its .par Result when the missile
         // reaches the target. A damage HIT/MISS event is a separate channel.
-        if (flight.kind == EffectEvent::Flight && !flight.resultStarted &&
-            flight.age >= flight.life) {
+        const bool arrived = flight.partTraceFollowing ? flight.partTraceFinished :
+            flight.age >= flight.life;
+        if (flight.kind == EffectEvent::Flight && !flight.resultStarted && arrived) {
             flight.resultStarted = true;
             // IDs 1000..1999 address magicsingleinfo; grouped magic already
             // expands to individual simple-magic IDs in EffectSystem::emit.
@@ -1022,15 +1537,19 @@ void EffectSystem::step(float dt) {
                         result.fromY = flight.fromY;
                         result.toX = flight.toX;
                         result.toY = flight.toY;
-                        if (historic_magic::knownMode(flight.path.mode)) {
-                            const auto arrival=flight.path.position(flight.life);
+                        if (flight.partTraceFollowing ||
+                            historic_magic::knownMode(flight.path.mode)) {
+                            const auto arrival=flight.partTraceFollowing
+                                ? flight.partTraceTimeline.position
+                                : flight.path.position(flight.life);
                             result.toX=arrival.x;
                             result.toY=arrival.z;
                             result.absoluteHeight=flight.absoluteHeight;
                             result.path.to=arrival;
                         }
                         result.life = 0.55f;
-                        result.age = std::max(0.f, flight.age-flight.life);
+                        result.age = historicalMagicResultStartsOnArrival() ? 0.f :
+                            std::max(0.f, flight.age-flight.life);
                         result.seed = serial_++ * 2654435761u;
                         result.expiresAfter = result.life;
                         // SK2.16-C: opt-in diagnostic for the ice .lgo impact.
@@ -1070,7 +1589,10 @@ void EffectSystem::step(float dt) {
                 }
             }
         }
-        if (flight.age >= flight.expiresAfter)
+        if (flight.partTraceRetirePending) {
+            flight.partTraceRetirePending=false;
+            ++i;
+        } else if (!flight.mapScene && flight.attachedSlot<0 && flight.age >= flight.expiresAfter)
             live_.erase(live_.begin() + static_cast<std::ptrdiff_t>(i));
         else ++i;
     }
@@ -1098,28 +1620,72 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
         const auto* magic=magicEffects_.find(effect.visualId-1000);
         return magic ? magic->renderMode : -1;
     };
-    const auto positionFor = [&](const Instance& effect) -> historic_magic::Vec3 {
-        // Player actor cast channels track their real dummy at EVERY frame.
+    const auto positionForAge = [&](const Instance& effect,float sampleAge) -> historic_magic::Vec3 {
+        if (effect.fixedPosition) return effect.fixedWorldPosition;
+        // Explicit actor cast channels track their own dummy at EVERY frame.
         // The matrix is DX row-vector XYZ (Z-up); GL world is X/height/Y.
-        if (effect.playerActorCast) {
+        if (effect.actorCastFollow) {
             if (effect.actorDummy>=0) {
-                const auto found=playerDummyMatrices_.find(effect.actorDummy);
-                if (found!=playerDummyMatrices_.end()) {
+                const auto& matrices=attachmentMatrices(effect.sourceActorIndex,false);
+                const auto found=matrices.find(effect.actorDummy);
+                if (found!=matrices.end()) {
                     const auto& m=found->second;
                     return {m[12],m[14],m[13]};
                 }
             }
             // SK2.13-A only followed dummies when an opt-in switch was set.
             // No dummy is not a reason to leave an actor aura at the old spot.
-            if (playerCastAnchorValid_)
-                return {playerCastX_,playerCastFeet_+.9f,playerCastY_};
+            if (effect.sourceActorIndex==-1 && playerCastAnchorValid_)
+                return {playerCastX_,playerCastFeet_,playerCastY_};
+            const auto root=targetActorRoots_.find(effect.sourceActorIndex);
+            if(root!=targetActorRoots_.end())return {root->second[0],root->second[1],root->second[2]};
+        }
+        // DX9 CCharacter::ItemEffect follows GetAttackItem() at the skill's
+        // authored item dummy. The GL bridge already samples those matrices
+        // from the same rendered .lab frame for direct strips and ordinary
+        // .eff/.par channels.
+        if (effect.itemCastFollow && historicalItemDummyBindingEnabled() &&
+            effect.itemDummy >= 0) {
+            const auto& matrices=attachmentMatrices(effect.sourceActorIndex,true);
+            const auto found=matrices.find(effect.itemDummy);
+            if (found!=matrices.end()) {
+                const auto& m=found->second;
+                return {m[12],m[14],m[13]};
+            }
+            // ItemEffect emits at GetPos() when the item dummy is absent.
+            // Do not substitute the unrelated generic body-height offset.
+            if (effect.sourceActorIndex==-1 && playerCastAnchorValid_)
+                return {playerCastX_,playerCastFeet_,playerCastY_};
+            const auto root=targetActorRoots_.find(effect.sourceActorIndex);
+            if(root!=targetActorRoots_.end())return {root->second[0],root->second[1],root->second[2]};
+        }
+        if (effect.kind == EffectEvent::SkillHit && historicalTargetDummyBindingEnabled() &&
+            effect.targetActorFollow) {
+            if (effect.targetDummy >= 0) {
+                const auto actor=targetDummyMatrices_.find(effect.targetActorIndex);
+                if (actor!=targetDummyMatrices_.end()) {
+                    const auto found=actor->second.find(effect.targetDummy);
+                    if (found!=actor->second.end()) {
+                        const auto& m=found->second;
+                        return {m[12],m[14],m[13]};
+                    }
+                }
+            }
+            const auto root=targetActorRoots_.find(effect.targetActorIndex);
+            if (root!=targetActorRoots_.end())
+                return {root->second[0],root->second[1],root->second[2]};
+        }
+        if (effect.kind==EffectEvent::Flight && effect.partTraceFollowing) {
+            if (sampleAge>=effect.partTraceTimeline.renderAge)
+                return effect.partTraceTimeline.renderPosition;
+            return effect.partTraceTimeline.positionAt(sampleAge);
         }
         historic_magic::Vec3 p;
         if(effect.kind==EffectEvent::Flight && historic_magic::knownMode(effect.path.mode))
-            p=effect.path.position(effect.age);
+            p=effect.path.position(sampleAge);
         else {
             const float travel=effect.kind==EffectEvent::Flight?
-                std::clamp(effect.age/std::max(.0001f,effect.life),0.f,1.f):
+                std::clamp(sampleAge/std::max(.0001f,effect.life),0.f,1.f):
                 (effect.kind==EffectEvent::SkillHit?1.f:0.f);
             p={effect.fromX+(effect.toX-effect.fromX)*travel,
                effect.absoluteHeight?effect.path.to.y:0.f,
@@ -1131,6 +1697,221 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
         }
         return p;
     };
+    const auto positionFor = [&](const Instance& effect) -> historic_magic::Vec3 {
+        return positionForAge(effect,effect.age);
+    };
+    const auto orientationFor = [&](const Instance& effect) {
+        historic_magic::Path orientation=effect.path;
+        if (effect.partTraceFollowing) {
+            orientation.from=effect.partTraceTimeline.renderPosition;
+            orientation.to=orientation.from+effect.partTraceTimeline.renderDirection;
+        }
+        return std::array<float,2>{{
+            historic_magic::knownMode(orientation.mode)?orientation.yaw():0.f,
+            historic_magic::knownMode(orientation.mode)?orientation.pitch():0.f}};
+    };
+    const auto dummyBindingFor = [&](const Instance& effect) -> const std::array<float,16>* {
+        if (effect.actorCastFollow && effect.actorDummy >= 0) {
+            const auto& matrices=attachmentMatrices(effect.sourceActorIndex,false);
+            const auto found=matrices.find(effect.actorDummy);
+            return found!=matrices.end()?&found->second:nullptr;
+        }
+        if (effect.itemCastFollow && historicalItemDummyBindingEnabled() && effect.itemDummy >= 0) {
+            const auto& matrices=attachmentMatrices(effect.sourceActorIndex,true);
+            const auto found=matrices.find(effect.itemDummy);
+            return found!=matrices.end()?&found->second:nullptr;
+        }
+        if (effect.targetActorFollow && historicalTargetDummyBindingEnabled() && effect.targetDummy >= 0) {
+            const auto actor = targetDummyMatrices_.find(effect.targetActorIndex);
+            if(actor!=targetDummyMatrices_.end()) {
+                const auto found=actor->second.find(effect.targetDummy);
+                if(found!=actor->second.end())return &found->second;
+            }
+        }
+        return nullptr;
+    };
+    const auto range2At = [&](const ParticleProfile& profile,int count,
+                              float age,unsigned seed,const historic_magic::Vec3& origin,
+                              const std::array<float,3>& path,
+                              const std::vector<unsigned>& reportedGeneration) {
+        const historical_range2_collision::V3 base{{
+            origin.x+profile.offset[0]+path[0],
+            origin.z+profile.offset[1]+path[1],
+            origin.y-.9f+profile.offset[2]+path[2]}};
+        const historical_range2_collision::V3 range{{profile.range[0],profile.range[1],profile.range[2]}};
+        const historical_range2_collision::V3 direction{{profile.direction[0],profile.direction[1],profile.direction[2]}};
+        const auto ground=[&](int x,int y) {
+            return historical_range2_ground::sample(map,x,y);
+        };
+        return historical_range2_collision::simulate(age,count,profile.life,
+            profile.step,profile.velocity,base,range,direction,seed,ground,map.ok(),
+            reportedGeneration);
+    };
+    if (historical_particle_extended::enabled() && historical_range2_collision::enabled()) {
+        struct PendingRange2Hit {
+            std::string effect;
+            historic_magic::Vec3 position;
+            float age=0.f;
+            int variant=0;
+            unsigned seed=0;
+        };
+        std::vector<PendingRange2Hit> pending;
+        for (Instance& effect:live_) {
+            if (effect.age<0.f || !effect.namedResource.empty()) continue;
+            const auto asset=resourceCache_.find(effect.visualId);
+            if (asset==resourceCache_.end()) {
+                effect.range2FrameSteps.clear();
+                continue;
+            }
+            const auto origin=positionFor(effect);
+            for (std::size_t profileIndex=0;profileIndex<asset->second.particles.size();++profileIndex) {
+                const ParticleProfile& profile=asset->second.particles[profileIndex];
+                if (profile.type!=15 || effect.age<profile.delayTime) continue;
+                const float age=effect.age-profile.delayTime;
+                const float pathAge=profile.playTime>0.f?std::min(age,profile.playTime):age;
+                const auto path=pathPosition(profile,pathAge);
+                const int count=std::min(profile.count,24);
+                const std::size_t baseIndex=profileIndex*100u;
+                const bool actualDt=historical_range2_collision::actualDtEnabled() &&
+                                    !effect.actorCastFollow;
+                if(actualDt&&effect.range2Timelines.size()<asset->second.particles.size())
+                    effect.range2Timelines.resize(asset->second.particles.size());
+                if(actualDt&&profileIndex<effect.range2Timelines.size()) {
+                    if(!effect.range2FrameSteps.empty()) {
+                    auto& timeline=effect.range2Timelines[profileIndex];
+                    const historical_range2_collision::V3 range{{
+                        profile.range[0],profile.range[1],profile.range[2]}};
+                    const historical_range2_collision::V3 direction{{
+                        profile.direction[0],profile.direction[1],profile.direction[2]}};
+                    const auto ground=[&](int x,int y) {
+                        return historical_range2_ground::sample(map,x,y);
+                    };
+                    for(const auto& frame:effect.range2FrameSteps) {
+                        if(frame.oldAge<profile.delayTime)continue;
+                        const float frameAge=frame.newAge-profile.delayTime;
+                        const float framePathAge=profile.playTime>0.f?
+                            std::min(frameAge,profile.playTime):frameAge;
+                        const auto frameOrigin=positionForAge(effect,frame.newAge);
+                        const auto framePath=pathPosition(profile,framePathAge);
+                        const historical_range2_collision::V3 base{{
+                            frameOrigin.x+profile.offset[0]+framePath[0],
+                            frameOrigin.z+profile.offset[1]+framePath[1],
+                            frameOrigin.y-.9f+profile.offset[2]+framePath[2]}};
+                        const auto frameResult=timeline.advance(frame.dt,count,profile.life,
+                            profile.step,profile.velocity,base,range,direction,
+                            effect.seed,ground,map.ok());
+                        for(const auto& hit:frameResult.hits) {
+                            if(!profile.hitEffect.empty())
+                                pending.push_back({profile.hitEffect,
+                                    {hit.position[0],hit.position[2],hit.position[1]},
+                                    std::max(0.f,effect.age-frame.newAge),
+                                    effect.variant,serial_++*2654435761u});
+                        }
+                    }
+                    }
+                    continue;
+                }
+                if(effect.range2HitGenerations.size()<baseIndex+static_cast<std::size_t>(count))
+                    effect.range2HitGenerations.resize(baseIndex+static_cast<std::size_t>(count));
+                std::vector<unsigned> reported(static_cast<std::size_t>(count));
+                for(int particle=0;particle<count;++particle)
+                    reported[static_cast<std::size_t>(particle)]=
+                        effect.range2HitGenerations[baseIndex+static_cast<std::size_t>(particle)];
+                const auto system=range2At(profile,count,age,effect.seed,origin,path,reported);
+                for(const auto& hit:system.hits) {
+                    const std::size_t index=baseIndex+static_cast<std::size_t>(hit.slot);
+                    effect.range2HitGenerations[index]=std::max(
+                        effect.range2HitGenerations[index],hit.generation);
+                    if(!profile.hitEffect.empty())
+                        pending.push_back({profile.hitEffect,
+                            {hit.position[0],hit.position[2],hit.position[1]},
+                            hit.age,effect.variant,serial_++*2654435761u});
+                }
+            }
+            effect.range2FrameSteps.clear();
+        }
+        for (const auto& hit:pending) {
+            const VisualResource& visual=resourceForName(hit.effect);
+            if (visual.particles.empty()) continue;
+            Instance child;
+            child.kind=EffectEvent::SkillHit;
+            child.age=hit.age;
+            child.life=.55f;
+            child.expiresAfter=child.life;
+            for (const auto& profile:visual.particles)
+                child.expiresAfter=std::max(child.expiresAfter,
+                    profile.delayTime+std::max(0.f,profile.playTime)+profile.life);
+            child.variant=hit.variant;
+            child.seed=hit.seed;
+            child.namedResource=hit.effect;
+            child.absoluteHeight=true;
+            child.groundAnchored=true;
+            child.fixedPosition=true;
+            child.fixedWorldPosition=hit.position;
+            live_.push_back(std::move(child));
+        }
+    }
+    if (historical_fire_hit::enabled() && historical_particle_pool::enabled()) {
+        struct PendingFireHit {
+            std::string effect;
+            historic_magic::Vec3 position;
+            float age = 0.f;
+            int variant = 0;
+            unsigned seed = 0;
+        };
+        std::vector<PendingFireHit> pending;
+        for (Instance& effect : live_) {
+            if (effect.age < 0.f || !effect.namedResource.empty()) continue;
+            const auto asset = resourceCache_.find(effect.visualId);
+            if (asset == resourceCache_.end()) continue;
+            if (effect.fireHitReported.size() < asset->second.particles.size())
+                effect.fireHitReported.resize(asset->second.particles.size(), 0);
+            if (effect.fireHitStopTimes.size() < asset->second.particles.size())
+                effect.fireHitStopTimes.resize(asset->second.particles.size(), -1.f);
+            const auto origin = positionFor(effect);
+            for (std::size_t index = 0; index < asset->second.particles.size(); ++index) {
+                const ParticleProfile& profile = asset->second.particles[index];
+                if (profile.type != 2 || profile.hitEffect.empty() ||
+                    profile.pathPoints.size() < 2 || !map.ok()) continue;
+                const auto event = historical_fire_hit::at(effect.age, profile.delayTime,
+                    profile.playTime, profile.pathVelocity, profile.pathDistances,
+                    !profile.hitEffect.empty(), map.ok(), effect.fireHitReported[index] != 0);
+                if (!event.trigger) continue;
+                effect.fireHitReported[index] = 1;
+                effect.fireHitStopTimes[index] = event.stopAt;
+                const float pathAge = std::max(0.f, effect.age - profile.delayTime);
+                const auto path = pathPosition(profile, pathAge);
+                historic_magic::Vec3 hitPosition{
+                    origin.x + path[0], origin.y + path[2], origin.z + path[1]};
+                const float ground = map.range2GroundHeightAt(
+                    static_cast<int>(hitPosition.x) * 2,
+                    static_cast<int>(hitPosition.z) * 2);
+                hitPosition.y = ground < 0.f ? 0.1f : ground;
+                pending.push_back({profile.hitEffect, hitPosition, 0.f,
+                                   effect.variant, serial_++ * 2654435761u});
+            }
+        }
+        for (const auto& hit : pending) {
+            const VisualResource& visual = resourceForName(hit.effect);
+            if (visual.particles.empty()) continue;
+            Instance child;
+            child.kind = EffectEvent::SkillHit;
+            child.age = hit.age;
+            child.life = .55f;
+            child.expiresAfter = child.life;
+            for (const auto& profile : visual.particles)
+                child.expiresAfter = std::max(child.expiresAfter,
+                    profile.delayTime + std::max(0.f, profile.playTime) + profile.life);
+            child.variant = hit.variant;
+            child.seed = hit.seed;
+            child.namedResource = hit.effect;
+            child.absoluteHeight = true;
+            child.groundAnchored = true;
+            child.fixedPosition = true;
+            child.fixedWorldPosition = hit.position;
+            live_.push_back(std::move(child));
+        }
+    }
     const auto hasAuthoredVisual = [&](const Instance& effect) {
         const auto asset = resourceCache_.find(effect.visualId);
         if (asset == resourceCache_.end()) return false;
@@ -1149,11 +1930,13 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
     // equipment dummy endpoints are unavailable.
     for (Instance& effect : live_) {
         if(effect.age<0.f || effect.kind!=EffectEvent::Cast ||
-           (!effect.playerActorCast&&!effect.playerItemCast))continue;
+           (!effect.actorCastFollow&&!effect.itemCastFollow))continue;
         const auto asset=resourceCache_.find(effect.visualId);
         if(asset==resourceCache_.end())continue;
         const auto& definitions=asset->second.directStrips;
-        const auto& matrices=effect.playerItemCast?stripItemMatrices_:stripBodyMatrices_;
+        const auto& matrices=effect.sourceActorIndex==-1 ?
+            (effect.itemCastFollow?stripItemMatrices_:stripBodyMatrices_) :
+            attachmentMatrices(effect.sourceActorIndex,effect.itemCastFollow);
         for(std::size_t i=0;i<definitions.size()&&i<effect.directTrails.size();++i){
             const auto& def=definitions[i];
             if(def.texture.empty())continue;
@@ -1163,21 +1946,23 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
             if(a==matrices.end()||b==matrices.end()){
                 if(traceOn&&!effect.directStripMissingLogged){
                     std::fprintf(stderr,"[direct-strip] skill=%d visual=%d owner=%s missing_dummies=%d,%d\n",
-                        effect.variant,effect.visualId,effect.playerItemCast?"item":"actor",
+                        effect.variant,effect.visualId,effect.itemCastFollow?"item":"actor",
                         def.dummyA,def.dummyB);
                     effect.directStripMissingLogged=true;
                 }
                 continue;
             }
             auto& history=effect.directTrails[i];
-            legacy_direct_strip::append(history,def,effect.age,a->second,b->second);
+            // The covered player actor/item routes bind the DX9 defaults:
+            // SetStripCharacter leaves m_bLoop=false and SetStripItem uses false.
+            legacy_direct_strip::append(history,def,effect.age,a->second,b->second,false);
             EffectBatch next;next.mode=4;next.texture=def.texture;
             setEffectBlend(next,def.srcBlend,def.dstBlend);
             legacy_direct_strip::emit(history,def,effect.age,next.verts);
             if(!next.verts.empty()){
                 if(traceOn&&!effect.directStripLogged){
                     std::fprintf(stderr,"[direct-strip] skill=%d visual=%d owner=%s texture=%s pairs=%zu triangles=%zu dx9=(%d,%d)\n",
-                        effect.variant,effect.visualId,effect.playerItemCast?"item":"actor",
+                        effect.variant,effect.visualId,effect.itemCastFollow?"item":"actor",
                         def.texture.c_str(),history.pairs.size(),next.verts.size()/3,
                         def.srcBlend,def.dstBlend);
                     effect.directStripLogged=true;
@@ -1340,17 +2125,24 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
             const auto uv = legacy_eff::sampleUV(part, authoredTime);
             // MindPower uses (x, y=ground, z=up); OpenGL world uses
             // (x, height, z=ground) as in main.cpp/terrain conversion.
-            historic_magic::forEachModelCopy(movementFor(effect), effect.age,
-                baseX,baseZ,effect.fromX,effect.fromY,effect.toX,effect.toY,
-                [&](float x,float z,float size,float alpha) {
+            auto emitBillboardCopy=[&](float x,float z,float size,float alpha) {
                     quadRotated(*dest, x+key.position[0], floor+.9f+key.position[2],
-                        z+key.position[1], width*.3f*size*
+                        z+key.position[1], width*historical_effect_units::planeHalfExtent*size*
                         frozenArrowMultiplier(effect.variant,effect.visualId),
                         view,key.angle[2],
                         std::clamp(key.color[0],0.f,1.f),std::clamp(key.color[1],0.f,1.f),
                         std::clamp(key.color[2],0.f,1.f),std::clamp(key.color[3]*alpha,0.f,1.f),&uv,
-                        height*.3f*size*frozenArrowMultiplier(effect.variant,effect.visualId));
-                });
+                        height*historical_effect_units::planeHalfExtent*size*frozenArrowMultiplier(effect.variant,effect.visualId));
+                };
+            if (historicalFshadeFrameCountEnabled() && effect.kind == EffectEvent::Flight &&
+                movementFor(effect) == historic_magic::kFshade) {
+                historic_magic::forEachModelCopy(movementFor(effect),effect.age,
+                    effect.fshadeTimeline.state(effect.age),baseX,baseZ,
+                    effect.fromX,effect.fromY,effect.toX,effect.toY,emitBillboardCopy);
+            } else {
+                historic_magic::forEachModelCopy(movementFor(effect),effect.age,
+                    baseX,baseZ,effect.fromX,effect.fromY,effect.toX,effect.toY,emitBillboardCopy);
+            }
         }
     }
 
@@ -1400,13 +2192,12 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
             for (const auto& point : primitive.points) defaultUV.push_back(point.uv);
             auto authoredUV = legacy_eff::sampleMeshUV(part, at, defaultUV);
             const int movement=movementFor(effect);
-            const float heading=historic_magic::knownMode(effect.path.mode)?effect.path.yaw():0.f;
-            const float pitch=historic_magic::knownMode(effect.path.mode)?effect.path.pitch():0.f;
-            // Legacy 05-K's generic 0.3 world scale makes the 2x2 plane of
-            // 04000009.eff only 0.6 m across. The original Illusion Slash
-            // should read as a visible ranged wave, not a tiny speck.
-            // Optional multiplier permits visual tuning without rebuilding.
-            float worldScale = .3f;
+            const auto orientation=orientationFor(effect);
+            const float heading=orientation[0];
+            const float pitch=orientation[1];
+            // CEffectModel and LAB dummies share world units. Preserve the
+            // authored size, with the existing provisional skill tuning below.
+            float worldScale = historical_effect_units::mesh;
             if (effect.kind == EffectEvent::Flight && effect.variant == 81 &&
                 effect.visualId == 1018) {
                 // DX9 Part_fshade itself performs Scaling(3) after the first
@@ -1423,14 +2214,21 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
             }
             worldScale *= frozenArrowMultiplier(effect.variant,effect.visualId);
             const auto key=legacy_eff::sample(part,at);
-            historic_magic::forEachModelCopy(movement,effect.age,
-                baseX,baseZ,effect.fromX,effect.fromY,effect.toX,effect.toY,
-                [&](float x,float z,float size,float alpha) {
+            auto emitMagicCopy=[&](float x,float z,float size,float alpha) {
                     auto shaded=key;
                     shaded.color[3]*=alpha;
                     legacy_mesh::emit(primitive,shaded,authoredUV,x,floor+.9f,z,
                                       dest->verts,worldScale*size,heading,pitch);
-                });
+                };
+            if (historicalFshadeFrameCountEnabled() && effect.kind == EffectEvent::Flight &&
+                movement == historic_magic::kFshade) {
+                historic_magic::forEachModelCopy(movement,effect.age,
+                    effect.fshadeTimeline.state(effect.age),baseX,baseZ,
+                    effect.fromX,effect.fromY,effect.toX,effect.toY,emitMagicCopy);
+            } else {
+                historic_magic::forEachModelCopy(movement,effect.age,
+                    baseX,baseZ,effect.fromX,effect.fromY,effect.toX,effect.toY,emitMagicCopy);
+            }
         }
     }
 
@@ -1486,17 +2284,23 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                 const auto animatedUV = legacy_eff::sampleMeshUV(part, at, defaultUV);
                 const auto oldCount = dest->verts.size();
                 const auto key=legacy_eff::sample(part,at);
-                historic_magic::forEachModelCopy(movementFor(effect),effect.age,
-                    baseX,baseZ,effect.fromX,effect.fromY,effect.toX,effect.toY,
-                    [&](float x,float z,float size,float alpha) {
+                auto emitNativeCopy=[&](float x,float z,float size,float alpha) {
                         auto shaded=key;
                         shaded.color[3]*=alpha;
                         legacy_mesh::emit(primitive,shaded,animatedUV,
-                            x,floor+.9f,z,dest->verts,.3f*size*
+                            x,floor+.9f,z,dest->verts,historical_effect_units::mesh*size*
                             frozenArrowMultiplier(effect.variant,effect.visualId),
-                            historic_magic::knownMode(effect.path.mode)?effect.path.yaw():0.f,
-                            historic_magic::knownMode(effect.path.mode)?effect.path.pitch():0.f);
-                    });
+                            orientationFor(effect)[0], orientationFor(effect)[1]);
+                    };
+                if (historicalFshadeFrameCountEnabled() && effect.kind == EffectEvent::Flight &&
+                    movementFor(effect) == historic_magic::kFshade) {
+                    historic_magic::forEachModelCopy(movementFor(effect),effect.age,
+                        effect.fshadeTimeline.state(effect.age),baseX,baseZ,
+                        effect.fromX,effect.fromY,effect.toX,effect.toY,emitNativeCopy);
+                } else {
+                    historic_magic::forEachModelCopy(movementFor(effect),effect.age,
+                        baseX,baseZ,effect.fromX,effect.fromY,effect.toX,effect.toY,emitNativeCopy);
+                }
                 // Blend subset material diffuse with the authored effect color.
                 const float red = std::isfinite(subset.r) ? std::clamp(subset.r, 0.f, 1.f) : 1.f;
                 const float green = std::isfinite(subset.g) ? std::clamp(subset.g, 0.f, 1.f) : 1.f;
@@ -1515,21 +2319,30 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
     // billboards OpenGL; cada textura historica conserva seu proprio lote.
     for (const Instance& effect : live_) {
         if (effect.age < 0.f) continue;
-        const auto asset = resourceCache_.find(effect.visualId);
+        const VisualResource* asset=nullptr;
+        if (!effect.namedResource.empty()) {
+            const auto named=namedResourceCache_.find(effect.namedResource);
+            if (named!=namedResourceCache_.end()) asset=&named->second;
+        } else {
+            const auto found=resourceCache_.find(effect.visualId);
+            if (found!=resourceCache_.end()) asset=&found->second;
+        }
         // An authored .eff mesh without declared .par must remain mesh-only.
         // Previously the empty particle vector fell through to hpushf.par
         // (or hpusht.par), superimposing generic rings on the real flight
         // geometry. In particular, magicsingleinfo ID 18 (visual 1018)
         // declares 04000009.eff and ZERO particle controllers.
-        if (asset != resourceCache_.end() && asset->second.particles.empty() &&
-            (!asset->second.billboards.empty() || !asset->second.nativeMeshes.empty() ||
-             !asset->second.externalMeshes.empty() || !asset->second.directStrips.empty())) continue;
+        if (asset && asset->particles.empty() &&
+            (!asset->billboards.empty() || !asset->nativeMeshes.empty() ||
+             !asset->externalMeshes.empty() || !asset->directStrips.empty())) continue;
         const std::vector<ParticleProfile>& profiles =
-            (asset != resourceCache_.end() && !asset->second.particles.empty()) ? asset->second.particles :
+            (asset && !asset->particles.empty()) ? asset->particles :
             ((effect.kind == EffectEvent::Cast || effect.kind == EffectEvent::Flight) ? castParticles_ : hitParticles_);
         if (profiles.empty() || (effect.kind != EffectEvent::Cast && effect.kind != EffectEvent::Flight &&
                                  effect.kind != EffectEvent::SkillHit)) continue;
-        for (const ParticleProfile& profile : profiles) {
+        for (std::size_t profileIndex=0;profileIndex<profiles.size();++profileIndex) {
+            const ParticleProfile& profile=profiles[profileIndex];
+            const bool useHistoricalDummy=profile.type==16 && effect.itemCastFollow;
             // CMPPartSys::Create uses an .eff model in every particle type,
             // not just MODEL/STRIP. A controller mask (notably black 1.tga)
             // is not that model's drawable texture. Never substitute it when
@@ -1537,14 +2350,17 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
             if (effectModelName(profile.modelName) && profile.modelTracks.empty()) continue;
             if (profile.texture.empty() && profile.modelTracks.empty()) continue;
             if (effect.age < profile.delayTime) continue;
+            const float controllerPlayTime = (effect.mapScene || effect.attachedSlot>=0) ? 0.f : profile.playTime;
             // IsDelay() compares the controller clock with _fPlayTime;
             // MODEL/STRIP Stop() immediately sets _bPlay=false. In particular,
             // an end of 2.3 with delay .3 means 2 seconds, not 2.3 more seconds.
-            if((profile.type==5 || profile.type==6) && profile.playTime>0.f &&
-               effect.age>=profile.playTime)continue;
+            if((profile.type==5 || profile.type==6) && controllerPlayTime>0.f &&
+               effect.age>=controllerPlayTime)continue;
+            if(profile.type==3 && historical_blast_group::enabled() &&
+               controllerPlayTime>0.f && effect.age>=controllerPlayTime)continue;
             const float particleAge = effect.age - profile.delayTime;
-            if (profile.playTime > 0.f && particleAge > profile.playTime + profile.life) continue;
-            const float pathAge = profile.playTime > 0.f ? std::min(particleAge, profile.playTime) : particleAge;
+            if (controllerPlayTime > 0.f && particleAge > controllerPlayTime + profile.life) continue;
+            const float pathAge = controllerPlayTime > 0.f ? std::min(particleAge, controllerPlayTime) : particleAge;
             const std::array<float, 3> authoredPath = pathPosition(profile, pathAge);
             EffectBatch* historical = nullptr;
             for (EffectBatch& candidate : batches_) {
@@ -1564,9 +2380,27 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                 historical = &batches_.back();
             }
             const bool singleModel=profile.type==5 || profile.type==6;
+            const bool useHistoricalModelTimeline=((profile.type==5 &&
+                (historical_model_timeline::enabled() || effect.mapScene)) || (profile.type==8 &&
+                historical_arraw_timeline::enabled() &&
+                historical_particle_extended::enabled())) &&
+                profileIndex<effect.modelTimelines.size() &&
+                effect.modelTimelines[profileIndex].initialized;
+            const float modelPhase=useHistoricalModelTimeline?
+                effect.modelTimelines[profileIndex].phase():0.f;
             const float curveAge=profile.type==6?0.f:
-                (profile.type==5?std::fmod(particleAge,profile.life):particleAge);
-            const float local = std::min(1.f, curveAge / std::max(0.0001f, profile.life));
+                (profile.type==5?(useHistoricalModelTimeline?
+                    modelPhase*profile.life:std::fmod(particleAge,profile.life)):particleAge);
+            const float local = useHistoricalModelTimeline?modelPhase:
+                std::min(1.f, curveAge / std::max(0.0001f, profile.life));
+            const bool useHistoricalRipple=profile.type==4&&
+                (historical_ripple::enabled() || effect.mapScene);
+            const auto ripplePool=useHistoricalRipple?
+                (profileIndex<effect.rippleTimelines.size()&&
+                 effect.rippleTimelines[profileIndex].initialized?
+                    effect.rippleTimelines[profileIndex].snapshot(profile.frameCount):
+                    historical_particle_pool::SystemSample{}):
+                historical_particle_pool::SystemSample{};
             const legacyfx::CurveSample curve = legacyfx::sample(
                 profile.sizes, profile.colors, profile.rotations, local);
             // 05-BH: the Illusion Slash's historical target impact (195)
@@ -1588,52 +2422,207 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                 }
             }
             impactScale *= frozenArrowMultiplier(effect.variant,effect.visualId);
-            const int count = (singleModel || (historical_particle_extended::enabled() && profile.type==8))
-                ? 1 : std::min(profile.count, 24);
+            const int count = historical_particle_count::resolve(profile.type,profile.count,
+                singleModel || (historical_particle_extended::enabled() && profile.type==8),
+                historical_particle_count::enabled());
             // SK2.16-A: evaluate births/deaths for SNOW/FIRE/BLAST separately.
             // All other particle types, including the STRIP and MODEL fixes,
             // keep their existing timeline and geometry paths.
-            const bool useExtended = historical_particle_extended::enabled() &&
+            const bool useExtended = (historical_particle_extended::enabled() || effect.mapScene) &&
                 (profile.type==7 || profile.type==8 || profile.type==9 ||
-                 profile.type==11 || profile.type==14 || profile.type==15);
-            const bool usePool = historical_particle_pool::enabled() &&
+                 profile.type==10 || profile.type==11 || profile.type==14 || profile.type==15);
+            const bool useRange2Collision = useExtended && profile.type==15 &&
+                historical_range2_collision::enabled();
+            const bool useBlast3Timeline=useExtended && profile.type==11 &&
+                historical_blast3_timeline::enabled() &&
+                profileIndex<effect.blast3Timelines.size() &&
+                effect.blast3Timelines[profileIndex].initialized;
+            const bool useBlast3EffTimeline=useBlast3Timeline &&
+                profileIndex<effect.blast3EffTimelines.size() &&
+                effect.blast3EffTimelines[profileIndex].initialized;
+            const bool usePool = (historical_particle_pool::enabled() || effect.mapScene) &&
                                  (profile.type == 1 || profile.type == 2 || profile.type == 3);
             // Historical motion requires per-slot ages from SK2.16-A; neither
             // switch alone changes the legacy motion path.
-            const bool useHistoricalMotion = usePool && historical_particle_motion::enabled();
-            const float stopAt = profile.playTime > 0.f ?
-                std::max(0.f,profile.playTime-profile.delayTime) : -1.f;
+            const bool useHistoricalMotion = usePool &&
+                (historical_particle_motion::enabled() || effect.mapScene);
+            const bool useHistoricalShrink = profile.type == 12 &&
+                (historical_shrink::enabled() || historical_shrink::timelineEnabled());
+            const bool useHistoricalShrinkTimeline = profile.type == 12 &&
+                historical_shrink::timelineEnabled() &&
+                profileIndex<effect.shrinkTimelines.size() &&
+                effect.shrinkTimelines[profileIndex].initialized;
+            const bool useRoundTimeline = profile.type == 9 &&
+                historical_particle_extended::enabled() &&
+                historical_round_timeline::enabled() &&
+                profileIndex < effect.roundTimelines.size() &&
+                effect.roundTimelines[profileIndex].initialized;
+            const float stopAt = controllerPlayTime > 0.f ?
+                std::max(0.f,controllerPlayTime-profile.delayTime) : -1.f;
+            const float fireStopAt = profile.type == 2 &&
+                profileIndex < effect.fireHitStopTimes.size() ?
+                effect.fireHitStopTimes[profileIndex] : -1.f;
+            const float effectiveStopAt = fireStopAt >= 0.f ? fireStopAt : stopAt;
             const auto origin=positionFor(effect);
             const float baseX=origin.x+profile.offset[0]+authoredPath[0];
             const float baseZ=origin.z+profile.offset[1]+authoredPath[1];
-            const float floor=origin.y-.9f+profile.offset[2]+authoredPath[2];
+            const float floor=origin.y-(effect.mapScene?0.f:.9f)+
+                              profile.offset[2]+authoredPath[2];
+            const historical_dummy::Timeline* dummyTimeline=nullptr;
+            if(useHistoricalDummy && profileIndex<profiles.size()) {
+                const auto& itemMatrices=attachmentMatrices(effect.sourceActorIndex,true);
+                const auto first=itemMatrices.find(1);
+                const auto second=itemMatrices.find(2);
+                if(first!=itemMatrices.end() && second!=itemMatrices.end()) {
+                    if(effect.dummyTimelines.size()<profiles.size())
+                        effect.dummyTimelines.resize(profiles.size());
+                    const auto xyz=[](const std::array<float,16>& m) {
+                        return historical_dummy::V3{m[12],m[13],m[14]};
+                    };
+                    historical_dummy::advance(effect.dummyTimelines[profileIndex],
+                        particleAge,xyz(first->second),xyz(second->second),count,
+                        profile.life,profile.step,profile.randomDivisor,profile.velocity,
+                        {profile.acceleration[0],profile.acceleration[1],profile.acceleration[2]},
+                        effect.seed);
+                    dummyTimeline=&effect.dummyTimelines[profileIndex];
+                }
+            }
+            // In DX9 _CreateBlast2 initializes every slot with the same
+            // _vFontDir and lateral animation. Avoid re-simulating its
+            // 60Hz state machine for each quad in the same frame.
+            const auto blast2Shared = (useExtended && profile.type==10) ?
+                historical_particle_extended::at(10,0,count,particleAge,
+                    profile.life,profile.step,effectiveStopAt,
+                    {{profile.range[0],profile.range[1],profile.range[2]}},
+                    {{profile.direction[0],profile.direction[1],profile.direction[2]}},
+                    {{profile.acceleration[0],profile.acceleration[1],profile.acceleration[2]}},
+                    profile.velocity,effect.seed,profile.frameCount,
+                    profile.rotations.empty()?0.f:profile.rotations[0]) :
+                historical_particle_extended::Sample{};
+            std::vector<unsigned> range2Reported;
+            if(useRange2Collision) {
+                range2Reported.resize(static_cast<std::size_t>(count));
+                const std::size_t baseIndex=profileIndex*100u;
+                for(int particle=0;particle<count;++particle) {
+                    const std::size_t index=baseIndex+static_cast<std::size_t>(particle);
+                    if(index<effect.range2HitGenerations.size())
+                        range2Reported[static_cast<std::size_t>(particle)]=
+                            effect.range2HitGenerations[index];
+                }
+            }
+            const auto range2System=useRange2Collision ?
+                (historical_range2_collision::actualDtEnabled()&&!effect.actorCastFollow&&
+                 profileIndex<effect.range2Timelines.size() ?
+                    effect.range2Timelines[profileIndex].snapshot() :
+                    range2At(profile,count,particleAge,effect.seed,origin,
+                             authoredPath,range2Reported)) :
+                historical_range2_collision::SystemSample{};
+            const bool useSharedEmitterTimer = usePool &&
+                historical_particle_pool::sharedEmitterTimerEnabled() &&
+                (profile.type==1 || profile.type==2);
+            const bool useHistoricalFrameAcceleration = useSharedEmitterTimer &&
+                useHistoricalMotion &&
+                historical_particle_jitter::frameAccelerationEnabled();
+            const auto snowFirePool = useSharedEmitterTimer ?
+                (profileIndex < effect.snowFireTimelines.size() &&
+                 effect.snowFireTimelines[profileIndex].initialized ?
+                    effect.snowFireTimelines[profileIndex].snapshot(profile.frameCount) :
+                    historical_particle_pool::snowFireSystemAt(profile.type,count,particleAge,
+                        profile.life,profile.step,effectiveStopAt,effect.seed,
+                        profile.randomDivisor,profile.frameCount,
+                        profile.type!=1 || (profile.direction[2]!=0.f && profile.velocity!=0.f))) :
+                historical_particle_pool::SystemSample{};
+            const auto blast3Pool=useBlast3Timeline?
+                effect.blast3Timelines[profileIndex].snapshot():
+                historical_blast3_timeline::SystemSample{};
+            const bool useBlastGroup=usePool&&profile.type==3&&
+                historical_blast_group::enabled()&&
+                profileIndex<effect.blastGroupTimelines.size()&&
+                effect.blastGroupTimelines[profileIndex].initialized;
+            const auto blastGroupPool=useBlastGroup?
+                effect.blastGroupTimelines[profileIndex].snapshot():
+                historical_blast_group::SystemSample{};
             for (int particle = 0; particle < count; ++particle) {
                 const unsigned key = effect.seed + static_cast<unsigned>(particle * 101 + profile.type * 977);
                 const float nx = noise(key) * 2.f - 1.f;
                 const float ny = noise(key + 1u) * 2.f - 1.f;
                 const float nz = noise(key + 2u) * 2.f - 1.f;
-                const auto individual = usePool ? historical_particle_pool::at(
-                    profile.type,particle,count,particleAge,profile.life,
-                    profile.step,stopAt,effect.seed,profile.randomDivisor) : historical_particle_pool::Sample{};
-                if (usePool && !individual.alive) continue;
-                const historical_particle_extended::Sample extra = useExtended ?
+                const historical_dummy::Slot* dummySlot=nullptr;
+                if(useHistoricalDummy) {
+                    if(!dummyTimeline || static_cast<std::size_t>(particle)>=dummyTimeline->slots.size())
+                        continue;
+                    dummySlot=&dummyTimeline->slots[static_cast<std::size_t>(particle)];
+                    if(!dummySlot->alive) continue;
+                }
+                const auto individual = useHistoricalRipple &&
+                    static_cast<std::size_t>(particle)<ripplePool.slots.size() ?
+                    ripplePool.slots[static_cast<std::size_t>(particle)] : useSharedEmitterTimer ?
+                    snowFirePool.slots[static_cast<std::size_t>(particle)] :
+                    useBlastGroup && static_cast<std::size_t>(particle)<blastGroupPool.slots.size() ?
+                    blastGroupPool.slots[static_cast<std::size_t>(particle)] :
+                    usePool ? historical_particle_pool::at(profile.type,particle,count,
+                        particleAge,profile.life,profile.step,effectiveStopAt,
+                        effect.seed,profile.randomDivisor) : historical_particle_pool::Sample{};
+                if ((usePool && !individual.alive) ||
+                    (useHistoricalRipple && !individual.alive)) continue;
+                const historical_range2_collision::SlotSample range2Sample =
+                    useRange2Collision && static_cast<std::size_t>(particle)<range2System.slots.size() ?
+                    range2System.slots[static_cast<std::size_t>(particle)] :
+                    historical_range2_collision::SlotSample{};
+                historical_particle_extended::Sample extra =
+                    useExtended && profile.type==10 ? blast2Shared : useExtended ?
                     historical_particle_extended::at(profile.type,particle,count,particleAge,
                         profile.life,profile.step,stopAt,
                         {{profile.range[0],profile.range[1],profile.range[2]}},
                         {{profile.direction[0],profile.direction[1],profile.direction[2]}},
                         {{profile.acceleration[0],profile.acceleration[1],profile.acceleration[2]}},
-                        profile.velocity,effect.seed) : historical_particle_extended::Sample{};
-                if (useExtended && !extra.alive) continue;
-                const float age = usePool ? individual.age :
+                        profile.velocity,effect.seed,profile.frameCount,
+                        profile.rotations.empty()?0.f:profile.rotations[0]) : historical_particle_extended::Sample{};
+                if (useRoundTimeline) {
+                    const auto round=effect.roundTimelines[profileIndex].sample(
+                        particle,{{profile.range[0],profile.range[1],profile.range[2]}});
+                    extra.alive=round.alive;
+                    extra.normalized=round.normalized;
+                    extra.position=round.position;
+                }
+                const auto blast3Sample=useBlast3Timeline &&
+                    static_cast<std::size_t>(particle)<blast3Pool.slots.size()?
+                    blast3Pool.slots[static_cast<std::size_t>(particle)]:
+                    historical_blast3_timeline::Sample{};
+                const float shrinkAge = particleAge - static_cast<float>(particle)*
+                                        std::max(0.f,profile.step);
+                const auto shrinkSample=useHistoricalShrinkTimeline?
+                    effect.shrinkTimelines[profileIndex].sample(
+                        static_cast<std::size_t>(particle),profile.frameCount):
+                    (useHistoricalShrink && !historical_shrink::timelineEnabled())?
+                    historical_shrink::at(
+                        {{profile.range[0],profile.range[1],profile.range[2]}},
+                        profile.velocity,shrinkAge,effect.seed,particle):
+                    historical_shrink::Sample{};
+                if ((useExtended && !useRange2Collision && !useBlast3Timeline && !extra.alive) ||
+                    (useRange2Collision && !range2Sample.alive) ||
+                    (useBlast3Timeline && !blast3Sample.alive) ||
+                    (profile.type==12 && historical_shrink::timelineEnabled() &&
+                     !useHistoricalShrinkTimeline) ||
+                    (useHistoricalShrink && !shrinkSample.alive)) continue;
+                const float age = useBlast3Timeline ? blast3Sample.age : useRange2Collision ? range2Sample.age :
+                    (usePool || useHistoricalRipple) ? individual.age :
+                    useHistoricalShrink ? shrinkAge :
                     particleAge + static_cast<float>(particle) * std::max(0.f, profile.step);
-                float particleLocal = useExtended ? extra.normalized : (usePool ? individual.normalized : local);
-                const legacyfx::CurveSample particleCurve = (usePool || useExtended) ?
+                float particleLocal = useBlast3Timeline?blast3Sample.normalized:
+                    useHistoricalRipple?individual.normalized:
+                    useRange2Collision ?
+                    std::clamp(range2Sample.age/std::max(.0001f,profile.life),0.f,1.f) :
+                    useHistoricalShrinkTimeline ? shrinkSample.normalized :
+                    useHistoricalShrink ? std::clamp(shrinkAge/std::max(.0001f,profile.life),0.f,1.f) :
+                    useExtended ? extra.normalized : (usePool ? individual.normalized : local);
+                const legacyfx::CurveSample particleCurve = (usePool || useExtended || useHistoricalShrink || useHistoricalRipple) ?
                     legacyfx::sample(profile.sizes,profile.colors,profile.rotations,
                                      particleLocal) : curve;
                 const float size = particleCurve.size * 0.12f * impactScale;
                 const float* color = particleCurve.color;
                 float x = baseX + nx * profile.range[0] * 0.22f + profile.direction[0] * profile.velocity * age * 0.12f;
-                float y = floor + 0.65f + nz * profile.range[2] * 0.18f +
+                float y = floor + (effect.mapScene?0.f:0.65f) + nz * profile.range[2] * 0.18f +
                                 profile.direction[2] * profile.velocity * age * 0.12f +
                                 0.5f * profile.acceleration[2] * age * age * 0.08f;
                 float z = baseZ + ny * profile.range[1] * 0.22f + profile.direction[1] * profile.velocity * age * 0.12f;
@@ -1648,16 +2637,32 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                         profile.acceleration[1],profile.acceleration[2]}};
                     // Use the pool's generation when enabled, otherwise one
                     // stable seeded particle motion for the legacy lifetime.
-                    const auto pose=historical_particle_motion::at(profile.type,
+                    auto pose=historical_particle_motion::at(profile.type,
                         range,direction,acceleration,profile.velocity,age,
                         effect.seed,particle,usePool?individual.generation:0u,
                         profile.randomDivisor);
+                    if (useHistoricalFrameAcceleration)
+                        for (std::size_t axis = 0; axis < pose.position.size(); ++axis)
+                            pose.position[axis] += individual.randomAccelerationOffset[axis];
+                    if (profile.type == 3 && historical_blast_motion::actualDtEnabled() &&
+                        profileIndex < effect.blastMotionTimelines.size()) {
+                        const auto correction = effect.blastMotionTimelines[profileIndex].correction(
+                            acceleration,static_cast<std::size_t>(particle),individual.generation);
+                        for (std::size_t axis = 0; axis < correction.size(); ++axis)
+                            pose.position[axis] += correction[axis];
+                    } else if (profile.type == 3 && historical_blast_motion::enabled()) {
+                        const auto correction = historical_blast_motion::discreteAccelerationCorrection(
+                            acceleration, age);
+                        for (std::size_t axis = 0; axis < correction.size(); ++axis)
+                            pose.position[axis] += correction[axis];
+                    }
                     if (profile.type==1 && std::fabs(pose.velocity[2])<1e-8f)
                         continue; // _CreateSnow returns false for zero vertical motion
                     x=baseX+pose.position[0];
                     z=baseZ+pose.position[1];
-                    y=floor+.9f+pose.position[2];
+                    y=floor+(effect.mapScene?0.f:.9f)+pose.position[2];
                     if (historical_particle_extended::enabled() &&
+                        !useHistoricalFrameAcceleration &&
                         (profile.type==1 || profile.type==2)) {
                         // In DX9 FIRE/SNOW choose +/- acceleration per frame;
                         // reproduce the rule on a repeatable nominal 60Hz
@@ -1672,28 +2677,94 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                     // X/Y remain horizontal and Z becomes OpenGL up.
                     x=baseX+extra.position[0];
                     z=baseZ+extra.position[1];
-                    y=floor+.9f+extra.position[2];
+                    y=floor+(effect.mapScene?0.f:.9f)+extra.position[2];
+                }
+                if (useBlast3Timeline) {
+                    // Keep the DX9 particle-space vector in XYZ; map its Z-up
+                    // axis only at the existing OpenGL coordinate boundary.
+                    x=baseX+blast3Sample.position[0];
+                    z=baseZ+blast3Sample.position[1];
+                    y=floor+(effect.mapScene?0.f:.9f)+blast3Sample.position[2];
+                }
+                if (useRange2Collision) {
+                    // DX9 coordinates are X/Y horizontal and Z-up. MapFile
+                    // supplies terrain height in world units; reorder only at
+                    // this OpenGL boundary.
+                    x=range2Sample.position[0];
+                    z=range2Sample.position[1];
+                    y=range2Sample.position[2];
+                }
+                if(dummySlot) {
+                    // The item matrices are in GL world storage. Reorder back
+                    // to DX9 XYZ inside the controller, then map Z-up to GL
+                    // height here, at the renderer boundary.
+                    x=dummySlot->position.x;
+                    z=dummySlot->position.y;
+                    y=dummySlot->position.z;
                 }
                 if(singleModel) {
                     // MoveTo subtract range/2. MODEL adds it back in
                     // _FrameMoveModel; STRIP deliberately retains that corner.
                     const float corner=profile.type==6?.5f:0.f;
-                    x=baseX-profile.range[0]*corner;
-                    y=floor+.9f-profile.range[2]*corner;
-                    z=baseZ-profile.range[1]*corner;
+                    if(profile.type==5 && historical_model_position::enabled()) {
+                        const auto midpoint=historical_model_position::midpointOffset(
+                            {{profile.range[0],profile.range[1],profile.range[2]}});
+                        x=baseX+midpoint[0];
+                        y=floor+(effect.mapScene?0.f:.9f)+midpoint[2];
+                        z=baseZ+midpoint[1];
+                    } else {
+                        x=baseX-profile.range[0]*corner;
+                        y=floor+(effect.mapScene?0.f:.9f)-profile.range[2]*corner;
+                        z=baseZ-profile.range[1]*corner;
+                    }
                 }
                 if(profile.type==4) {
                     // _CreateRipple samples the emitter range; _FrameMoveRipple
                     // animates size/color but does not translate the particle.
-                    x=baseX+nx*profile.range[0]*.5f;
-                    y=floor+.9f+nz*profile.range[2]*.5f;
-                    z=baseZ+ny*profile.range[1]*.5f;
+                    if(useHistoricalRipple) {
+                        const unsigned rippleKey=key^(individual.generation*0x9e3779b9u);
+                        x=baseX+noise(rippleKey)*profile.range[0];
+                        y=floor+(effect.mapScene?0.f:.9f)+noise(rippleKey+2u)*profile.range[2];
+                        z=baseZ+noise(rippleKey+1u)*profile.range[1];
+                    } else {
+                        x=baseX+nx*profile.range[0]*.5f;
+                        y=floor+(effect.mapScene?0.f:.9f)+nz*profile.range[2]*.5f;
+                        z=baseZ+ny*profile.range[1]*.5f;
+                    }
+                }
+                if (effect.mapScene && std::fabs(effect.mapSceneYaw) > 1e-6f) {
+                    const float dx = x - origin.x;
+                    const float dz = z - origin.z;
+                    historical_map_scene_effects::rotateHorizontal(
+                        dx, dz, effect.mapSceneYaw, x, z);
+                    x += origin.x;
+                    z += origin.z;
                 }
                 const float alpha = color[3]; // track RGBA historico inclui o fade
-                if((singleModel || profile.type==4) && legacy_mesh::recognized(profile.modelName)) {
+                if (profile.type == 13 && historical_shade::enabled()) {
+                    // DX9 SHADE draws one CMPShadeMap projected over the
+                    // terrain; it is not a free-standing particle billboard.
+                    // Convert its grid to GL's Y-up coordinates and let the
+                    // existing per-system blend/filter and texture path apply.
+                    if (particle != 0) continue;
+                    const float radius = profile.sizes.empty() ? particleCurve.size :
+                                         profile.sizes.front();
+                    const auto shade = historical_shade::build(baseX, baseZ, radius, floor,
+                        [&map](float gridX, float gridZ, bool edgeX, bool edgeZ) {
+                            return historical_shade::terrainGridEnabled() ?
+                                map.shadeGroundHeightAt(gridX, gridZ, edgeX, edgeZ) :
+                                map.heightAt(gridX, gridZ);
+                        });
+                    for (const auto& point : shade)
+                        historical->verts.push_back(vertex(point.x, point.y, point.z,
+                            color[0], color[1], color[2], alpha, point.u, point.v));
+                    continue;
+                }
+                if((singleModel || (profile.type>=1 && profile.type<=4)) &&
+                   legacy_mesh::recognized(profile.modelName)) {
                     if(profile.billboard) {
                         // RectPlane spans -0.5..+0.5; quadRotated takes a half-size.
-                        quadRotated(*historical,x,y,z,particleCurve.size*.15f*impactScale,
+                        quadRotated(*historical,x,y,z,particleCurve.size*historical_effect_units::planeHalfExtent*impactScale,
                             view,0.f,
                             color[0],color[1],color[2],alpha);
                     } else {
@@ -1701,10 +2772,10 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                         if(legacy_mesh::make(profile.modelName,{},primitive)) {
                             legacy_eff::Key pose;
                             pose.size={particleCurve.size,particleCurve.size,particleCurve.size};
-                            if(singleModel)for(int c=0;c<3;++c) pose.angle[c]=legacyfx::sampleTrack(
+                            if(profile.type!=4)for(int c=0;c<3;++c) pose.angle[c]=legacyfx::sampleTrack(
                                 profile.rotations,3,c,particleLocal,0.f);
                             for(int c=0;c<4;++c)pose.color[c]=color[c];
-                            legacy_mesh::emit(primitive,pose,{},x,y,z,historical->verts,.3f*impactScale);
+                            legacy_mesh::emit(primitive,pose,{},x,y,z,historical->verts,historical_effect_units::mesh*impactScale);
                         }
                     }
                     continue;
@@ -1713,7 +2784,64 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                 // authored geometry+texture, rather than a quad using the
                 // (potentially alpha-only) controller texture such as 1.tga.
                 if (!profile.modelTracks.empty()) {
-                    for (const auto& track : profile.modelTracks) {
+                    const bool useStripEffFrameTimeline = profile.type == 6 &&
+                        (historical_eff_timeline::enabled() || effect.mapScene) &&
+                        profileIndex < effect.stripEffTimelines.size() &&
+                        effect.stripEffTimelines[profileIndex].initialized;
+                    const bool useStripEffControllerClocks = profile.type == 6 &&
+                        (historical_eff_timeline::controllerClocksEnabled() || effect.mapScene) &&
+                        profileIndex < effect.stripEffTimelines.size() &&
+                        effect.stripEffTimelines[profileIndex].initialized;
+                    const bool useRippleEffTimeline = profile.type == 4 &&
+                        (historical_ripple::enabled() || effect.mapScene) &&
+                        profileIndex < effect.rippleEffTimelines.size() &&
+                        effect.rippleEffTimelines[profileIndex].initialized;
+                    const bool useArrawEffTimeline = profile.type == 8 &&
+                        historical_arraw_timeline::enabled() &&
+                        historical_particle_extended::enabled() &&
+                        profileIndex < effect.arrawEffTimelines.size() &&
+                        effect.arrawEffTimelines[profileIndex].initialized;
+                    const bool useModelEffTimeline=profile.type==5 &&
+                        (historical_model_timeline::enabled() || effect.mapScene) &&
+                        (historical_model_eff_timeline::enabled() || effect.mapScene) &&
+                        profileIndex<effect.modelEffTimelines.size() &&
+                        effect.modelEffTimelines[profileIndex].initialized;
+                    const bool useRoundEffTimeline=profile.type==9 &&
+                        historical_particle_extended::enabled() &&
+                        historical_round_timeline::enabled() &&
+                        profileIndex<effect.roundEffTimelines.size() &&
+                        effect.roundEffTimelines[profileIndex].initialized;
+                    const bool useSnowFireEffTimeline=(profile.type==1 || profile.type==2) &&
+                        historical_eff_timeline::snowFireEnabled() && !profile.mediayEff &&
+                        profileIndex<effect.snowFireEffTimelines.size() &&
+                        effect.snowFireEffTimelines[profileIndex].initialized;
+                    const auto* effTimeline = useBlast3EffTimeline ?
+                        &effect.blast3EffTimelines[profileIndex] : useArrawEffTimeline ?
+                        &effect.arrawEffTimelines[profileIndex] :
+                        (useRoundEffTimeline ? &effect.roundEffTimelines[profileIndex] :
+                        (useModelEffTimeline ? &effect.modelEffTimelines[profileIndex] :
+                        (useSnowFireEffTimeline ? &effect.snowFireEffTimelines[profileIndex] :
+                        (useRippleEffTimeline ?
+                        &effect.rippleEffTimelines[profileIndex] :
+                        (useStripEffFrameTimeline || useStripEffControllerClocks ?
+                            &effect.stripEffTimelines[profileIndex] : nullptr)))));
+                    const bool useHistoricalEffFrames = useBlast3EffTimeline ||
+                                                       useStripEffFrameTimeline ||
+                                                       useRippleEffTimeline ||
+                                                       useArrawEffTimeline ||
+                                                       useModelEffTimeline ||
+                                                       useRoundEffTimeline ||
+                                                       useSnowFireEffTimeline;
+                    const bool useHistoricalEffClocks = useBlast3EffTimeline ||
+                                                        useStripEffControllerClocks ||
+                                                        useRippleEffTimeline ||
+                                                        useArrawEffTimeline ||
+                                                        useModelEffTimeline ||
+                                                        useRoundEffTimeline ||
+                                                        useSnowFireEffTimeline;
+                    for (std::size_t modelTrackIndex = 0;
+                         modelTrackIndex < profile.modelTracks.size(); ++modelTrackIndex) {
+                        const auto& track = profile.modelTracks[modelTrackIndex];
                         const auto& part = track.subeffect;
                         const int iceLayer = static_cast<int>(&track - profile.modelTracks.data());
                         const bool traceIce = traceFrozen && effect.visualId == -1020 &&
@@ -1732,28 +2860,70 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                         // The old `!singleModel` rule incorrectly finished the
                         // child after one cycle for cast/hit type-6 systems.
                         const float modelAge = legacy_strip_system::nestedModelAge(
-                            profile.type, effect.kind==EffectEvent::Flight,
+                            profile.type, effect.kind==EffectEvent::Flight || effect.attachedSlot>=0,
                             (usePool ? age : (useExtended ? extra.age : particleAge)), track.cycleLength,
-                            legacy_strip_system::historicalCyclesEnabled());
-                        if (legacy_eff::framePhase(part, modelAge).finished) {
+                            legacy_strip_system::historicalCyclesEnabled() || effect.mapScene);
+                        const auto effFrame = useHistoricalEffFrames ?
+                            effTimeline->phase(
+                                modelTrackIndex, profile.modelTracks) :
+                            legacy_eff::framePhase(part, modelAge);
+                        if (effFrame.finished) {
                             if (traceIceNow) std::fprintf(stderr,
                                 "[frozen-geometry] layer=%d age=%.2f status=finished\n",
                                 iceLayer, effect.age);
                             continue;
                         }
-                        auto keyframe = legacy_eff::sample(part, modelAge);
+                        auto keyframe = useHistoricalEffFrames ?
+                            legacy_eff::samplePhase(part, effFrame) :
+                            legacy_eff::sample(part, modelAge);
                         legacy_mesh::ParentTransform parent;
                         parent.scale=particleCurve.size*impactScale;
                         parent.billboard=profile.billboard;
                         parent.view=view;
-                        if(profile.type!=4)for(int c=0;c<3;++c)
+                        if(historicalBoundModelMatrixEnabled() && singleModel &&
+                           !profile.billboard && !profile.modelDirection && !part.billboard)
+                            parent.bone=dummyBindingFor(effect);
+                        // BindingBone supplies SBoneMat directly for MODEL/STRIP
+                        // .eff children (MPParticleSys.cpp:3157-3159,3218-3220).
+                        // Range/path/parent angles from MoveTo are not that matrix.
+                        const float modelX=parent.bone?origin.x+profile.offset[0]:x;
+                        const float modelY=parent.bone?origin.y+profile.offset[2]:y;
+                        const float modelZ=parent.bone?origin.z+profile.offset[1]:z;
+                        const auto traceBinding = [&](std::size_t vertices,bool boundCenter) {
+                            if(!effect_binding_trace::enabled())return;
+                            effect_binding_trace::Row row;
+                            row.skill=effect.variant;row.visual=effect.visualId;
+                            row.kind=effect.kind;row.seed=effect.seed;row.age=effect.age;
+                            row.system=profile.sourceSystem;row.part=track.sourcePart;row.type=profile.type;
+                            row.parentBillboard=profile.billboard;row.modelDirection=profile.modelDirection;
+                            row.childBillboard=part.billboard;row.resource=profile.modelName;row.model=part.model;
+                            row.particle=profile.sourceParticle;
+                            row.matrix=dummyBindingFor(effect);row.vertices=vertices;
+                            row.boundMatrix=parent.bone!=nullptr;row.boundCenter=boundCenter;
+                            if(effect.actorCastFollow){row.owner=effect.sourceActorIndex==-1?"player_actor":"source_actor";row.dummy=effect.actorDummy;row.actor=effect.sourceActorIndex;}
+                            else if(effect.itemCastFollow){row.owner=effect.sourceActorIndex==-1?"player_item":"source_item";row.dummy=effect.itemDummy;row.actor=effect.sourceActorIndex;}
+                            else if(effect.targetActorFollow){row.owner="target_actor";row.dummy=effect.targetDummy;row.actor=effect.targetActorIndex;}
+                            effect_binding_trace::record(row);
+                        };
+                        if(profile.type!=4 && !(profile.type==8 &&
+                           historical_arraw_timeline::enabled() &&
+                           historical_particle_extended::enabled()))
+                            for(int c=0;c<3;++c)
                             parent.angle[c]=legacyfx::sampleTrack(profile.rotations,3,c,local,0.f);
-                        for (int channel = 0; channel < 4; ++channel)
-                            keyframe.color[static_cast<std::size_t>(channel)] *= color[channel];
+                        if (effect.mapScene) parent.angle[1] += effect.mapSceneYaw;
+                        if (historical_strip_alpha::enabled() && profile.type == 6) {
+                            keyframe.color[3] = historical_strip_alpha::effectiveAlpha(
+                                profile.type, color[3], keyframe.color[3]);
+                        } else {
+                            for (int channel = 0; channel < 4; ++channel)
+                                keyframe.color[static_cast<std::size_t>(channel)] *= color[channel];
+                        }
                         std::string selected = track.texture;
                         if (!track.frames.empty()) {
-                            const auto index = legacy_eff::textureFrameIndex(modelAge,
-                                part.textureFrameTime, track.frames.size());
+                            const auto index = useHistoricalEffClocks && part.type == 1 ?
+                                effTimeline->textureFrame(modelTrackIndex) :
+                                legacy_eff::textureFrameIndex(modelAge, part.textureFrameTime,
+                                                              track.frames.size());
                             if (!track.frames[index].empty()) selected = track.frames[index];
                         }
                         // External model tracks can use the material texture of
@@ -1772,8 +2942,10 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                                     const std::string materialTexture = textureFromName(root_, subset.texture);
                                     std::string frameTexture;
                                     if (!track.frames.empty()) {
-                                        const auto frame=legacy_eff::textureFrameIndex(
-                                            modelAge,part.textureFrameTime,track.frames.size());
+                                        const auto frame=useHistoricalEffClocks && part.type == 1 ?
+                                            effTimeline->textureFrame(modelTrackIndex) :
+                                            legacy_eff::textureFrameIndex(modelAge,part.textureFrameTime,
+                                                                          track.frames.size());
                                         frameTexture=track.frames[frame];
                                     }
                                     const auto chosenTexture = legacy_effect_texture::choose(
@@ -1809,12 +2981,16 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                                     defaultUV.reserve(primitive.points.size());
                                     for (const auto& point:primitive.points)
                                         defaultUV.push_back(point.uv);
-                                    const auto uv=legacy_eff::sampleMeshUV(part,modelAge,defaultUV);
+                                    const auto uv=useHistoricalEffClocks ?
+                                        effTimeline->sampleMesh(
+                                            modelTrackIndex,part,defaultUV) :
+                                        legacy_eff::sampleMeshUV(part,modelAge,defaultUV);
                                     const auto before=target->verts.size();
                                     // Keep historic scale/curves; no special
                                     // enlargement for Frozen Arrow.
-                                    legacy_mesh::emit(primitive,keyframe,uv,x,y,z,
-                                                      target->verts,.3f,0.f,0.f,&parent);
+                                    legacy_mesh::emit(primitive,keyframe,uv,modelX,modelY,modelZ,
+                                                      target->verts,historical_effect_units::mesh,0.f,0.f,&parent);
+                                    traceBinding(target->verts.size()-before,false);
                                     const float red=std::isfinite(subset.r)?std::clamp(subset.r,0.f,1.f):1.f;
                                     const float green=std::isfinite(subset.g)?std::clamp(subset.g,0.f,1.f):1.f;
                                     const float blue=std::isfinite(subset.b)?std::clamp(subset.b,0.f,1.f):1.f;
@@ -1872,28 +3048,40 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                             setEffectFilter(*target, profile.minFilter, profile.magFilter);
                             target->texture = selected;
                         }
+                        const auto beforePart=target->verts.size();
+                        bool usedBindingCenter=false;
                         if (part.billboard) {
-                            const auto uv=legacy_eff::sampleUV(part,modelAge);
-                            // BindingBone on billboard controllers replaces the
-                            // child's translation with the binding position.
+                            const auto uv=useHistoricalEffClocks ?
+                                effTimeline->sampleQuad(
+                                    modelTrackIndex,part) : legacy_eff::sampleUV(part,modelAge);
+                            // DX9 also replaces a billboard child's center when
+                            // its non-billboard MODEL/STRIP parent uses BindingBone.
+                            const bool bindingCenter = parent.billboard ||
+                                (historicalBoundBillboardCenterEnabled() && singleModel &&
+                                 !profile.modelDirection && dummyBindingFor(effect));
+                            usedBindingCenter=bindingCenter;
                             const auto pos=parent.apply(keyframe.position);
-                            quadRotated(*target, x+(parent.billboard?0.f:pos[0]),
-                                y+(parent.billboard?0.f:pos[2]),
-                                z+(parent.billboard?0.f:pos[1]),
-                                keyframe.size[0] * .3f * parent.scale,
+                            quadRotated(*target, x+(bindingCenter?0.f:pos[0]),
+                                y+(bindingCenter?0.f:pos[2]),
+                                z+(bindingCenter?0.f:pos[1]),
+                                keyframe.size[0] * historical_effect_units::planeHalfExtent * parent.scale,
                                 view, keyframe.angle[2],
                                 keyframe.color[0], keyframe.color[1],
-                                keyframe.color[2], keyframe.color[3],&uv,keyframe.size[1]*.3f*parent.scale);
+                                keyframe.color[2], keyframe.color[3],&uv,keyframe.size[1]*historical_effect_units::planeHalfExtent*parent.scale);
                         } else {
                             legacy_mesh::Primitive primitive;
                             if (!legacy_mesh::make(part.model,
                                 legacy_mesh::paramsAt(part, modelAge), primitive)) continue;
                             std::vector<legacy_mesh::UV> defaultUV;
                             for (const auto& point : primitive.points) defaultUV.push_back(point.uv);
-                            const auto uv = legacy_eff::sampleMeshUV(part, modelAge, defaultUV);
+                            const auto uv = useHistoricalEffClocks ?
+                                effTimeline->sampleMesh(
+                                    modelTrackIndex,part,defaultUV) :
+                                legacy_eff::sampleMeshUV(part, modelAge, defaultUV);
                             legacy_mesh::emit(primitive, keyframe, uv,
-                                x, y, z, target->verts, .3f,0.f,0.f,&parent);
+                                modelX, modelY, modelZ, target->verts,historical_effect_units::mesh,0.f,0.f,&parent);
                         }
+                        traceBinding(target->verts.size()-beforePart,usedBindingCenter);
                     }
                     continue;
                 }
@@ -1910,20 +3098,24 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                     // inverse of BLAST/BLAST3, not another radial burst.
                     // The historical pool emits particles at _fStep intervals;
                     // age them from deterministic staggered birth times.
-                    const float shrinkAge = particleAge - static_cast<float>(particle) * std::max(0.f, profile.step);
-                    if (shrinkAge < 0.f) continue;
-                    const float dx = nx * profile.range[0] * 0.22f;
-                    const float dy = nz * profile.range[2] * 0.18f;
-                    const float dz = ny * profile.range[1] * 0.22f;
-                    const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
-                    const float travel = std::min(distance,
-                        std::fabs(profile.velocity) * shrinkAge * 0.12f);
-                    const float fraction = distance > 0.0001f ? travel / distance : 1.f;
-                    x = baseX + dx * (1.f - fraction);
-                    y = floor + 0.65f + dy * (1.f - fraction);
-                    z = baseZ + dz * (1.f - fraction);
-                    particleLocal = std::min(1.f, shrinkAge / std::max(0.05f, profile.life));
-                    if (fraction >= 1.f || distance <= 0.06f) continue;
+                    if (useHistoricalShrink) {
+                        x = baseX + shrinkSample.position[0];
+                        z = baseZ + shrinkSample.position[1];
+                        y = floor + (effect.mapScene?0.f:0.9f) + shrinkSample.position[2];
+                    } else {
+                        const float dx = nx * profile.range[0] * 0.22f;
+                        const float dy = nz * profile.range[2] * 0.18f;
+                        const float dz = ny * profile.range[1] * 0.22f;
+                        const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+                        const float travel = std::min(distance,
+                            std::fabs(profile.velocity) * shrinkAge * 0.12f);
+                        const float fraction = distance > 0.0001f ? travel / distance : 1.f;
+                        x = baseX + dx * (1.f - fraction);
+                        y = floor + (effect.mapScene?0.f:0.65f) + dy * (1.f - fraction);
+                        z = baseZ + dz * (1.f - fraction);
+                        particleLocal = std::min(1.f, shrinkAge / std::max(0.05f, profile.life));
+                        if (fraction >= 1.f || distance <= 0.06f) continue;
+                    }
                 }
                 if ((profile.type == 3 && !useHistoricalMotion) || profile.type == 11) {
                     const float radial = std::fabs(profile.velocity) * age * 0.1f;
@@ -1931,10 +3123,22 @@ void EffectSystem::build(MapFile& map, const EffectViewBasis& view) {
                     y += nz * radial;
                     z += ny * radial;
                 }
-                if (profile.type == 4 || profile.type == 10 || profile.type == 16 || profile.type == 17) {
+                if (profile.type == 4 || profile.type == 10 ||
+                    (profile.type == 16 && !useHistoricalDummy) || profile.type == 17) {
                     const float spread = size * (1.f + particleLocal * 2.5f);
                     groundQuad(*historical, x, floor + 0.025f + static_cast<float>(particle) * 0.0005f, z,
                                spread, color[0], color[1], color[2], alpha);
+                } else if (profile.type == 7 && profile.billboard &&
+                           profile.modelName == "RectPlane" && useExtended) {
+                    // DX9 billboards WIND by its camera basis, then applies
+                    // its accumulated Z rotation. RectPlane is authored at
+                    // +/-0.5, while quadRotated takes a half extent.
+                    quadRotated(*historical,x,y,z,particleCurve.size*impactScale*.5f,view,
+                        profile.velocity*extra.age,color[0],color[1],color[2],alpha);
+                } else if (profile.type == 7 && !profile.billboard &&
+                           profile.modelName == "RectPlane" && useExtended) {
+                    groundQuadRotated(*historical,x,y,z,particleCurve.size*impactScale*.5f,
+                        profile.velocity*extra.age,color[0],color[1],color[2],alpha);
                 } else if (profile.type == 7 || profile.type == 9 || profile.type == 18) {
                     float dx = profile.direction[0];
                     float dz = profile.direction[1];

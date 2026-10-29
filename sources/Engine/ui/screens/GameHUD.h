@@ -1,5 +1,6 @@
 #pragma once
 #include "../UIRenderer.h"
+#include "SkillsUI.h"
 namespace top::ui {
 struct HudDrawList;
 struct WindowState;
@@ -11,7 +12,8 @@ public:
     static void drawSkillBar(UIRenderer& r, int sw, int sh, const UITheme& theme = {});
     static void drawFunctionBar(UIRenderer& r, float x, float y, int mx, int my, bool down, const UITheme& theme = {});
     static void drawStatus(UIRenderer& r, float x, float y, int mx, int my, const UITheme& theme = {});
-    static void drawSkills(UIRenderer& r, float x, float y, int page, int count, const UITheme& theme = {});
+    static void drawSkills(UIRenderer& r, float x, float y, int page, const std::vector<SkillView>& skills,
+                          const UITheme& theme = {}, bool testMode = false);
     static void drawQuests(UIRenderer& r, float x, float y, const UITheme& theme = {});
     static void drawInventory(UIRenderer& r, float x, float y, const UITheme& theme = {}, int page = 0, int capacity = 24);
 };

@@ -128,7 +128,7 @@ inline Report scan(const fs::path& client){
             }
         } else {
             ++r.effFiles; LegacyEffectSummary eff;
-            if(!inspectLegacyEff(p.string(),eff)){ r.failures.push_back({rel,"eff","unreadable_or_bad_header"}); continue; }
+            if(!inspectLegacyEff(p.string(),eff,true)){ r.failures.push_back({rel,"eff","unreadable_or_bad_header"}); continue; }
             if(!eff.structured){ r.failures.push_back({rel,"eff","structure_not_decoded"}); continue; }
             for(std::size_t i=0;i<eff.document.parts.size();++i){
                 const auto& s=eff.document.parts[i]; Use u;

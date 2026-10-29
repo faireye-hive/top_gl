@@ -169,6 +169,37 @@ int main(int argc, char** argv) {
         skill(skills, 91, 0, 2001, 0); // fan/group spread
         skill(skills, 93, 0, 1020, 0); // historical Frozen Arrow
         skill(skills, 13, 197, 0, 0); // .par serializes its own blend factors
+        std::vector<std::string> itemDummySkill(74, "0");
+        itemDummySkill[0] = "14";
+        itemDummySkill[53] = "0";
+        itemDummySkill[54] = "42,0";
+        for (std::size_t i = 0; i < itemDummySkill.size(); ++i)
+            skills << (i ? "\t" : "") << itemDummySkill[i];
+        skills << '\n';
+        std::vector<std::string> itemWithoutDummySkill(74, "0");
+        itemWithoutDummySkill[0] = "17";
+        itemWithoutDummySkill[53] = "-1";
+        itemWithoutDummySkill[54] = "42,0";
+        itemWithoutDummySkill[55] = "45,0";
+        for (std::size_t i = 0; i < itemWithoutDummySkill.size(); ++i)
+            skills << (i ? "\t" : "") << itemWithoutDummySkill[i];
+        skills << '\n';
+        std::vector<std::string> targetDummySkill(74, "0");
+        targetDummySkill[0] = "15";
+        targetDummySkill[62] = "55";
+        targetDummySkill[63] = "42";
+        targetDummySkill[64] = "0";
+        for (std::size_t i = 0; i < targetDummySkill.size(); ++i)
+            skills << (i ? "\t" : "") << targetDummySkill[i];
+        skills << '\n';
+        std::vector<std::string> targetRootSkill(74, "0");
+        targetRootSkill[0] = "16";
+        targetRootSkill[62] = "-1";
+        targetRootSkill[63] = "42";
+        targetRootSkill[64] = "0";
+        for (std::size_t i = 0; i < targetRootSkill.size(); ++i)
+            skills << (i ? "\t" : "") << targetRootSkill[i];
+        skills << '\n';
         // A partially converted historical skill must not create a generic
         // spinning tornado for missing item/flight/hit assets.
         std::vector<std::string> illusion(74, "0");
@@ -365,6 +396,94 @@ int main(int argc, char** argv) {
     multiple.emit({top::EffectEvent::Cast, 1.f, 2.f, 1.f, 2.f, 9});
     assert(multiple.activeCount() == 0); // absent historical assets => no fake tornado
 
+    // SK2.17-BU: a player item effect can follow its authored item dummy.
+    // The switch is opt-in; without it the legacy GL event position remains.
+    auto itemEffectCenterX = [&](const char* bind) {
+        if (bind) assert(::setenv("TOP_HISTORICAL_ITEM_DUMMY_BIND",bind,1)==0);
+        else assert(::unsetenv("TOP_HISTORICAL_ITEM_DUMMY_BIND")==0);
+        top::EffectSystem itemEffect;
+        assert(itemEffect.open(root.string()));
+        itemEffect.setPlayerCastAnchor(1.f,2.f,0.f);
+        std::array<float,16> itemMatrix{};
+        itemMatrix[0]=itemMatrix[5]=itemMatrix[10]=itemMatrix[15]=1.f;
+        itemMatrix[12]=10.f; itemMatrix[13]=30.f; itemMatrix[14]=20.f;
+        itemEffect.setPlayerStripItemMatrices({{0,itemMatrix}});
+        top::EffectEvent cast{top::EffectEvent::Cast,1.f,2.f,1.f,2.f,14};
+        cast.sourceIsPlayer=true;
+        itemEffect.emit(cast);
+        itemEffect.build(map,1.f,0.f);
+        float minX=1e9f,maxX=-1e9f;
+        for(const auto& batch:itemEffect.batches())
+            if(batch.texture.find("flight_tex.tga.png")!=std::string::npos)
+                for(const auto& vertex:batch.verts){minX=std::min(minX,vertex.x);maxX=std::max(maxX,vertex.x);}
+        assert(minX<maxX);
+        return (minX+maxX)*.5f;
+    };
+    const float itemFallbackX=itemEffectCenterX("0");
+    const float itemBoundX=itemEffectCenterX("1");
+    assert(itemFallbackX>8.f && itemBoundX>8.f && std::fabs(itemBoundX-itemFallbackX)<1e-5f);
+    assert(::unsetenv("TOP_HISTORICAL_ITEM_DUMMY_BIND")==0);
+
+    // SK2.17-BW: DX9 ItemEffect rejects item channels whose configured dummy
+    // is exactly -1. The compatibility path remains unchanged without the gate.
+    assert(::unsetenv("TOP_HISTORICAL_ITEM_EFFECT_REQUIRE_DUMMY")==0);
+    top::EffectSystem itemWithoutDummyLegacy;
+    assert(itemWithoutDummyLegacy.open(root.string()));
+    itemWithoutDummyLegacy.emit({top::EffectEvent::Cast,1.f,2.f,1.f,2.f,17});
+    assert(itemWithoutDummyLegacy.activeCount()==0); // DX9 rejects dummy -1 by default
+    assert(::setenv("TOP_HISTORICAL_ITEM_EFFECT_REQUIRE_DUMMY","1",1)==0);
+    top::EffectSystem itemWithoutDummyHistorical;
+    assert(itemWithoutDummyHistorical.open(root.string()));
+    itemWithoutDummyHistorical.emit({top::EffectEvent::Cast,1.f,2.f,1.f,2.f,17});
+    assert(itemWithoutDummyHistorical.activeCount()==0); // DX9 returns false for dummy -1
+    top::EffectSystem itemWithDummyHistorical;
+    assert(itemWithDummyHistorical.open(root.string()));
+    itemWithDummyHistorical.emit({top::EffectEvent::Cast,1.f,2.f,1.f,2.f,14});
+    assert(itemWithDummyHistorical.activeCount()==1); // nonnegative item dummy remains eligible
+    assert(::unsetenv("TOP_HISTORICAL_ITEM_EFFECT_REQUIRE_DUMMY")==0);
+
+    // SK2.17-BV: target channels follow the addressed actor's authored dummy.
+    auto targetEffectCenterX = [&](const char* bind) {
+        if (bind) assert(::setenv("TOP_HISTORICAL_TARGET_DUMMY_BIND",bind,1)==0);
+        else assert(::unsetenv("TOP_HISTORICAL_TARGET_DUMMY_BIND")==0);
+        top::EffectSystem targetEffect;
+        assert(targetEffect.open(root.string()));
+        std::array<float,16> targetDummyMatrix{};
+        targetDummyMatrix[0]=targetDummyMatrix[5]=targetDummyMatrix[10]=targetDummyMatrix[15]=1.f;
+        targetDummyMatrix[12]=15.f; targetDummyMatrix[13]=30.f; targetDummyMatrix[14]=20.f;
+        std::unordered_map<int,std::unordered_map<int,std::array<float,16>>> targetMatrices;
+        targetMatrices[0][55]=targetDummyMatrix;
+        targetEffect.setTargetDummyMatrices(std::move(targetMatrices));
+        top::EffectEvent hit{top::EffectEvent::SkillHit,1.f,2.f,3.f,4.f,15};
+        hit.targetActorIndex=0;
+        targetEffect.emit(hit);
+        targetEffect.build(map,1.f,0.f);
+        float minX=1e9f,maxX=-1e9f;
+        for(const auto& batch:targetEffect.batches())
+            if(batch.texture.find("flight_tex.tga.png")!=std::string::npos)
+                for(const auto& vertex:batch.verts){minX=std::min(minX,vertex.x);maxX=std::max(maxX,vertex.x);}
+        assert(minX<maxX);
+        return (minX+maxX)*.5f;
+    };
+    const float targetFallbackX=targetEffectCenterX("0");
+    const float targetBoundX=targetEffectCenterX("1");
+    assert(targetFallbackX>8.f && targetBoundX>8.f && std::fabs(targetBoundX-targetFallbackX)<1e-5f);
+    assert(::unsetenv("TOP_HISTORICAL_TARGET_DUMMY_BIND")==0);
+    ::setenv("TOP_HISTORICAL_TARGET_DUMMY_BIND","1",1);
+    top::EffectSystem targetRootEffect;
+    assert(targetRootEffect.open(root.string()));
+    targetRootEffect.setTargetActorRoots({{0,{12.f,30.f,20.f}}});
+    top::EffectEvent rootHit{top::EffectEvent::SkillHit,1.f,2.f,3.f,4.f,16};
+    rootHit.targetActorIndex=0;
+    targetRootEffect.emit(rootHit);
+    targetRootEffect.build(map,1.f,0.f);
+    float rootMinX=1e9f,rootMaxX=-1e9f;
+    for(const auto& batch:targetRootEffect.batches())
+        if(batch.texture.find("flight_tex.tga.png")!=std::string::npos)
+            for(const auto& vertex:batch.verts){rootMinX=std::min(rootMinX,vertex.x);rootMaxX=std::max(rootMaxX,vertex.x);}
+    assert(rootMinX<rootMaxX && (rootMinX+rootMaxX)*.5f>10.f);
+    assert(::unsetenv("TOP_HISTORICAL_TARGET_DUMMY_BIND")==0);
+
     // A type-6 STRIP .par can wrap an effect model; render the model's
     // original texture/geometry, not a flat controller billboard.
     top::EffectSystem nestedStrip;
@@ -473,6 +592,26 @@ int main(int argc, char** argv) {
     assert(resultFx.activeCount() == singleResult); // no repeated spawn
     resultFx.step(10.f);
     assert(resultFx.activeCount() == 0);
+
+    // DX9 starts the Result controller at age zero on Stop(), then calls its
+    // first FrameMove with dt=0 during Render. Do not carry the flight frame's
+    // overshoot into the result's authored delay when the historical switch is on.
+    assert(::setenv("TOP_HISTORICAL_MAGIC_RESULT_FRAME_START","1",1)==0);
+    top::EffectSystem resultFrameStart;
+    assert(resultFrameStart.open(root.string()));
+    resultFrameStart.emit({top::EffectEvent::Flight,1.f,2.f,9.f,7.f,93,.5f});
+    resultFrameStart.step(.76f); // arrives with .26s left in this GL update
+    auto resultFrameVisible = [&]() {
+        resultFrameStart.build(map,1.f,0.f);
+        for (const auto& batch:resultFrameStart.batches())
+            if (batch.texture.find("icearrowh_tex.tga.png")!=std::string::npos &&
+                !batch.verts.empty()) return true;
+        return false;
+    };
+    assert(!resultFrameVisible()); // Result's authored 0.25s delay has just begun.
+    resultFrameStart.step(.26f);
+    assert(resultFrameVisible());
+    assert(::unsetenv("TOP_HISTORICAL_MAGIC_RESULT_FRAME_START")==0);
 
     // SK2.2: 2002 references group #2, not a missing magic ID.
     // DX9 Part_sequence fires magicsingle 10/25/26 at 0.0 / 0.2 / 0.4s.

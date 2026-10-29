@@ -28,11 +28,21 @@ int main() {
        c.gate.unsupported.size() || c.beginFlags.size()!=1 || c.beginFlags[0]!=1) {
         std::fprintf(stderr,"05-AQ: Decoction Recipe or begin flag regression\n");return 1;
     }
+    top::NpcSystem argent;
+    if(!argent.load("garner"))return 2;
+    int testNpcCount=0;
+    for(const auto& npc:argent.npcs())if(npc.script.rfind("TOP_TEST_",0)==0 || npc.script=="TOP_CUSTOM_MISSIONS")++testNpcCount;
+    if(testNpcCount!=6)return 3;
+    for(const char* script:{"TOP_TEST_APPAREL","TOP_TEST_WEAPONS","TOP_TEST_CHESTS","TOP_TEST_GENERAL"}) {
+        std::vector<int> stock;
+        if(!argent.catalog(script,stock) || stock.empty())return 4;
+    }
     namespace fs=std::filesystem;
     const auto previous=fs::current_path();
     const fs::path fixture=fs::temp_directory_path() /
         ("top_05aq_flag_fixture_"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     fs::create_directories(fixture / "Client/scripts/offline/script/MisScript");
+    fs::create_directories(fixture / "Client/scripts/offline");
     {
         std::ofstream lua(fixture / "Client/scripts/offline/script/MisScript/MissionScript01.lua");
         lua << "DefineMission(902, \"Safe result flag\", 880)\n"
@@ -60,6 +70,12 @@ int main() {
                "MisResultAction(TakeItem,5001,1)\n"
                "MisResultAction(ClearMission,881)\n";
     }
+    {
+        std::ofstream custom(fixture / "Client/scripts/offline/custom-missions.tsv");
+        custom << "900001\tTest collection\tCollect three apples for the board.\t1\titem:8:3\t50\t100\t15:1\n"
+                  "900002\tTest hunt\tDefeat two creatures and deliver a hide.\t5\tkill:268:2;item:4474:1\t75\t125\t\n"
+                  "900003\tBad objective\tThis row must be rejected.\t1\tteleport:1:1\t0\t0\t\n";
+    }
     fs::current_path(fixture);
     top::NpcSystem synthetic;
     top::HistoricalMission safe,unsafe;
@@ -69,9 +85,18 @@ int main() {
         safe.resultNoFlags==std::vector<int>{10} && safe.rewardExp==11;
     const bool blocked=synthetic.mission(881,unsafe) && !unsafe.turnInRequired &&
         !unsafe.gate.unsupported.empty();
+    top::HistoricalMission authored,authoredHunt;
+    std::vector<int> authoredIds;
+    const bool customMissions=synthetic.missionByDisplay(900001,authored) &&
+        synthetic.mission(900002,authoredHunt) &&
+        synthetic.missionIds("TOP_CUSTOM_MISSIONS",authoredIds) &&
+        authored.title=="Test collection" && authored.neededItems.size()==1 &&
+        authored.neededItems[0].id==8 && authored.rewardItems.size()==1 &&
+        authored.rewardItems[0].id==15 && authoredHunt.eventTriggers.size()==2 &&
+        authoredIds==std::vector<int>({900001,900002});
     fs::current_path(previous);
     fs::remove_all(fixture);
-    if(!good || !blocked) {
+    if(!good || !blocked || !customMissions) {
         std::fprintf(stderr,"05-AQ: synthetic result conditions not safely recognized\n");return 1;
     }
     return 0;

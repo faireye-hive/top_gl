@@ -11,12 +11,7 @@ constexpr Pair choose(int min, int mag, bool enabled) {
     return enabled ? Pair{supported(min), supported(mag)} : Pair{};
 }
 constexpr bool same(Pair a, Pair b) { return a.min == b.min && a.mag == b.mag; }
-inline bool enabled() {
-    static const bool value = []() {
-        const char* raw = std::getenv("TOP_HISTORICAL_FILTERS");
-        return raw && raw[0] == '1' && raw[1] == '\0';
-    }();
-    return value;
-}
+// SK2.18-L: historical behavior is part of normal execution.
+inline constexpr bool enabled() { return true; }
 inline Pair effective(int min, int mag) { return choose(min, mag, enabled()); }
 }} // namespace top::historical_filter

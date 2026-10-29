@@ -31,7 +31,8 @@ struct LegacyEffectSummary {
     std::vector<std::string> verifiedResources;
 };
 
-inline bool inspectLegacyEff(const std::string& filename, LegacyEffectSummary& out) {
+inline bool inspectLegacyEff(const std::string& filename, LegacyEffectSummary& out,
+                             bool allowRawModelParams = false) {
     std::ifstream input(filename, std::ios::binary | std::ios::ate);
     if (!input) return false;
     const std::streamoff length = input.tellg();
@@ -74,7 +75,7 @@ inline bool inspectLegacyEff(const std::string& filename, LegacyEffectSummary& o
         decoded.document = partial;
     }
     legacy_eff::Document full;
-    if (legacy_eff::decode(bytes, full)) {
+    if (legacy_eff::decode(bytes, full, allowRawModelParams)) {
         decoded.structured = true;
         decoded.document = std::move(full);
         auto add = [&](const std::string& value) {

@@ -147,7 +147,7 @@ int audit(const fs::path& client,const fs::path& output,bool strict){
     std::ofstream files(output/"par_files.csv"),systems(output/"par_systems.csv"),deps(output/"par_dependencies.csv"),failures(output/"par_failures.csv"),summary(output/"par_summary.json");
     if(!files||!systems||!deps||!failures||!summary){std::cerr<<"Unable to create output files\n";return 2;}
     row(files,{"file","bytes","status","version","controller","declared_systems","decoded_systems","consumed_bytes","trailing_bytes","error","error_offset"});
-    row(systems,{"file","index","name","version","type","count_raw","frames","texture_name","model_name","model_kind","model_range","model_range_name","life","velocity","step","delay","play","has_path","path_points","path_velocity","range_x","range_y","range_z","offset_x","offset_y","offset_z","size_start","size_end","alpha_start","alpha_end","runtime_visual_status"});
+    row(systems,{"file","index","name","version","type","count_raw","frames","texture_name","model_name","model_kind","billboard","model_range","model_range_name","mediay_eff","life","velocity","step","delay","play","has_path","path_points","path_velocity","range_x","range_y","range_z","offset_x","offset_y","offset_z","size_start","size_end","alpha_start","alpha_end","runtime_visual_status","model_direction"});
     row(deps,{"file","index","kind","declared_name","resolved_path","status"});
     row(failures,{"file","reason","offset","bytes"});
     Index textures(client/"texture"/"effect"), effects(effect), models(client/"model"/"effect");
@@ -189,7 +189,7 @@ int audit(const fs::path& client,const fs::path& output,bool strict){
             const auto lastSize=s.sizes.empty()?"":num(s.sizes.back());
             const auto firstAlpha=s.colors.size()<4?"":num(s.colors[3]);
             const auto lastAlpha=s.colors.size()<4?"":num(s.colors[s.colors.size()-1]);
-            row(systems,{file,str(idx),s.name,str(d.version),str(s.type),str(s.count),str(s.frames),s.texture,s.model,modelKind(s.model),s.modelRange?"1":"0",s.modelRangeName,num(s.life),num(s.velocity),num(s.step),num(s.delay),num(s.play),s.hasPath?"1":"0",str(s.pathPoints),num(s.pathVelocity),num(s.range[0]),num(s.range[1]),num(s.range[2]),num(s.offset[0]),num(s.offset[1]),num(s.offset[2]),firstSize,lastSize,firstAlpha,lastAlpha,"not_visual_tested"});
+            row(systems,{file,str(idx),s.name,str(d.version),str(s.type),str(s.count),str(s.frames),s.texture,s.model,modelKind(s.model),s.billboard?"1":"0",s.modelRange?"1":"0",s.modelRangeName,s.mediayEff?"1":"0",num(s.life),num(s.velocity),num(s.step),num(s.delay),num(s.play),s.hasPath?"1":"0",str(s.pathPoints),num(s.pathVelocity),num(s.range[0]),num(s.range[1]),num(s.range[2]),num(s.offset[0]),num(s.offset[1]),num(s.offset[2]),firstSize,lastSize,firstAlpha,lastAlpha,"not_visual_tested",s.modelDirection?"1":"0"});
             if(!s.texture.empty())dep(file,idx,"texture",s.texture,resolve(textures,s.texture,true));
             if(!s.model.empty()){
                 auto kind=modelKind(s.model);

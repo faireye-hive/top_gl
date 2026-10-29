@@ -210,12 +210,37 @@ int main(){
     assert(planarSpan(tuned)>planarSpan(slash)*1.15f);
     EffectSystem impact; assert(impact.open(root.string()));
     impact.emit({EffectEvent::SkillHit,0.f,0.f,4.f,0.f,81});
+    impact.step(.01f); // shared FIRE emitter reaches its authored interval
     impact.build(map,1.f,0.f);
     bool sawHit195 = false;
     for (const auto& b: impact.batches())
         if (!b.verts.empty() && b.texture.find("generic_ring.tga.png")!=std::string::npos)
             sawHit195 = true;
     assert(sawHit195);
+
+    // DX9 Part_fshade discards timer overshoot and adds at most one trail
+    // copy per call. A long update must therefore differ from age-derived
+    // copy counting when the opt-in historical state is enabled.
+    auto fshadeVertices=[&](EffectSystem& system) {
+        std::size_t count=0;
+        for(const auto& batch:system.batches())
+            if(batch.texture.find("alpha.tga.png")!=std::string::npos)
+                count+=batch.verts.size();
+        return count;
+    };
+    assert(::setenv("TOP_HISTORICAL_FSHADE_FRAME_COUNT","1",1)==0);
+    EffectSystem fshadeHistorical; assert(fshadeHistorical.open(root.string()));
+    fshadeHistorical.emit({EffectEvent::Flight,0.f,0.f,100.f,0.f,81,8.f});
+    fshadeHistorical.step(1.21f);
+    fshadeHistorical.build(map,1.f,0.f);
+    const auto historicalFshadeVertices=fshadeVertices(fshadeHistorical);
+    assert(::unsetenv("TOP_HISTORICAL_FSHADE_FRAME_COUNT")==0);
+    EffectSystem fshadeAgeBased; assert(fshadeAgeBased.open(root.string()));
+    fshadeAgeBased.emit({EffectEvent::Flight,0.f,0.f,100.f,0.f,81,8.f});
+    fshadeAgeBased.step(1.21f);
+    fshadeAgeBased.build(map,1.f,0.f);
+    assert(historicalFshadeVertices>0 &&
+           fshadeVertices(fshadeAgeBased)>historicalFshadeVertices);
 
     auto useModel=[&](const std::string& file){
         std::ofstream f(root/"scripts/table/magicsingleinfo.txt");

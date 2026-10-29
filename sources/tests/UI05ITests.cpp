@@ -1,4 +1,5 @@
 #include "top/LegacyEffectInspector.h"
+#include "top/LegacyEffectGeometry.h"
 #include "top/EffectSystem.h"
 
 #include <cassert>
@@ -7,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 #include <unistd.h>
@@ -18,7 +20,8 @@ void name32(std::ofstream& f, const std::string& s) {
     assert(s.size() < 32);
     s.copy(bytes, s.size()); f.write(bytes, 32);
 }
-void originalEff(const fs::path& dest) {
+void originalEff(const fs::path& dest, bool invalidModelParams=false,
+                 bool invalidKeyTime=false, const std::string& model="square") {
     // Header follows the actual CMPResManger::LoadEffectFromFile version 6.
     // Child follows I_Effect::LoadFromFile, including its versioned suffix.
     std::ofstream f(dest, std::ios::binary);
@@ -31,15 +34,19 @@ void originalEff(const fs::path& dest) {
     name32(f, "Sparks");
     for (int v : {1, 5, 6}) put<std::int32_t>(f, v); // type / blends
     put<float>(f, 1.f); put<std::uint16_t>(f, 3);
-    for (float v : {.5f,.5f,.5f}) put<float>(f,v);
+    for (int i=0;i<3;++i) put<float>(f, invalidKeyTime&&i==0?
+        std::numeric_limits<float>::quiet_NaN():.5f);
     for (float v : {1.f,1.f,1.f, 4.f,4.f,4.f, 1.f,1.f,1.f}) put<float>(f,v);
     for (float v : {0.f,0.f,0.f, 0.f,0.f,.785398f, 0.f,0.f,1.570796f}) put<float>(f,v);
     for (float v : {0.f,0.f,0.f, 2.f,1.f,0.f, 0.f,0.f,0.f}) put<float>(f,v);
     for (float v : {1.f,0.f,0.f,1.f, 0.f,1.f,0.f,.8f, 0.f,0.f,1.f,0.f}) put<float>(f,v);
     put<std::uint16_t>(f, 0); put<std::uint16_t>(f, 0); put<float>(f, 0.f); // UV
     put<std::uint16_t>(f, 0); put<float>(f, 0.f); name32(f, "shine.tga");
-    name32(f, "square"); put<std::uint8_t>(f, 1); put<std::int32_t>(f,0); // billboard
-    put<std::int32_t>(f, 4); for (int i=0;i<3;++i) put<float>(f, 1.f); // mesh params, >v1
+    name32(f, model); put<std::uint8_t>(f, 1); put<std::int32_t>(f,0); // billboard
+    put<std::int32_t>(f, 4); put<float>(f, invalidModelParams?
+        std::numeric_limits<float>::quiet_NaN():1.f);
+    put<float>(f, invalidModelParams?std::numeric_limits<float>::infinity():1.f);
+    put<float>(f, invalidModelParams?-std::numeric_limits<float>::infinity():1.f); // mesh params, >v1
     put<std::uint16_t>(f, 1); put<float>(f,0.1f); name32(f,"shine.tga"); put<float>(f,0.1f); // >v2
     put<std::int32_t>(f, 0); // >v3 no cylinder params
     put<std::uint8_t>(f,0); for (int i=0;i<4;++i) put<float>(f, 0.f); // >v4
@@ -79,6 +86,25 @@ int main() {
     assert(std::fabs(mid.color[3] - .8f) < .0001f);
     assert(std::fabs(mid.angle[2] - .785398f) < .0001f);
     assert(std::fabs(top::legacy_eff::sample(summary.document.parts[0], .25f).size[0] - 2.5f) < .0001f);
+    // The DX9 reads model parameters verbatim. RectPlane geometry ignores them,
+    // while the GL Cone/Cylinder generator separately rejects unsafe values.
+    const auto rawModelParams = root / "effect" / "raw_model_params.eff";
+    originalEff(rawModelParams, true, false, "RectPlane");
+    top::LegacyEffectSummary rawParams;
+    assert(top::inspectLegacyEff(rawModelParams.string(), rawParams));
+    assert(!rawParams.structured); // default is strict/off
+    assert(top::inspectLegacyEff(rawModelParams.string(), rawParams, true));
+    assert(rawParams.structured && rawParams.document.parts.size()==1);
+    assert(std::isnan(rawParams.document.parts[0].modelParams.height));
+    assert(std::isinf(rawParams.document.parts[0].modelParams.topRadius));
+    top::legacy_mesh::Primitive rectangle;
+    assert(top::legacy_mesh::make("RectPlane", rawParams.document.parts[0].modelParams, rectangle));
+    // Non-finite animation values remain malformed rather than entering GL transforms.
+    const auto rawKeyTime = root / "effect" / "raw_key_time.eff";
+    originalEff(rawKeyTime, false, true);
+    top::LegacyEffectSummary invalidKey;
+    assert(top::inspectLegacyEff(rawKeyTime.string(), invalidKey));
+    assert(!invalidKey.structured && invalidKey.document.parts.empty());
     // Truncation must NOT publish a half-decoded binary structure.
     fs::path truncated = root / "effect" / "partial.eff";
     fs::copy_file(source, truncated);

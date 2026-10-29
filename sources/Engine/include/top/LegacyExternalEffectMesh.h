@@ -1,9 +1,10 @@
 #pragma once
 // 05-L: reusable .lgo decoder adapter for MindPower effect meshes.
 // Only reads a single lwGeomObjInfo from model/effect, not an invented mesh.
-// ModelFile.cpp remains the sole decoder; unsupported/skinned/oversize
-// geometry returns false and the caller keeps its existing fallback.
+// ModelFile.cpp preserves embedded animation. Unresolved external skeletons
+// and unsupported/oversize geometry return false without inventing a model.
 #include "top/ModelFile.h"
+#include "top/EmbeddedEffectSkin.h"
 #include "top/LegacyEffectGeometry.h"
 #include "top/MagicEffectCatalog.h"
 
@@ -30,12 +31,13 @@ inline bool load(const std::string& root, const std::string& name, Model& model)
     Model candidate;
     if (!candidate.loadGeom(root + "/model/effect/" + file)) return false;
     if (candidate.geoms.size() != 1) return false;
-    const ModelGeom& geom = candidate.geoms.front();
+    ModelGeom& geom = candidate.geoms.front();
+    if((!geom.blendIndex.empty() || !geom.blendWeight.empty()) &&
+       (!embedded_effect_skin::decode(geom) || !embedded_effect_skin::skinned(geom)))return false;
     const std::size_t n = geom.position.size() / 3;
     if (n < 3 || n > 8192 || geom.position.size() != n * 3 ||
         geom.indices.size() < 3 || geom.indices.size() > 36000 ||
         geom.subsets.empty() || geom.subsets.size() > 16 ||
-        !geom.blendIndex.empty() || !geom.blendWeight.empty() ||
         (!geom.uv.empty() && geom.uv.size() != n * 2)) return false;
     for (float x : geom.position) if (!std::isfinite(x) || std::fabs(x) > 10000.f) return false;
     for (float x : geom.uv) if (!std::isfinite(x) || std::fabs(x) > 10000.f) return false;
@@ -65,7 +67,8 @@ inline bool subsetPrimitive(const ModelGeom& geom, const ModelSubset& subset,
         subset.indexCount == 0 || subset.indexCount % 3 != 0 ||
         subset.startIndex > geom.indices.size() ||
         subset.indexCount > geom.indices.size() - subset.startIndex ||
-        !geom.blendIndex.empty() || !geom.blendWeight.empty()) return false;
+        ((!geom.blendIndex.empty() || !geom.blendWeight.empty()) &&
+         !embedded_effect_skin::skinned(geom))) return false;
     const float* matrix = geom.local;
     if (geom.matrixFrames > 0 && geom.matrixAnimation.size() == static_cast<std::size_t>(geom.matrixFrames) * 16) {
         const float safe = std::isfinite(seconds) ? std::max(0.f,seconds) : 0.f;
@@ -76,7 +79,8 @@ inline bool subsetPrimitive(const ModelGeom& geom, const ModelSubset& subset,
     legacy_mesh::Primitive result;
     result.points.reserve(n);
     for (std::size_t i=0; i<n; ++i) {
-        const float x=geom.position[i*3], y=geom.position[i*3+1], z=geom.position[i*3+2];
+        float x=geom.position[i*3], y=geom.position[i*3+1], z=geom.position[i*3+2];
+        if(!embedded_effect_skin::position(geom,i,seconds,x,y,z))return false;
         const float ox = x*matrix[0]+y*matrix[4]+z*matrix[8]+matrix[12];
         const float oy = x*matrix[1]+y*matrix[5]+z*matrix[9]+matrix[13];
         const float oz = x*matrix[2]+y*matrix[6]+z*matrix[10]+matrix[14];

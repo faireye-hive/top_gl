@@ -50,13 +50,14 @@ void makeObjectFile(const fs::path& file){
     patch32(head,16,600);patch32(head,24,1);patch32(head,28,1);
     patch32(head,32,8);patch32(head,36,8);
     f.write(head,sizeof(head));
-    put<std::uint32_t>(f,52);put<std::uint32_t>(f,2);
-    for(int id=1;id<=2;++id){
+    put<std::uint32_t>(f,52);put<std::uint32_t>(f,3);
+    for(int id=1;id<=3;++id){
         char object[20]{};
-        const std::uint16_t kind=static_cast<std::uint16_t>(id);
+        const std::uint16_t kind=static_cast<std::uint16_t>(id==3 ? 0x4007 : id);
         std::memcpy(object,&kind,sizeof(kind));
-        patch32(object,4,static_cast<std::uint32_t>(id*200));
-        patch32(object,8,200);
+        patch32(object,4,static_cast<std::uint32_t>(id==3 ? 600 : id*200));
+        patch32(object,8,static_cast<std::uint32_t>(id==3 ? 700 : 200));
+        if(id==3){const std::int16_t height=125,yaw=250;std::memcpy(object+12,&height,2);std::memcpy(object+14,&yaw,2);}
         f.write(object,sizeof(object));
     }
 }
@@ -84,12 +85,25 @@ int main(){
     world.build(map,4.f,2.f,8.f,staticMesh,top::SceneWorld::Pass::Static);
     world.build(map,4.f,2.f,8.f,animatedMesh,top::SceneWorld::Pass::Animated);
     assert(all.triangles==2 && all.placed==2 && total(all)==6);
+    assert(all.mapEffects.size()==1 && all.mapEffects[0].effectId==7); // normal scene path
     assert(staticMesh.triangles==1 && animatedMesh.triangles==1);
     assert(total(staticMesh)+total(animatedMesh)==total(all));
     auto combined=vertices(staticMesh),animatedVerts=vertices(animatedMesh);
     combined.insert(combined.end(),animatedVerts.begin(),animatedVerts.end());
     std::sort(combined.begin(),combined.end());
     assert(vertices(all)==combined);
+    assert(::setenv("TOP_HISTORICAL_MAP_SCENE_EFFECTS","1",1)==0);
+    top::SceneMesh withMapEffects;
+    world.build(map,4.f,2.f,8.f,withMapEffects,top::SceneWorld::Pass::Static);
+    assert(withMapEffects.mapEffects.size()==1);
+    assert(withMapEffects.mapEffects[0].effectId==7);
+    assert(withMapEffects.mapEffects[0].x==6.f && withMapEffects.mapEffects[0].y==7.f);
+    assert(withMapEffects.mapEffects[0].height==1.25f);
+    assert(withMapEffects.mapEffects[0].yaw==2.5f);
+    top::SceneMesh animatedWithMapEffects;
+    world.build(map,4.f,2.f,8.f,animatedWithMapEffects,top::SceneWorld::Pass::Animated);
+    assert(animatedWithMapEffects.mapEffects.empty());
+    assert(::unsetenv("TOP_HISTORICAL_MAP_SCENE_EFFECTS")==0);
     // All walkable collision triangles remain in the static snapshot.
     assert(staticMesh.walk==all.walk);
     assert(animatedMesh.walk.empty());

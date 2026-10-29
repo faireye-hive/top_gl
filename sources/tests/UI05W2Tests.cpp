@@ -18,7 +18,10 @@ int main() {
     assert(distance(999.f)==kMaxDistance);
     ui::UIManager manager;
     manager.windows.showSkill_ = true;
-    manager.skills.setView({{97,"Heal","",5,true,false,-1},{84,"Berserk","",6,true,false,7}},2);
+    ui::SkillView heal;heal.id=97;heal.name="Heal";heal.sp=5;heal.learned=true;
+    ui::SkillView berserk;berserk.id=84;berserk.name="Berserk";berserk.sp=6;
+    berserk.learned=true;berserk.hotkey=7;
+    manager.skills.setView({heal,berserk},2);
     constexpr int screenW=1024;
     const int bx=screenW-206;
     assert(manager.skills.hit(bx+25,64+76,screenW,manager.windows)==97);

@@ -2,7 +2,9 @@
 
 namespace top::item_newbie_chests {
 namespace {
-void give(Plan& plan, int id, int count=1, int itemEvent=0) { plan.rewards.push_back({id,count,itemEvent}); }
+void give(Plan& plan, int id, int count=1, int itemEvent=0, int quality=0) {
+    plan.rewards.push_back({id,count,itemEvent,quality});
+}
 // Essas familias de profissao constam explicitamente no NewbieChest Lua.
 int group(int job) {
     if (job==1 || job==8 || job==9) return 1;
@@ -62,8 +64,61 @@ bool equipment(Plan& p, int chest, int groupId, int type) {
 bool isHistoricalNewbieChest(int id, const std::string& callback) {
     return callback=="NewbieChest" && id>=436 && id<=443;
 }
+bool isHistoricalClassChest(int id, const std::string& callback) {
+    return isHistoricalNewbieChest(id,callback) ||
+        (id==985 && callback=="ItemUse_SANWUBOX") ||
+        (id==986 && callback=="ItemUse_SIWUBOX") ||
+        (id==987 && callback=="ItemUse_WUWUBOX") ||
+        (id==988 && callback=="ItemUse_LIUWUBOX");
+}
 Result evaluate(int id, const std::string& callback, int level, int job, int type, bool boat) {
-    if (!isHistoricalNewbieChest(id,callback)) return {Failure::NotNewbieChest,{}};
+    if (!isHistoricalClassChest(id,callback)) return {Failure::NotNewbieChest,{}};
+    const bool classicNewbie = isHistoricalNewbieChest(id,callback);
+    if (classicNewbie && boat) return {Failure::Boat,{}};
+    if (id>=985 && id<=988) {
+        static constexpr int requiredLevels[] = {0,10,35,45,55};
+        const int requiredLevel = requiredLevels[id-984];
+        if (level < requiredLevel) return {Failure::Level,{}};
+        Plan plan;
+        plan.minimumFreeSlots=4;
+        int equipmentId=0;
+        int followupId=0;
+        if (id==985) {
+            if ((job==4 || job==16) && type!=2) equipmentId=803;
+            else if (type==2 && job!=0) equipmentId=763;
+            else if ((job==2 || job==12) && type!=2 && type!=4) equipmentId=777;
+            else if ((job==5 || job==13 || job==14) && type!=1 && type!=2) equipmentId=789;
+            else if (job==1 && type==1) equipmentId=1928;
+            followupId=986;
+        } else if (id==986) {
+            if (job==9 && type==1) equipmentId=767;
+            else if (job==8 && type==2) equipmentId=764;
+            else if (job==12 && (type==1 || type==3)) equipmentId=778;
+            else if (job==13 && (type==3 || type==4)) equipmentId=790;
+            else if (job==14 && (type==3 || type==4)) equipmentId=796;
+            else if (job==16 && (type==1 || type==3 || type==4)) equipmentId=804;
+            followupId=987;
+        } else if (id==987) {
+            if (job==9 && type==1) equipmentId=768;
+            else if (job==8 && type==2) equipmentId=765;
+            else if (job==12 && (type==1 || type==3)) equipmentId=779;
+            else if (job==13 && (type==3 || type==4)) equipmentId=791;
+            else if (job==14 && (type==3 || type==4)) equipmentId=797;
+            else if (job==16 && (type==1 || type==3 || type==4)) equipmentId=805;
+            followupId=988;
+        } else {
+            if (job==9 && type==1) equipmentId=769;
+            else if (job==8 && type==2) equipmentId=766;
+            else if (job==12 && (type==1 || type==3)) equipmentId=780;
+            else if (job==13 && (type==3 || type==4)) equipmentId=792;
+            else if (job==14 && (type==3 || type==4)) equipmentId=798;
+            else if (job==16 && (type==1 || type==3 || type==4)) equipmentId=806;
+        }
+        if (equipmentId<=0) return {job==0 ? Failure::Job : Failure::CharacterType,{}};
+        give(plan,equipmentId,1,0,4);
+        if (followupId>0) give(plan,followupId,1,0,4);
+        return {Failure::None,plan};
+    }
     if (boat) return {Failure::Boat,{}};
     const int requiredLevel=5*(id-435);
     if (level<requiredLevel) return {Failure::Level,{}};

@@ -18,9 +18,11 @@ int keyIndex(KeySym sym) {
     if (sym >= 'A' && sym <= 'Z') return static_cast<int>(sym - 'A' + 'a');
     if (sym >= '0' && sym <= '9') return static_cast<int>(sym);
     if (sym >= XK_KP_0 && sym <= XK_KP_9) return static_cast<int>('0' + (sym - XK_KP_0));
-    if (sym >= XK_F1 && sym <= XK_F8) return 128 + static_cast<int>(sym - XK_F1);
+    if (sym >= XK_F1 && sym <= XK_F9) return 128 + static_cast<int>(sym - XK_F1);
     switch (sym) {
         case XK_Escape: return 27;
+        case XK_Return:
+        case XK_KP_Enter: return 13;
         case XK_Left: return 1;
         case XK_Right: return 2;
         case XK_Up: return 3;

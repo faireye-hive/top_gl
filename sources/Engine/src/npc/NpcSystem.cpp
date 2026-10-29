@@ -36,6 +36,87 @@ bool point(const std::string& text, float& x, float& y) {
     return true;
 }
 
+bool testVendorScript(const std::string& script) {
+    return script.rfind("TOP_TEST_",0)==0;
+}
+
+std::vector<int> testVendorStock(const std::string& script) {
+    enum class Shelf { Apparel, Weapons, Chests, General };
+    Shelf shelf;
+    if(script=="TOP_TEST_APPAREL")shelf=Shelf::Apparel;
+    else if(script=="TOP_TEST_WEAPONS")shelf=Shelf::Weapons;
+    else if(script=="TOP_TEST_CHESTS")shelf=Shelf::Chests;
+    else if(script=="TOP_TEST_GENERAL")shelf=Shelf::General;
+    else return {};
+
+    // As quatro prateleiras usam o mesmo iteminfo. Uma leitura preenche todas;
+    // a classificação de cada linha permanece a das varreduras separadas.
+    struct Shelves {
+        std::vector<int> apparel, weapons, chests, general;
+    };
+    static Shelves shelves;
+    static bool ready=false;
+    if(!ready) {
+        FILE* file=nullptr;
+        for(const char* root:{"Client","../Client","../../Client"}) {
+            const std::string actual=historicalFilePath(root,"scripts/table/iteminfo.txt");
+            if(!actual.empty() && (file=std::fopen(actual.c_str(),"rb")))break;
+        }
+        if(!file)return {};
+        Shelves built;
+        char raw[16384];
+        while(std::fgets(raw,sizeof raw,file)) {
+            const auto cols=tabs(raw);
+            if(cols.size()<29)continue;
+            char* end=nullptr;
+            const long id=std::strtol(cols[0].c_str(),&end,10);
+            if(end==cols[0].c_str() || *end || id<=0 || id>1000000)continue;
+            const std::string& slots=cols[28];
+            bool weapon=false;
+            bool wearable=false;
+            for(std::size_t i=0;i<slots.size();) {
+                const std::size_t begin=i;
+                while(i<slots.size() && slots[i]!=',')++i;
+                char* slotEnd=nullptr;
+                const std::string field=slots.substr(begin,i-begin);
+                const long parsed=std::strtol(field.c_str(),&slotEnd,10);
+                if(slotEnd==field.c_str() || *slotEnd || parsed<1 || parsed>1000) {
+                    if(i<slots.size())++i;
+                    continue;
+                }
+                const int slot=static_cast<int>(parsed);
+                if(slot==6 || slot==9)weapon=true;
+                else if(slot>0)wearable=true;
+                if(i<slots.size())++i;
+            }
+            std::string lower=cols[1];
+            std::transform(lower.begin(),lower.end(),lower.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
+            const bool chest=lower.find("chest")!=std::string::npos || lower.find("treasure")!=std::string::npos ||
+                             lower.find("box")!=std::string::npos || lower.find("crate")!=std::string::npos;
+            const int itemId=static_cast<int>(id);
+            if(wearable&&!weapon)built.apparel.push_back(itemId);
+            if(weapon)built.weapons.push_back(itemId);
+            if(chest)built.chests.push_back(itemId);
+            if(!wearable&&!weapon)built.general.push_back(itemId);
+        }
+        std::fclose(file);
+        // Materiais diretamente usados pela promocao de Crusader e pelo caminho
+        // historico do Champion ficam no vendedor geral para testes de missao.
+        for(int id:{15,295,4368,4453,4454,4456,4474})
+            if(std::find(built.general.begin(),built.general.end(),id)==built.general.end())
+                built.general.push_back(id);
+        shelves=std::move(built);
+        ready=true;
+    }
+    switch(shelf) {
+        case Shelf::Apparel: return shelves.apparel;
+        case Shelf::Weapons: return shelves.weapons;
+        case Shelf::Chests: return shelves.chests;
+        case Shelf::General: return shelves.general;
+    }
+    return {};
+}
+
 
 }  // namespace
 
@@ -84,6 +165,32 @@ bool NpcSystem::load(const std::string& mapName) {
         if (parse(line, npc)) npcs_.push_back(std::move(npc));
     }
     std::fclose(file);
+    if(mapName=="garner") {
+        // Additional QA vendors in Argent; historical NPC rows and stocks are
+        // intentionally untouched. Reuse known NPC actor models from the map.
+        constexpr int actorModels[]={17,20,18,13};
+        constexpr const char* names[]={"Test Apparel & Armor","Test Weapons","Test Chests","Test General & Quest Items"};
+        constexpr const char* scripts[]={"TOP_TEST_APPAREL","TOP_TEST_WEAPONS","TOP_TEST_CHESTS","TOP_TEST_GENERAL"};
+        constexpr float locations[][2]={{2224.50f,2784.50f},{2227.00f,2784.50f},
+                                        {2224.50f,2787.00f},{2227.00f,2787.00f}};
+        for(int i=0;i<4;++i) {
+            Npc npc;
+            npc.serial=10000+i; npc.name=names[i]; npc.characterId=actorModels[i]; npc.service=1;
+            npc.x=locations[i][0]; npc.y=locations[i][1]; npc.yaw=180.f;
+            npc.region="Argent City"; npc.script=scripts[i];
+            npcs_.push_back(std::move(npc));
+        }
+        Npc board;
+        board.serial=10004;board.name="Argent Mission Board";board.characterId=11;board.service=1;
+        board.x=2225.75f;board.y=2785.75f;board.yaw=180.f;board.region="Argent City";
+        board.script="TOP_CUSTOM_MISSIONS";
+        npcs_.push_back(std::move(board));
+        Npc trainer;
+        trainer.serial=10005;trainer.name="Class Test Trainer";trainer.characterId=13;trainer.service=1;
+        trainer.x=2222.50f;trainer.y=2786.50f;trainer.yaw=180.f;trainer.region="Argent City";
+        trainer.script="TOP_TEST_CLASS";
+        npcs_.push_back(std::move(trainer));
+    }
     return !npcs_.empty();
 }
 
@@ -183,10 +290,22 @@ bool NpcSystem::readScriptData(const std::string& script, NpcLuaData& out) const
 
 bool NpcSystem::catalog(const std::string& script, std::vector<int>& itemIds) const {
     itemIds.clear();
+    if(testVendorScript(script)) {
+        itemIds=testVendorStock(script);
+        return !itemIds.empty();
+    }
     NpcLuaData data;
     if (!readScriptData(script, data)) return false;
     itemIds = std::move(data.tradeItems);
     return !itemIds.empty();
+}
+
+bool NpcSystem::exchangeRules(const std::string& script, std::vector<NpcLuaData::ExchangeRule>& rules) const {
+    rules.clear();
+    NpcLuaData data;
+    if (!readScriptData(script, data)) return false;
+    rules = std::move(data.exchangeRules);
+    return !rules.empty();
 }
 
 bool NpcSystem::bankService(const std::string& script) const {
@@ -215,6 +334,10 @@ bool NpcSystem::dialogPage(const std::string& script, int page, NpcLuaData::Dial
 
 bool NpcSystem::missionIds(const std::string& script, std::vector<int>& ids) const {
     ids.clear();
+    if(script=="TOP_CUSTOM_MISSIONS") {
+        ids=missionCatalog_.customMissionIds();
+        return !ids.empty();
+    }
     NpcLuaData data;
     if (!readScriptData(script, data)) return false;
     ids = std::move(data.missionIds);

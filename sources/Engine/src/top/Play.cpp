@@ -25,6 +25,7 @@
 #include <sstream>
 #include <iomanip>
 #include <limits>
+#include <numeric>
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -339,6 +340,116 @@ int Play::roll(int span) {
     return static_cast<int>((seed_ >> 16) % static_cast<unsigned>(span));
 }
 
+bool Play::summonHistoricalMonster(ActorSkin* actors) {
+    if (!actors) return false;
+    const int activeSummons = static_cast<int>(std::count_if(foes_.begin(), foes_.end(),
+        [](const Foe& foe) { return foe.summoned && foe.summonRemaining > 0.f && foe.hp > 0; }));
+    if (activeSummons >= 5) return false;
+
+    int id = 789;
+    switch (roll(5)) {
+    case 0: id = 40 + roll(41); break;
+    case 1: id = 98 + roll(49); break;
+    case 2: id = 194 + roll(48); break;
+    case 3: id = 500 + roll(72); break;
+    default: break;
+    }
+    return createHistoricalSummon(id, 50, 40, actors);
+}
+
+bool Play::summonAriesGuardian(ActorSkin* actors) {
+    return createHistoricalSummon(1009, 3600, 3600, actors);
+}
+
+bool Play::summonGoddessGuardian(ActorSkin* actors) {
+    return createHistoricalSummon(857, 3700, 3600, actors);
+}
+
+bool Play::summonMedicalReportCreature(ActorSkin* actors) {
+    return createHistoricalSummon(858, 190, 180, actors);
+}
+
+bool Play::createHistoricalSummon(int id, int respawnSeconds, int lifetimeSeconds,
+                                  ActorSkin* actors, bool followsPlayer,
+                                  float spawnOffsetX, float spawnOffsetY) {
+    if (!actors || id <= 0 || respawnSeconds <= 0 || lifetimeSeconds <= 0) return false;
+    const auto found = summonMonsterRows_.find(id);
+    if (found == summonMonsterRows_.end()) return false;
+    const std::vector<std::string>& row = found->second;
+    const bool duplicateModel = std::any_of(foes_.begin(), foes_.end(),
+        [id](const Foe& foe) { return foe.id == id; });
+    const int actorSlot = actors->appendMonsterModel(id, duplicateModel);
+    if (actorSlot < 0) return false;
+
+    Foe foe;
+    foe.id = id;
+    foe.name = asciiOf(cell(row, 1));
+    if (foe.name.size() < 3) foe.name = "Monstro " + std::to_string(id);
+    const auto stats = historical_stats::monsterFromColumns(
+        cellInt(row, 60, 1), cellInt(row, 61, 20), cellInt(row, 62, 0),
+        cellInt(row, 65, 0), cellInt(row, 66, 0), cellInt(row, 68, 0),
+        cellInt(row, 69, 0), cellInt(row, 70, 0), cellInt(row, 67, 0), cellInt(row, 71, 0));
+    foe.level = stats.level;
+    foe.maxHp = foe.hp = stats.hp;
+    foe.minAtk = stats.minAttack;
+    foe.maxAtk = stats.maxAttack;
+    foe.def = stats.defense;
+    foe.hit = stats.hit;
+    foe.dodge = stats.dodge;
+    foe.resist = stats.physicalResistance;
+    foe.crit = stats.criticalPercent;
+    foe.con = std::max(0, cellInt(row, 83, 0));
+    foe.sta = std::max(0, cellInt(row, 84, 0));
+    foe.job = std::max(0, cellInt(row, 89, 0));
+    foe.expReward = stats.experience > 0 ? stats.experience : -1;
+    const int reach = std::max(1, cellInt(row, 76, 100));
+    foe.range = static_cast<float>(reach) / 100.f;
+    foe.radius = static_cast<float>(std::max(0, cellInt(row, 32, 40))) / 100.f;
+    foe.vision = static_cast<float>(std::max(0, cellInt(row, 55, 1000))) / 100.f;
+    foe.leash = static_cast<float>(std::max(0, cellInt(row, 77, 1500))) / 100.f;
+    foe.ai = cellInt(row, 53, 1);
+    // ItemEffect.lua seasonal pets spawn five historical coordinate units
+    // beside the player (the map uses 100 units per world meter).
+    foe.x = hereX_ + (followsPlayer ? .05f : spawnOffsetX);
+    foe.y = hereY_ + (followsPlayer ? .05f : spawnOffsetY);
+    foe.homeX = hereX_;
+    foe.homeY = hereY_;
+    foe.yaw = 145.f * 0.017453292519943295f;
+    foe.summoned = true;
+    foe.followsPlayer = followsPlayer;
+    foe.respawnSeconds = respawnSeconds; // CreateChaX(..., Refresh)
+    foe.summonRemaining = static_cast<float>(lifetimeSeconds); // SetChaLifeTime(new, Life)
+    foe.actorSlot = actorSlot;
+    std::vector<int> attackIds, attackRates;
+    commaInts(cell(row, 44), attackIds);
+    commaInts(cell(row, 45), attackRates);
+    for (std::size_t k = 0; k < attackIds.size() && k < 16; ++k) {
+        if (k >= attackRates.size() || attackRates[k] <= 0 || attackRates[k] > 10000) continue;
+        const auto rule = skillRules_.find(attackIds[k]);
+        if (rule == skillRules_.end() || rule->second.helpful != 0 || rule->second.type == 2 ||
+            rule->second.target != 4) continue;
+        const monster_skills::Attack attack{attackIds[k], attackRates[k],
+            static_cast<float>(rule->second.distance) / 100.f, rule->second.flightSpeed};
+        if (monster_skills::valid(attack)) foe.attacks.push_back(attack);
+    }
+    foe.speed = std::min(8.f, static_cast<float>(std::max(0, cellInt(row, 78, 0))) / 100.f);
+    foe.cd = std::clamp(static_cast<float>(cellInt(row, 75, 1400)) / 1000.f, .7f, 2.2f);
+    std::vector<int> dropIds, dropRates;
+    commaInts(cell(row, 46), dropIds);
+    commaInts(cell(row, 47), dropRates);
+    for (std::size_t d = 0; d < dropIds.size(); ++d) {
+        const int rate = d < dropRates.size() ? dropRates[d] : 0;
+        if (dropIds[d] > 0 && rate > 0) foe.drops.push_back({dropIds[d], rate});
+    }
+    for (int action = 1; action <= 54; ++action) {
+        const auto timing = actors->monsterActionTiming(actorSlot, action);
+        foe.actionDurations[static_cast<std::size_t>(action)] = timing.duration;
+        foe.actionImpacts[static_cast<std::size_t>(action)] = timing.impact;
+    }
+    foes_.push_back(std::move(foe));
+    return true;
+}
+
 void Play::say(const std::string& text) {
     log_.push_back(text);
     if (log_.size() > 4) log_.erase(log_.begin());
@@ -353,6 +464,14 @@ void Play::makeQuests() {
 void Play::load(const std::string& path) {
     saveRecoveredFromBackup_ = false;
     saveRecoveryPath_.clear();
+    ownedBoatIds_.clear();
+    ownedBoatHp_.clear();
+    ownedBoatSp_.clear();
+    historicalRecords_.clear();
+    fame_ = 0;
+    fairyCoinChestDay_ = 0;
+    fairyCoinChestOpened_ = 0;
+    hairStyleItemId_ = 0;
     std::string saveLine;
     bool recovered = false;
     if (!save_recovery::read(path, saveLine, recovered)) return;
@@ -362,6 +481,8 @@ void Play::load(const std::string& path) {
         say("Save principal invalido; progresso recuperado do backup.");
     }
     const char* buf = saveLine.c_str();
+    lifeSkills_.clear();
+    lifeSkillPoints_ = 0;
     int level = 1;
     int hp = 0;
     int have0 = 0;
@@ -493,6 +614,26 @@ void Play::load(const std::string& path) {
         const char* pipe16 = pipe15 ? std::strchr(pipe15 + 1, '|') : nullptr;
         const char* pipe17 = pipe16 ? std::strchr(pipe16 + 1, '|') : nullptr;
         const char* pipe18 = pipe17 ? std::strchr(pipe17 + 1, '|') : nullptr;
+        const char* lifeTag = std::strstr(buf, "|LS1:");
+        if (lifeTag) {
+            lifeSkillPoints_ = 0;
+            lifeSkills_.clear();
+            const char* field = lifeTag + 5;
+            int points = 0;
+            int used = 0;
+            if (std::sscanf(field, "%d%n", &points, &used) == 1 && used > 0) {
+                lifeSkillPoints_ = std::max(0, std::min(points, 1000000));
+                field += used;
+                if (*field == ';') ++field;
+                while (*field && *field != '|' && *field != '\n' && *field != '\r') {
+                    int id = 0, skillLevel = 0, consumed = 0;
+                    if (std::sscanf(field, "%d,%d%n", &id, &skillLevel, &consumed) != 2 || consumed <= 0) break;
+                    if (id > 0 && skillLevel > 0 && skillLevel <= 10) lifeSkills_[id] = skillLevel;
+                    field += consumed;
+                    if (*field == ';') ++field;
+                }
+            }
+        }
         restoredSp_ = -1.f;
         if (pipe11) {
             float currentSp = -1.f;
@@ -530,6 +671,16 @@ void Play::load(const std::string& path) {
                 skill += used;
                 if (*skill == ';') ++skill;
             }
+        }
+        // Saves feitos pelo primeiro UI de teste podiam ter skills profissionais
+        // no mesmo mapa das skills de combate. Migra os IDs identificados pela
+        // tabela historica sem descartar o nivel que o jogador ja testou.
+        for (const auto& entry : lifeSkillBooks_) {
+            const int skillId = entry.second.skillId;
+            const auto legacy = learnedSkills_.find(skillId);
+            if (legacy == learnedSkills_.end()) continue;
+            lifeSkills_[skillId] = std::max(lifeSkills_[skillId], std::min(10, legacy->second));
+            learnedSkills_.erase(legacy);
         }
         if (pipe7) {
             int ids[8]{};
@@ -603,10 +754,16 @@ void Play::load(const std::string& path) {
         // Fazer a associacao UID apenas depois de ler pilhas e slots.
         // Nunca aplicar atributos de metadados que nao combinem com ID/quantidade.
         if (pipe12 && (std::strncmp(pipe12 + 1, "Y1:", 3) == 0 ||
-                       std::strncmp(pipe12 + 1, "Y2:", 3) == 0))
+                       std::strncmp(pipe12 + 1, "Y2:", 3) == 0 ||
+                       std::strncmp(pipe12 + 1, "Y3:", 3) == 0 ||
+                       std::strncmp(pipe12 + 1, "Y4:", 3) == 0 ||
+                       std::strncmp(pipe12 + 1, "Y5:", 3) == 0))
             item_instance::decodeStacks(pipe12 + 4, bag_);
         if (pipe13 && (std::strncmp(pipe13 + 1, "T1:", 3) == 0 ||
-                       std::strncmp(pipe13 + 1, "T2:", 3) == 0))
+                       std::strncmp(pipe13 + 1, "T2:", 3) == 0 ||
+                       std::strncmp(pipe13 + 1, "T3:", 3) == 0 ||
+                       std::strncmp(pipe13 + 1, "T4:", 3) == 0 ||
+                       std::strncmp(pipe13 + 1, "T5:", 3) == 0))
             item_instance::decodeStacks(pipe13 + 4, temp_);
         assignItemUids();
         wornUid_.clear();
@@ -758,6 +915,87 @@ void Play::load(const std::string& path) {
             }
         }
     }
+    if (const char* fameTag = std::strstr(buf, "|FM1:")) {
+        int fame = 0;
+        int used = 0;
+        if (std::sscanf(fameTag + 5, "%d%n", &fame, &used) == 1 && used > 0 &&
+            fame >= 0 && fame <= 99999999)
+            fame_ = fame;
+    }
+    fairyCoinChestDay_ = 0;
+    fairyCoinChestOpened_ = 0;
+    if (const char* chestTag = std::strstr(buf, "|FC1:")) {
+        int day = 0;
+        int opened = 0;
+        int used = 0;
+        if (std::sscanf(chestTag + 5, "%d,%d%n", &day, &opened, &used) == 2 && used > 0 &&
+            day >= 19700101 && day <= 99991231 && opened >= 0 && opened <= 1000000) {
+            fairyCoinChestDay_ = day;
+            fairyCoinChestOpened_ = opened;
+        }
+    }
+    if (const char* boatTag = std::strstr(buf, "|BT1:")) {
+        const char* cursor = boatTag + 5;
+        const char* end = std::strpbrk(cursor, "|\r\n");
+        const std::string encoded(cursor, end ? static_cast<std::size_t>(end - cursor) : std::strlen(cursor));
+        for (std::size_t at = 0; at < encoded.size() && ownedBoatIds_.size() < 3;) {
+            const std::size_t stop = encoded.find(';', at);
+            const std::string token = encoded.substr(at, stop == std::string::npos ? stop : stop - at);
+            int id = 0, consumed = 0;
+            if (std::sscanf(token.c_str(), "%d%n", &id, &consumed) == 1 && consumed == int(token.size()) &&
+                id > 0 &&
+                std::any_of(boatBuildOptions_.begin(), boatBuildOptions_.end(),
+                            [id](const BoatBuildOption& option) { return option.id == id; }) &&
+                std::find(ownedBoatIds_.begin(), ownedBoatIds_.end(), id) == ownedBoatIds_.end()) {
+                ownedBoatIds_.push_back(id);
+                const auto option = std::find_if(boatBuildOptions_.begin(), boatBuildOptions_.end(),
+                                                 [id](const BoatBuildOption& row) { return row.id == id; });
+                ownedBoatHp_[id] = option->maxHp;
+                ownedBoatSp_[id] = option->maxSp;
+            }
+            if (stop == std::string::npos) break;
+            at = stop + 1;
+        }
+    }
+    if (const char* boatTag = std::strstr(buf, "|BT2:")) {
+        const char* cursor = boatTag + 5;
+        const char* end = std::strpbrk(cursor, "|\r\n");
+        const std::string encoded(cursor, end ? static_cast<std::size_t>(end - cursor) : std::strlen(cursor));
+        for (std::size_t at = 0; at < encoded.size();) {
+            const std::size_t stop = encoded.find(';', at);
+            const std::string token = encoded.substr(at, stop == std::string::npos ? stop : stop - at);
+            int id = 0, hp = 0, sp = 0, consumed = 0;
+            if (std::sscanf(token.c_str(), "%d,%d,%d%n", &id, &hp, &sp, &consumed) == 3 &&
+                consumed == static_cast<int>(token.size()) && ownsBoat(id)) {
+                const int maxHp = boatMaxHp(id);
+                const int maxSp = boatMaxSp(id);
+                ownedBoatHp_[id] = std::clamp(hp, 0, maxHp);
+                ownedBoatSp_[id] = std::clamp(sp, 0, maxSp);
+            }
+            if (stop == std::string::npos) break;
+            at = stop + 1;
+        }
+    }
+    if (const char* recordsTag = std::strstr(buf, "|GR1:")) {
+        const char* cursor = recordsTag + 5;
+        const char* end = std::strpbrk(cursor, "|\r\n");
+        const std::string encoded(cursor, end ? static_cast<std::size_t>(end - cursor) : std::strlen(cursor));
+        for (std::size_t at = 0; at < encoded.size() && historicalRecords_.size() < 4096;) {
+            const std::size_t stop = encoded.find(';', at);
+            const std::string token = encoded.substr(at, stop == std::string::npos ? stop : stop - at);
+            int id = 0, consumed = 0;
+            if (std::sscanf(token.c_str(), "%d%n", &id, &consumed) == 1 &&
+                consumed == static_cast<int>(token.size()) && id > 0 && id <= 100000000)
+                historicalRecords_.insert(id);
+            if (stop == std::string::npos) break;
+            at = stop + 1;
+        }
+    }
+    if (const char* hairTag = std::strstr(buf, "|HA1:")) {
+        int itemId=0, consumed=0;
+        if (std::sscanf(hairTag+5,"%d%n",&itemId,&consumed)==1 && consumed>0 &&
+            itemId>0 && itemId<=1000000) hairStyleItemId_=itemId;
+    }
     bank_.clear();
     if (const char* bankTag = std::strstr(buf, "|B1:")) {
         const char* begin = bankTag + 4;
@@ -775,7 +1013,11 @@ void Play::load(const std::string& path) {
             at = stop + 1;
         }
         assignItemUids();
-        if (const char* instanceTag = std::strstr(buf, "|BI2:"))
+        if (const char* instanceTag = std::strstr(buf, "|BI4:"))
+            item_instance::decodeStacks(instanceTag + 5, bank_);
+        else if (const char* instanceTag = std::strstr(buf, "|BI3:"))
+            item_instance::decodeStacks(instanceTag + 5, bank_);
+        else if (const char* instanceTag = std::strstr(buf, "|BI2:"))
             item_instance::decodeStacks(instanceTag + 5, bank_);
         else if (const char* instanceTag = std::strstr(buf, "|BI1:"))
             item_instance::decodeStacks(instanceTag + 5, bank_);
@@ -870,6 +1112,7 @@ void Play::decodeAdditionalMissions(const char* data) {
 }
 
 bool Play::save(const std::string& path) {
+    if(readOnlyPreview_)return true;
     if (path.empty()) return false;
     auto failed = [&]() {
         if (!saveFailureReported_) say("Falha ao salvar o personagem; confira espaco e permissoes do disco.");
@@ -907,7 +1150,7 @@ bool Play::save(const std::string& path) {
     for (const MissionItem& item : historical_.rewardItems) std::fprintf(file, "%d,%d;", item.id, item.count);
     std::fprintf(file, "|%d|%.3f", bagCapacity_, static_cast<double>(std::max(0.f, player_.homeY)));
     // Conteudo anterior preservado; readers antigos ignoram os campos novos.
-    std::fprintf(file, "|Y2:%s|T2:%s|W1:%s", item_instance::encodeStacks(bag_).c_str(),
+    std::fprintf(file, "|Y5:%s|T5:%s|W1:%s", item_instance::encodeStacks(bag_).c_str(),
                  item_instance::encodeStacks(temp_).c_str(), item_instance::encodeWorn(wornUid_).c_str());
     std::fprintf(file,"|Z1:%s|ZT1:%s",forge_instance::encode(bag_).c_str(),forge_instance::encode(temp_).c_str());
     std::fprintf(file,"|Q2:%s",encodeAdditionalMissions().c_str());
@@ -957,7 +1200,19 @@ bool Play::save(const std::string& path) {
     // Optional tail fields: preserve all legacy pipe offsets and quest tags.
     std::fputs("|B1:", file);
     for (const Stack& stack : bank_) std::fprintf(file, "%d,%d;", stack.id, stack.count);
-    std::fprintf(file,"|BI2:%s|ZB1:%s",item_instance::encodeStacks(bank_).c_str(),forge_instance::encode(bank_).c_str());
+    std::fprintf(file,"|BI4:%s|ZB1:%s",item_instance::encodeStacks(bank_).c_str(),forge_instance::encode(bank_).c_str());
+    std::fprintf(file,"|LS1:%d;", lifeSkillPoints_);
+    for (const auto& skill : lifeSkills_) std::fprintf(file, "%d,%d;", skill.first, skill.second);
+    std::fprintf(file,"|FM1:%d",std::clamp(fame_,0,99999999));
+    std::fprintf(file,"|FC1:%d,%d",fairyCoinChestDay_,std::clamp(fairyCoinChestOpened_,0,1000000));
+    std::fputs("|BT1:", file);
+    for (int boatId : ownedBoatIds_) std::fprintf(file, "%d;", boatId);
+    std::fputs("|BT2:", file);
+    for (int boatId : ownedBoatIds_)
+        std::fprintf(file, "%d,%d,%d;", boatId, boatHp(boatId), boatSp(boatId));
+    std::fputs("|GR1:", file);
+    for (int recordId : historicalRecords_) std::fprintf(file, "%d;", recordId);
+    std::fprintf(file,"|HA1:%d",std::max(0,hairStyleItemId_));
     bool okay = save_recovery::appendChecksum(file) &&
                 std::fflush(file) == 0 && !std::ferror(file);
     if (okay && ::fsync(::fileno(file)) != 0) okay = false;
@@ -997,6 +1252,113 @@ std::string Play::savePath(const std::string& root) const {
     return save_paths::character(base, identity);
 }
 
+void Play::ensureWorldFoeRow(int id) {
+    if (id <= 0 || summonMonsterRows_.count(id)) return;
+    std::unordered_map<int, std::vector<std::string>> rows;
+    loadRows(root_ + "/scripts/table/characterinfo.txt", std::unordered_set<int>{id}, rows);
+    auto found = rows.find(id);
+    if (found != rows.end()) summonMonsterRows_.emplace(id, std::move(found->second));
+}
+
+Play::Foe Play::createWorldFoe(const MonsterSlot& slot, const ActorSkin& actors, int ordinal) {
+    Foe foe;
+    foe.id = slot.id;
+    foe.spawnKey = slot.passive ? 0 : slot.spawnKey;
+    foe.respawnSeconds = slot.respawnSeconds;
+    foe.x = slot.x;
+    foe.y = slot.y;
+    foe.homeX = slot.x;
+    foe.homeY = slot.y;
+    // CreateCha guarda a direcao inicial em graus; a IA usa radianos.
+    // NPCs passivos continuam usando a orientacao historica do ActorSkin.
+    foe.yaw = slot.yaw * 0.017453292519943295f;
+    foe.name = "Monstro " + std::to_string(slot.id);
+    const auto rowIt = summonMonsterRows_.find(slot.id);
+    if (rowIt != summonMonsterRows_.end()) {
+        const std::vector<std::string>& row = rowIt->second;
+        const std::string name = asciiOf(cell(row, 1));
+        if (name.size() >= 3) foe.name = name;
+        foe.level = std::max(1, cellInt(row, 60, 1));
+        // characterinfo: Lv 60, HP 61, EXP 62, ATK 65/66,
+        // DEF 68, HIT 69, FLEE 70. Nao reduzir o HP de bosses.
+        const auto stats = historical_stats::monsterFromColumns(
+            cellInt(row, 60, 1), cellInt(row, 61, 20), cellInt(row, 62, 0),
+            cellInt(row, 65, 0), cellInt(row, 66, 0), cellInt(row, 68, 0),
+            cellInt(row, 69, 0), cellInt(row, 70, 0),
+            cellInt(row, 67, 0), cellInt(row, 71, 0));
+        foe.level = stats.level;
+        foe.maxHp = stats.hp;
+        foe.hp = stats.hp;
+        foe.minAtk = stats.minAttack;
+        foe.maxAtk = stats.maxAttack;
+        foe.def = stats.defense;
+        foe.hit = stats.hit;
+        foe.dodge = stats.dodge;
+        foe.resist = stats.physicalResistance;
+        foe.crit = stats.criticalPercent;
+        foe.con = std::max(0, cellInt(row, 83, 0));
+        foe.sta = std::max(0, cellInt(row, 84, 0));
+        foe.job = std::max(0, cellInt(row, 89, 0));
+        // A maioria dos registros tem EXP=0, embora o servidor original
+        // atribua recompensas em outros pontos. Preservar ganho offline
+        // provisório para não bloquear a progressão do personagem.
+        foe.expReward = stats.experience > 0 ? stats.experience : -1;
+        // Centimetros da ficha, o mesmo lADis / lVision / lCDis do servidor.
+        int dist = cellInt(row, 76, 0);
+        if (dist <= 0) dist = 100;
+        foe.range = static_cast<float>(dist) / 100.f;
+        foe.radius = static_cast<float>(std::max(0, cellInt(row, 32, 40))) / 100.f;
+        foe.vision = static_cast<float>(std::max(0, cellInt(row, 55, 1000))) / 100.f;
+        foe.leash = static_cast<float>(std::max(0, cellInt(row, 77, 1500))) / 100.f;
+        foe.ai = cellInt(row, 53, 1);
+        // characterinfo: Skill ID (44), Skill Rate (45). Parear por
+        // indice, descartar -1/passivas/buffs e usar o alcance de cada
+        // habilidade ofensiva do skillinfo, nao o alcance do autoataque.
+        std::vector<int> attackIds, attackRates;
+        commaInts(cell(row, 44), attackIds);
+        commaInts(cell(row, 45), attackRates);
+        for (std::size_t k = 0; k < attackIds.size() && k < 16; ++k) {
+            if (k >= attackRates.size() || attackRates[k] <= 0 || attackRates[k] > 10000) continue;
+            const auto rule = skillRules_.find(attackIds[k]);
+            if (rule == skillRules_.end() || rule->second.helpful != 0 ||
+                rule->second.type == 2 || rule->second.target != 4) continue;
+            const monster_skills::Attack attack{attackIds[k], attackRates[k],
+                static_cast<float>(rule->second.distance) / 100.f,
+                rule->second.flightSpeed};
+            if (monster_skills::valid(attack)) foe.attacks.push_back(attack);
+        }
+        int spd = cellInt(row, 78, 0);
+        foe.speed = static_cast<float>(std::max(0, spd)) / 100.f;
+        if (foe.speed > 8.f) foe.speed = 8.f;
+        int atk = cellInt(row, 75, 1400);
+        foe.cd = static_cast<float>(atk) / 1000.f;
+        if (foe.cd < 0.7f) foe.cd = 0.7f;
+        if (foe.cd > 2.2f) foe.cd = 2.2f;
+        std::vector<int> dropIds;
+        std::vector<int> dropRates;
+        commaInts(cell(row, 46), dropIds);
+        commaInts(cell(row, 47), dropRates);
+        for (std::size_t d = 0; d < dropIds.size(); ++d) {
+            Foe::Drop drop;
+            drop.id = dropIds[d];
+            drop.rate = d < dropRates.size() ? dropRates[d] : 0;
+            if (drop.id > 0 && drop.rate > 0) foe.drops.push_back(drop);
+        }
+    }
+    for (int action = 1; action <= 54; ++action) {
+        const auto timing = actors.monsterActionTiming(ordinal, action);
+        foe.actionDurations[action] = timing.duration;
+        foe.actionImpacts[action] = timing.impact;
+    }
+    // Nao reviver monstros simplesmente por trocar o setor de streaming.
+    // O registro por mapa e spawn identifica inclusive multiplos do mesmo ID.
+    if (foe.spawnKey != 0)
+        worldMonsters_.restore(worldMap_, foe.spawnKey, worldClock_, foe.maxHp,
+                               foe.homeX, foe.homeY, foe.respawnSeconds,
+                               foe.hp, foe.x, foe.y, foe.yaw, foe.deadFor);
+    return foe;
+}
+
 bool Play::bind(const std::string& clientRoot, const ActorSkin& actors, int profileId,
                 const std::string& profileName) {
     // Troca de personagem inicia uma simulacao propria, sem herdar derrotas.
@@ -1005,8 +1367,51 @@ bool Play::bind(const std::string& clientRoot, const ActorSkin& actors, int prof
         worldClock_ = 0.;
     }
     pendingTicketTravel_.reset();
+    pendingAltarMaterialUid_ = 0;
+    pendingCloakUpgradeUid_ = 0;
+    pendingApparelConverterUid_ = 0;
     usingTicketBoat_ = false;
+    hereSafeZone_ = false;
+    fairyCoinChestDay_ = 0;
+    fairyCoinChestOpened_ = 0;
+    itemCooldownRemaining_.clear();
+    foodStates_.fill(FoodState{});
+    itemStrengthState_ = ItemAttributeState{};
+    itemConstitutionState_ = ItemAttributeState{};
+    itemAgilityState_ = ItemAttributeState{};
+    itemAccuracyState_ = ItemAttributeState{};
+    itemSpiritState_ = ItemAttributeState{};
+    itemPotionStrengthState_ = ItemAttributeState{};
+    itemPotionAgilityState_ = ItemAttributeState{};
+    itemPotionConstitutionState_ = ItemAttributeState{};
+    itemPotionAccuracyState_ = ItemAttributeState{};
+    itemPotionSpiritState_ = ItemAttributeState{};
+    itemPotionMspdState_ = ItemAttributeState{};
+    itemPotionAttackState_ = ItemAttributeState{};
+    itemPotionAspdState_ = ItemAttributeState{};
+    itemPotionHitState_ = ItemAttributeState{};
+    itemPotionMaxHpState_ = ItemAttributeState{};
+    itemKaraVictoryState_ = ItemAttributeState{};
+    itemLotteryDefenseState_ = ItemAttributeState{};
+    itemLanternDefenseState_ = ItemAttributeState{};
+    itemFairyMarchState_ = ItemAttributeState{};
+    itemMaliciousHornState_ = ItemAttributeState{};
+    itemInnocenceState_ = ItemAllAttributeState{};
+    itemForgeBoostFor_ = 0.f;
+    itemForgeBoostLevel_ = 0;
+    itemCombineBoostFor_ = 0.f;
+    itemCombineBoostLevel_ = 0;
+    experienceBoost_ = ItemBoostState{};
+    dropRateBoost_ = ItemBoostState{};
+    fairyGrowthBoost_ = ItemBoostState{};
     root_ = clientRoot;
+    loadBoatBuildCatalog(clientRoot);
+    itemRandomRewards_.load(clientRoot + "/scripts/offline/script/calculate/ItemEffect.lua",
+                            clientRoot + "/scripts/offline/calculate/variable.lua");
+    historicalChestRules_.load(clientRoot + "/scripts/offline/script/calculate/ItemEffect.lua");
+    itemStatRules_.load(clientRoot + "/scripts/offline/calculate/variable.lua");
+    itemProductionRules_.load(clientRoot + "/scripts/offline/script/calculate/variable.lua");
+    itemGemVoucherRules_.load((clientRoot + "/scripts/offline/script/calculate/ItemEffect.lua").c_str());
     profileId_ = profileId > 0 ? profileId : actors.playerId();
     profileName_ = profileName;
     saveFailureReported_ = false;
@@ -1028,17 +1433,34 @@ bool Play::bind(const std::string& clientRoot, const ActorSkin& actors, int prof
     npcMissionGates_.clear();npcMissionFlagRules_.clear();
     journalSelectedId_=0; journalPage_=0;
     skillBooks_.clear();
+    lifeSkillBooks_.clear();
+    lifeSkillIds_.clear();
     skillRules_.clear();
     learnedSkills_.clear();
+    lifeSkills_.clear();
+    lifeSkillPoints_ = 0;
     effectEvents_.clear();
     scheduledEffects_.clear();
     armedSkill_ = -1;
+    skillTestMode_ = false;
+    fairySystemTimer_ = 0.f;
+    fairySystemUid_ = 0;
     requestedSkill_ = -1;
     pendingBasicStrike_ = false;
     berserkFor_ = 0.f;
     berserkAttackSpeedBonus_ = 0.f;
     hardenFor_ = 0.f;
     hardenDefense_ = 0;
+    itemHardenFor_ = 0.f;
+    itemHardenDefense_ = 0;
+    itemEtherCloverFor_ = 0.f;
+    itemEtherCloverDodge_ = 0;
+    itemBodyStateId_ = 0;
+    itemBodyStateFor_ = 0.f;
+    itemBlessedPotionFor_ = 0.f;
+    itemBodyMoveSpeedBonus_ = 0.f;
+    itemBodyAttackBonus_ = 0;
+    itemBodyDefenseBonus_ = 0;
     willOfSteelFor_ = 0.f;
     willOfSteelDefense_ = 0;
     genericBuffFor_ = 0.f;
@@ -1055,6 +1477,7 @@ bool Play::bind(const std::string& clientRoot, const ActorSkin& actors, int prof
     nextSkillSlot_ = 0;
     hotbarLoaded_ = false;
     foes_.clear();
+    summonMonsterRows_.clear();
     loots_.clear();
     requestedLoot_=-1;
     pops_.clear();
@@ -1093,6 +1516,8 @@ bool Play::bind(const std::string& clientRoot, const ActorSkin& actors, int prof
     const std::string table = clientRoot + "/scripts/table/characterinfo.txt";
     loadSkillBooks((clientRoot + "/scripts/offline/calculate/variable.lua").c_str());
     loadSkillBooks("Client/scripts/offline/calculate/variable.lua");
+    loadLifeSkillBooks((clientRoot + "/scripts/offline/script/calculate/variable.lua").c_str());
+    loadLifeSkillBooks("Client/scripts/offline/script/calculate/variable.lua");
     loadSkillRules((clientRoot + "/scripts/table/skillinfo.txt").c_str());
     loadSkillRules("Client/scripts/table/skillinfo.txt");
     actionTimingMode_ = -1;
@@ -1107,8 +1532,32 @@ bool Play::bind(const std::string& clientRoot, const ActorSkin& actors, int prof
         slots.push_back(actors.monsterSlot(i));
         wanted.insert(slots.back().id);
     }
+    // ItemEffect.lua summon callbacks: random ItemUse_MonsterSummon pools,
+    // guardians, the medical report creature, and fixed summon-scroll targets.
+    // Cache rows for on-demand model/stat creation.
+    // They do not become active world spawns here.
+    for (const auto range : {std::pair{40,80}, std::pair{98,146}, std::pair{194,241}, std::pair{500,571}})
+        for (int id = range.first; id <= range.second; ++id) wanted.insert(id);
+    wanted.insert(789);
+    wanted.insert(857);
+    wanted.insert(858);
+    wanted.insert(1009);
+    // Fixed historical summon scroll callbacks: commander, captain, fox spirit,
+    // and Black Dragon Phantom. Cache their character rows on demand.
+    for (const int id : {757, 761, 786, 952}) wanted.insert(id);
+    // Evil Generator tiers 1..4: exact candidate IDs from ItemEffect.lua.
+    for (const int id : {841,842,843,845,846,229,274,847,848,849,850,851,852,
+                         211,706,673,690,691,692,693,106,289,679,678,707,708,
+                         776,74,805,807,788}) wanted.insert(id);
+    // Seasonal pet scrolls HJZHQ/MLZHQ/XRZHQ/SDZHQ use these follower rows.
+    for (const int id : {929, 930, 931, 932}) wanted.insert(id);
     std::unordered_map<int, std::vector<std::string>> rows;
     loadRows(table, wanted, rows);
+    for (int id : wanted) {
+        if (id == chosenPlayer) continue;
+        const auto row = rows.find(id);
+        if (row != rows.end()) summonMonsterRows_.emplace(id, row->second);
+    }
 
     // Origem: Client/scripts/offline/calculate/variable.lua DEXP[1..100].
     // DEXP e cumulativa no servidor; exp_ no save offline e relativa ao nivel.
@@ -1160,111 +1609,28 @@ bool Play::bind(const std::string& clientRoot, const ActorSkin& actors, int prof
     player_.deadFor = 0.f;
     expNext_ = experience_.needed(player_.level);
     for (const MonsterSlot& slot : slots) {
-        Foe foe;
-        foe.id = slot.id;
-        foe.spawnKey = slot.passive ? 0 : slot.spawnKey;
-        foe.respawnSeconds = slot.respawnSeconds;
-        foe.x = slot.x;
-        foe.y = slot.y;
-        foe.homeX = slot.x;
-        foe.homeY = slot.y;
-        // CreateCha guarda a direcao inicial em graus; a IA usa radianos.
-        // NPCs passivos continuam usando a orientacao historica do ActorSkin.
-        foe.yaw = slot.yaw * 0.017453292519943295f;
-        foe.name = "Monstro " + std::to_string(slot.id);
-        const auto rowIt = rows.find(slot.id);
-        if (rowIt != rows.end()) {
-            const std::vector<std::string>& row = rowIt->second;
-            const std::string name = asciiOf(cell(row, 1));
-            if (name.size() >= 3) foe.name = name;
-            foe.level = std::max(1, cellInt(row, 60, 1));
-            // characterinfo: Lv 60, HP 61, EXP 62, ATK 65/66,
-            // DEF 68, HIT 69, FLEE 70. Nao reduzir o HP de bosses.
-            const auto stats = historical_stats::monsterFromColumns(
-                cellInt(row, 60, 1), cellInt(row, 61, 20), cellInt(row, 62, 0),
-                cellInt(row, 65, 0), cellInt(row, 66, 0), cellInt(row, 68, 0),
-                cellInt(row, 69, 0), cellInt(row, 70, 0),
-                cellInt(row, 67, 0), cellInt(row, 71, 0));
-            foe.level = stats.level;
-            foe.maxHp = stats.hp;
-            foe.hp = stats.hp;
-            foe.minAtk = stats.minAttack;
-            foe.maxAtk = stats.maxAttack;
-            foe.def = stats.defense;
-            foe.hit = stats.hit;
-            foe.dodge = stats.dodge;
-            foe.resist = stats.physicalResistance;
-            foe.crit = stats.criticalPercent;
-            foe.con = std::max(0, cellInt(row, 83, 0));
-            foe.sta = std::max(0, cellInt(row, 84, 0));
-            foe.job = std::max(0, cellInt(row, 89, 0));
-            // A maioria dos registros tem EXP=0, embora o servidor original
-            // atribua recompensas em outros pontos. Preservar ganho offline
-            // provisório para não bloquear a progressão do personagem.
-            foe.expReward = stats.experience > 0 ? stats.experience : -1;
-            // Centimetros da ficha, o mesmo lADis / lVision / lCDis do servidor.
-            int dist = cellInt(row, 76, 0);
-            if (dist <= 0) dist = 100;
-            foe.range = static_cast<float>(dist) / 100.f;
-            foe.radius = static_cast<float>(std::max(0, cellInt(row, 32, 40))) / 100.f;
-            foe.vision = static_cast<float>(std::max(0, cellInt(row, 55, 1000))) / 100.f;
-            foe.leash = static_cast<float>(std::max(0, cellInt(row, 77, 1500))) / 100.f;
-            foe.ai = cellInt(row, 53, 1);
-            // characterinfo: Skill ID (44), Skill Rate (45). Parear por
-            // indice, descartar -1/passivas/buffs e usar o alcance de cada
-            // habilidade ofensiva do skillinfo, nao o alcance do autoataque.
-            std::vector<int> attackIds, attackRates;
-            commaInts(cell(row, 44), attackIds);
-            commaInts(cell(row, 45), attackRates);
-            for (std::size_t k = 0; k < attackIds.size() && k < 16; ++k) {
-                if (k >= attackRates.size() || attackRates[k] <= 0 || attackRates[k] > 10000) continue;
-                const auto rule = skillRules_.find(attackIds[k]);
-                if (rule == skillRules_.end() || rule->second.helpful != 0 ||
-                    rule->second.type == 2 || rule->second.target != 4) continue;
-                const monster_skills::Attack attack{attackIds[k], attackRates[k],
-                    static_cast<float>(rule->second.distance) / 100.f,
-                    rule->second.flightSpeed};
-                if (monster_skills::valid(attack)) foe.attacks.push_back(attack);
-            }
-            int spd = cellInt(row, 78, 0);
-            foe.speed = static_cast<float>(std::max(0, spd)) / 100.f;
-            if (foe.speed > 8.f) foe.speed = 8.f;
-            int atk = cellInt(row, 75, 1400);
-            foe.cd = static_cast<float>(atk) / 1000.f;
-            if (foe.cd < 0.7f) foe.cd = 0.7f;
-            if (foe.cd > 2.2f) foe.cd = 2.2f;
-            std::vector<int> dropIds;
-            std::vector<int> dropRates;
-            commaInts(cell(row, 46), dropIds);
-            commaInts(cell(row, 47), dropRates);
-            for (std::size_t d = 0; d < dropIds.size(); ++d) {
-                Foe::Drop drop;
-                drop.id = dropIds[d];
-                drop.rate = d < dropRates.size() ? dropRates[d] : 0;
-                if (drop.id > 0 && drop.rate > 0) foe.drops.push_back(drop);
-            }
+        if (summonMonsterRows_.find(slot.id) == summonMonsterRows_.end()) {
+            const auto row = rows.find(slot.id);
+            if (row != rows.end()) summonMonsterRows_.emplace(slot.id, row->second);
         }
-        for (int action = 1; action <= 54; ++action) {
-            const auto timing = actors.monsterActionTiming(static_cast<int>(foes_.size()), action);
-            foe.actionDurations[action] = timing.duration;
-            foe.actionImpacts[action] = timing.impact;
-        }
-        // Nao reviver monstros simplesmente por trocar o setor de streaming.
-        // O registro por mapa e spawn identifica inclusive multiplos do mesmo ID.
-        if (foe.spawnKey != 0)
-            worldMonsters_.restore(worldMap_, foe.spawnKey, worldClock_, foe.maxHp,
-                                   foe.homeX, foe.homeY, foe.respawnSeconds,
-                                   foe.hp, foe.x, foe.y, foe.yaw, foe.deadFor);
-        foes_.push_back(foe);
+        foes_.push_back(createWorldFoe(slot, actors, static_cast<int>(foes_.size())));
     }
     // Tabela inteira: a bolsa guarda itens que nao caem de monstro, e o icone
     // e a coluna 2 (texture/icon/%s.png), como CItemRecord::GetIconFile.
     loadItems(clientRoot + "/scripts/table/iteminfo.txt", {});
+    resolveNamedSkillBooks();
     loadHeals((clientRoot + "/scripts/offline/calculate/variable.lua").c_str());
     loadHeals("Client/scripts/offline/calculate/variable.lua");
-    for (auto& item : items_) {
-        if (item.second.medkit && item.second.healHp == 0 && item.second.healSp == 0) item.second.healHp = 15;
-    }
+    loadFairyRations(clientRoot + "/scripts/offline/script/calculate/variable.lua");
+    loadFairyRations("Client/scripts/offline/script/calculate/variable.lua");
+    loadFairyEggs(clientRoot + "/scripts/offline/script/calculate/variable.lua");
+    loadFairyEggs("Client/scripts/offline/script/calculate/variable.lua");
+    loadFairySkills(clientRoot + "/scripts/offline/script/calculate/variable.lua");
+    loadFairySkills("Client/scripts/offline/script/calculate/variable.lua");
+    loadFairyTrainingBooks(clientRoot + "/scripts/offline/script/calculate/variable.lua");
+    loadFairyTrainingBooks("Client/scripts/offline/script/calculate/variable.lua");
+    loadFairyFruits(clientRoot + "/scripts/offline/script/calculate/variable.lua");
+    loadFairyFruits("Client/scripts/offline/script/calculate/variable.lua");
     // Skills only appear on the bar after being learned or restored from a save.
     for (SkillDef& skill : skills_) skill = {};
     // Save do personagem. O arquivo unico antigo (offline-save.txt) so e lido
@@ -1276,6 +1642,15 @@ bool Play::bind(const std::string& clientRoot, const ActorSkin& actors, int prof
     }
     const bool freshCharacter = !fileExists(characterSavePath);
     load(characterSavePath);
+    // The historical ApparelConverter output IDs are referenced by Lua but
+    // absent from this client's iteminfo.txt. Rebuild only those saved apparel
+    // records from their persisted FuseID source equipment, after the full
+    // item table and save have both been loaded.
+    for (const auto* collection : {&bag_, &temp_, &bank_}) {
+        for (const Stack& stack : *collection) {
+            if (stack.fuseId > 0) ensureApparelInfo(stack.id, stack.fuseId);
+        }
+    }
     // 05-AO: WorldMission 1 em EudemonScript.lua; Senna conclui com 6 EXP.
     // Nao atribuir de novo a saves existentes nem importar automaticamente
     // em personagens antigos; a missao fica no formato historico ja salvo.
@@ -1362,6 +1737,56 @@ void Play::loadItems(const std::string& path, const std::vector<int>& ids) {
     }
 }
 
+bool Play::ensureApparelInfo(int apparelId, int sourceEquipmentId) {
+    const auto existing = items_.find(apparelId);
+    if (existing != items_.end()) return existing->second.maxStack == 1;
+    const auto source = items_.find(sourceEquipmentId);
+    if (apparelId < 5287 || apparelId > 5297 || source == items_.end() ||
+        source->second.slot < 0 || source->second.equipSlots.empty()) return false;
+
+    // PORT_APPROX: client iteminfo.txt omits historical apparel IDs 5287-5297.
+    // The Lua mapping and FuseID behavior are historical; slot restrictions
+    // and icon are inherited to keep the item usable, while apparel bonuses,
+    // icon art, and localized output name remain unknown.
+    ItemInfo apparel = source->second;
+    apparel.id = apparelId;
+    apparel.name = "PORT_APPROX: " + source->second.name + " Apparel";
+    apparel.price = 0;
+    apparel.chInstance = false;
+    apparel.maxEnergy = 0;
+    apparel.maxEnergyRange = 0;
+    apparel.maxDurability = 25000;
+    apparel.maxDurabilityRange = 25000;
+    apparel.maxSockets = 0;
+    apparel.maxStack = 1;
+    apparel.minAtk = 0;
+    apparel.maxAtk = 0;
+    apparel.def = 0;
+    apparel.stats = {};
+    apparel.statsMaximum = {};
+    apparel.healHp = 0;
+    apparel.healSp = 0;
+    apparel.healHpPercent = 0.0;
+    apparel.healSpPercent = 0.0;
+    apparel.healCooldownSeconds = 0;
+    apparel.healStateId = 0;
+    apparel.healStateLevel = 0;
+    apparel.healStateSeconds = 0;
+    apparel.fairyRationAmount = 0;
+    apparel.fairyEggTargetId = 0;
+    apparel.fairySkillId = 0;
+    apparel.fairySkillLevel = 0;
+    apparel.learnedSkillId = 0;
+    apparel.learnedSkillLevel = 0;
+    apparel.fairyFruitAttribute = -1;
+    apparel.fairyFruitLevels = 0;
+    apparel.fairyFruitImproved = false;
+    apparel.medkit = false;
+    apparel.scriptAction.clear();
+    items_.emplace(apparelId, std::move(apparel));
+    return true;
+}
+
 void Play::loadHeals(const std::string& path) {
     FILE* file = std::fopen(path.c_str(), "rb");
     if (!file) return;
@@ -1377,13 +1802,297 @@ void Play::loadHeals(const std::string& path) {
             const int id = std::atoi(key + 13);
             const auto it = items_.find(id);
             if (it != items_.end() && it->second.medkit) {
-                const char* hp = std::strstr(line.c_str(), "HP =");
-                const char* sp = std::strstr(line.c_str(), "SP =");
-                if (hp) it->second.healHp = std::max(0, std::atoi(hp + 4));
-                if (sp) it->second.healSp = std::max(0, std::atoi(sp + 4));
+                auto numberAfter = [](const char* begin, const char* field, double fallback) {
+                    const char* value = begin ? std::strstr(begin, field) : nullptr;
+                    if (!value) return fallback;
+                    value += std::strlen(field);
+                    char* end = nullptr;
+                    const double parsed = std::strtod(value, &end);
+                    return end == value || !std::isfinite(parsed) ? fallback : parsed;
+                };
+                const char* amount = std::strstr(line.c_str(), "Amount");
+                const char* percentage = std::strstr(line.c_str(), "Percentage");
+                if (amount) {
+                    it->second.healHp = std::max(0, static_cast<int>(numberAfter(amount, "HP =", 0.0)));
+                    it->second.healSp = std::max(0, static_cast<int>(numberAfter(amount, "SP =", 0.0)));
+                }
+                if (percentage) {
+                    it->second.healHpPercent = std::max(0.0, numberAfter(percentage, "HP =", 0.0));
+                    it->second.healSpPercent = std::max(0.0, numberAfter(percentage, "SP =", 0.0));
+                }
+                it->second.healStateId = std::max(0, static_cast<int>(
+                    numberAfter(line.c_str(), "State =", 0.0)));
+                it->second.healStateLevel = std::max(0, static_cast<int>(
+                    numberAfter(line.c_str(), "StateLevel =", 0.0)));
+                it->second.healStateSeconds = std::max(0, static_cast<int>(
+                    numberAfter(line.c_str(), "StateTime =", 0.0)));
+                it->second.healCooldownSeconds = std::max(0, static_cast<int>(
+                    numberAfter(line.c_str(), "Cooldown =", 0.0)));
             }
         }
         line.clear();
+    }
+    std::fclose(file);
+}
+
+void Play::loadFairyRations(const std::string& path) {
+    FILE* file = std::fopen(path.c_str(), "rb");
+    if (!file) return;
+    char raw[4096];
+    while (std::fgets(raw, sizeof raw, file)) {
+        const char* autoThreshold = std::strstr(raw, "Server.Fairy.AutoFeed.Stamina =");
+        if (autoThreshold) {
+            double value = 0.0;
+            if (std::sscanf(autoThreshold, "Server.Fairy.AutoFeed.Stamina = %lf", &value) == 1 &&
+                value >= 0.0 && value <= 1.0)
+                fairyAutoFeedThreshold_ = value;
+        }
+        const char* normalId = std::strstr(raw, "Server.Fairy.AutoFeed.Normal =");
+        if (normalId) {
+            int value = 0;
+            if (std::sscanf(normalId, "Server.Fairy.AutoFeed.Normal = %d", &value) == 1 && value > 0)
+                fairyAutoFeedNormalId_ = value;
+        }
+        const char* greatId = std::strstr(raw, "Server.Fairy.AutoFeed.Great =");
+        if (greatId) {
+            int value = 0;
+            if (std::sscanf(greatId, "Server.Fairy.AutoFeed.Great = %d", &value) == 1 && value > 0)
+                fairyAutoFeedGreatId_ = value;
+        }
+        const char* begin = std::strstr(raw, "Server.Fairy.Ration[");
+        if (!begin) continue;
+        int itemId = 0;
+        int amount = 0;
+        if (std::sscanf(begin, "Server.Fairy.Ration[%d] = %d", &itemId, &amount) != 2 ||
+            itemId <= 0 || amount <= 0) continue;
+        const auto item = items_.find(itemId);
+        if (item != items_.end() && item->second.scriptAction == "FairyRation")
+            item->second.fairyRationAmount = amount;
+    }
+    std::fclose(file);
+}
+
+void Play::updateFairyAutoFeed() {
+    if (usingTicketBoat_ || fairyAutoFeedSlot_ < 0 ||
+        fairyAutoFeedSlot_ >= static_cast<int>(bag_.size())) return;
+    const auto equipped = worn_.find(16);
+    const auto equippedUid = wornUid_.find(16);
+    if (equipped == worn_.end() || equippedUid == wornUid_.end()) return;
+    const auto fairyDefinition = items_.find(equipped->second);
+    if (fairyDefinition == items_.end() || fairyDefinition->second.type != 59) return;
+    auto fairyStack = std::find_if(bag_.begin(), bag_.end(), [&](const Stack& candidate) {
+        return candidate.uid == equippedUid->second && candidate.id == equipped->second &&
+               candidate.count == 1;
+    });
+    if (fairyStack == bag_.end()) return;
+    const int maximum = fairyStack->maxDurability > 0 ? fairyStack->maxDurability :
+                        fairyDefinition->second.maxDurability;
+    if (maximum <= 0 || fairyStack->durability < 0 || fairyStack->durability >= maximum ||
+        static_cast<double>(fairyStack->durability) / maximum > fairyAutoFeedThreshold_) return;
+    Stack& ration = bag_[static_cast<std::size_t>(fairyAutoFeedSlot_)];
+    if (ration.id != fairyAutoFeedNormalId_ && ration.id != fairyAutoFeedGreatId_) return;
+    const auto rationDefinition = items_.find(ration.id);
+    if (rationDefinition == items_.end() || rationDefinition->second.type != 57 ||
+        rationDefinition->second.fairyRationAmount <= 0 || ration.count <= 0) return;
+
+    const int previousStamina = fairyStack->durability;
+    const long long restored = static_cast<long long>(rationDefinition->second.fairyRationAmount) * 50LL;
+    fairyStack->maxDurability = maximum;
+    fairyStack->durability = static_cast<int>(std::min<long long>(maximum,
+        static_cast<long long>(previousStamina) + restored));
+    const int currentStamina = fairyStack->durability;
+    if (--ration.count <= 0) bag_.erase(bag_.begin() + fairyAutoFeedSlot_);
+    say("Fairy auto feed: " + rationDefinition->second.name + " consumida; stamina " +
+        std::to_string(previousStamina) + " -> " + std::to_string(currentStamina) + ".");
+    if(sheetReady_)applyAttrs(false);
+    save(savePath());
+}
+
+void Play::updateFairySystem(float dt) {
+    if (!std::isfinite(dt) || dt <= 0.f) return;
+    const auto equipped = worn_.find(16);
+    const auto equippedUid = wornUid_.find(16);
+    if (equipped == worn_.end() || equippedUid == wornUid_.end()) {
+        fairySystemTimer_ = 0.f;
+        fairySystemUid_ = 0;
+        return;
+    }
+    const auto definition = items_.find(equipped->second);
+    if (definition == items_.end() || definition->second.type != 59) {
+        fairySystemTimer_ = 0.f;
+        fairySystemUid_ = 0;
+        return;
+    }
+    if (fairySystemUid_ != equippedUid->second) {
+        fairySystemUid_ = equippedUid->second;
+        fairySystemTimer_ = 0.f;
+    }
+    auto fairy = std::find_if(bag_.begin(), bag_.end(), [&](const Stack& candidate) {
+        return candidate.uid == equippedUid->second && candidate.id == equipped->second &&
+               candidate.count == 1;
+    });
+    if (fairy == bag_.end()) return;
+    const int level = std::accumulate(fairy->fairyStats.begin(), fairy->fairyStats.end(), 0);
+    const int interval = 60 + std::max(0, level - 27) * 5; // FairyFreq(Level)
+    fairySystemTimer_ += dt;
+    bool changed = false;
+    while (fairySystemTimer_ >= static_cast<float>(interval)) {
+        fairySystemTimer_ -= static_cast<float>(interval);
+        fairy = std::find_if(bag_.begin(), bag_.end(), [&](const Stack& candidate) {
+            return candidate.uid == equippedUid->second && candidate.id == equipped->second &&
+                   candidate.count == 1;
+        });
+        if (fairy == bag_.end()) break;
+        const int maximumEnergy = fairy->maxEnergy > 0 ? fairy->maxEnergy : definition->second.maxEnergy;
+        const int maximumStamina = fairy->maxDurability > 0 ? fairy->maxDurability : definition->second.maxDurability;
+        const int oldStamina = fairy->durability;
+        int tick = fairy->fairySystemTick >= 1200 ? 1 : fairy->fairySystemTick + 1;
+        if (level >= 0) {
+            auto grantCoin = [&](int itemId) {
+                const auto coin = items_.find(itemId);
+                if (coin == items_.end() || coin->second.maxStack <= 0 ||
+                    !addStack(bag_, itemId, 1, coin->second.maxStack, bagCapacity_)) return;
+                auto granted = std::find_if(bag_.begin(), bag_.end(), [&](const Stack& value) {
+                    return value.id == itemId;
+                });
+                if (granted != bag_.end()) granted->quality = 4;
+                assignItemUids();
+                changed = true;
+            };
+            if (oldStamina >= 50) {
+                if (tick % 3 == 0) grantCoin(855);
+                if (tick % 30 == 0) grantCoin(2588);
+                if (tick % 60 == 0) grantCoin(2588);
+                if (tick % 120 == 0) grantCoin(2588);
+                if (tick % 1200 == 0) grantCoin(2589);
+            }
+        }
+        if (tick == 1200) tick = 0;
+        fairy = std::find_if(bag_.begin(), bag_.end(), [&](const Stack& candidate) {
+            return candidate.uid == equippedUid->second && candidate.id == equipped->second &&
+                   candidate.count == 1;
+        });
+        if (fairy == bag_.end()) break;
+        fairy->fairySystemTick = tick;
+        if (oldStamina > 49) {
+            fairy->maxDurability = std::max(fairy->maxDurability, maximumStamina);
+            fairy->durability = std::max(49, oldStamina - 50); // Take_ElfURE
+            if (fairy->durability > 49 && maximumEnergy > 0) {
+                fairy->maxEnergy = std::max(fairy->maxEnergy, maximumEnergy);
+                const int growthRate = fairyExperienceRate_ *
+                    (fairyGrowthBoost_.remaining > 0.f ? fairyGrowthBoost_.multiplierPercent : 100) / 100;
+                fairy->energy = std::min(fairy->maxEnergy, fairy->energy + growthRate);
+            }
+        }
+        changed = true;
+    }
+    if (changed) {
+        if(sheetReady_)applyAttrs(false);
+        save(savePath());
+    }
+}
+
+void Play::loadFairyEggs(const std::string& path) {
+    FILE* file = std::fopen(path.c_str(), "rb");
+    if (!file) return;
+    char raw[4096];
+    while (std::fgets(raw, sizeof raw, file)) {
+        const char* begin = std::strstr(raw, "Server.Fairy.Egg[");
+        if (!begin) continue;
+        int eggId = 0;
+        int fairyId = 0;
+        if (std::sscanf(begin, "Server.Fairy.Egg[%d] = {ID = %d", &eggId, &fairyId) != 2 ||
+            eggId <= 0 || fairyId <= 0) continue;
+        const auto egg = items_.find(eggId);
+        if (egg != items_.end() && egg->second.scriptAction == "ItemUse_Egg")
+            egg->second.fairyEggTargetId = fairyId;
+    }
+    std::fclose(file);
+}
+
+void Play::loadFairySkills(const std::string& path) {
+    FILE* file = std::fopen(path.c_str(), "rb");
+    if (!file) return;
+    char raw[4096];
+    while (std::fgets(raw, sizeof raw, file)) {
+        const char* begin = std::strstr(raw, "Server.Fairy.Skill[");
+        if (!begin) continue;
+        int itemId = 0;
+        int skillId = 0;
+        int skillLevel = 0;
+        if (std::sscanf(begin, "Server.Fairy.Skill[%d] = {Skill = %d, Level = %d",
+                        &itemId, &skillId, &skillLevel) != 3 ||
+            itemId <= 0 || skillId <= 0 || skillId > 99 || skillLevel <= 0 || skillLevel > 9) continue;
+        const auto item = items_.find(itemId);
+        if (item != items_.end() && item->second.scriptAction == "AddFairySkill" && item->second.type == 58) {
+            item->second.fairySkillId = skillId;
+            item->second.fairySkillLevel = skillLevel;
+        }
+    }
+    std::fclose(file);
+}
+
+void Play::loadFairyTrainingBooks(const std::string& path) {
+    FILE* file = std::fopen(path.c_str(), "rb");
+    if (!file) return;
+    char raw[4096];
+    while (std::fgets(raw, sizeof raw, file)) {
+        const char* begin = std::strstr(raw, "Server.Fairy.Possession.Skill[");
+        if (!begin) begin = std::strstr(raw, "Server.Fairy.Funny.Skill[");
+        if (!begin) continue;
+        int itemId = 0;
+        int skillId = 0;
+        int skillLevel = 0;
+        const char* bracket = std::strchr(begin, '[');
+        if (!bracket || std::sscanf(bracket, "[%d] = {Skill = %d, Level = %d",
+                        &itemId, &skillId, &skillLevel) != 3 ||
+            itemId <= 0 || skillId <= 0 || skillLevel <= 0 || skillLevel > 9) continue;
+        const auto item = items_.find(itemId);
+        if (item != items_.end() && item->second.type == 34 &&
+            (item->second.scriptAction == "AddFairyBody" || item->second.scriptAction == "AddFunnySkill")) {
+            item->second.learnedSkillId = skillId;
+            item->second.learnedSkillLevel = skillLevel;
+        }
+    }
+    std::fclose(file);
+}
+
+void Play::loadFairyFruits(const std::string& path) {
+    FILE* file = std::fopen(path.c_str(), "rb");
+    if (!file) return;
+    char raw[4096];
+    while (std::fgets(raw, sizeof raw, file)) {
+        int value = 0;
+        if (std::sscanf(raw, "Server.Fairy.Level.Maximum = %d", &value) == 1 && value > 0 && value <= 99)
+            fairyMaximumLevel_ = value;
+        if (std::sscanf(raw, "Server.Fairy.Level.Normal = %d", &value) == 1 && value > 0 && value <= 99)
+            fairyNormalFruitMaximum_ = value;
+        if (std::sscanf(raw, "Server.Fairy.Level.Improved = %d", &value) == 1 && value > 0 && value <= 99)
+            fairyImprovedFruitMaximum_ = value;
+        if (std::sscanf(raw, "Server.Rates.Global.FairyEXP = %d", &value) == 1 && value > 0 && value <= 100000)
+            fairyExperienceRate_ = value;
+
+        const char* begin = std::strstr(raw, "Server.Fairy.Fruit[");
+        if (!begin) continue;
+        int itemId = 0;
+        int levels = 0;
+        char attribute[32]{};
+        if (std::sscanf(begin, "Server.Fairy.Fruit[%d] = {LV = %d, ATTR = ITEMATTR_VAL_%31[A-Z]",
+                        &itemId, &levels, attribute) != 3 || itemId <= 0 || levels <= 0 || levels > 10)
+            continue;
+        int attributeIndex = -1;
+        if (std::strcmp(attribute, "STR") == 0) attributeIndex = 0;
+        else if (std::strcmp(attribute, "CON") == 0) attributeIndex = 1;
+        else if (std::strcmp(attribute, "AGI") == 0) attributeIndex = 2;
+        else if (std::strcmp(attribute, "DEX") == 0) attributeIndex = 3;
+        else if (std::strcmp(attribute, "STA") == 0) attributeIndex = 4;
+        const auto item = items_.find(itemId);
+        if (attributeIndex >= 0 && item != items_.end() && item->second.type == 58 &&
+            (item->second.scriptAction == "FairyFruit" || item->second.scriptAction == "FairyFruitImprvd")) {
+            item->second.fairyFruitAttribute = attributeIndex;
+            item->second.fairyFruitLevels = levels;
+            item->second.fairyFruitImproved = item->second.scriptAction == "FairyFruitImprvd";
+        }
     }
     std::fclose(file);
 }
@@ -1399,6 +2108,57 @@ void Play::loadSkillBooks(const std::string& path) {
         int skill = 0;
         if (std::sscanf(begin, "Server.Player.Skill[%d] = {Skill = %d", &item, &skill) == 2 && item > 0 && skill > 0)
             skillBooks_[item] = skill;
+    }
+    std::fclose(file);
+}
+
+void Play::resolveNamedSkillBooks() {
+    std::unordered_map<std::string,int> skillsByName;
+    std::unordered_set<std::string> ambiguousNames;
+    for (const auto& entry : skillRules_) {
+        const std::string key = lowerCopy(entry.second.name);
+        if (key.empty()) continue;
+        const auto inserted = skillsByName.emplace(key, entry.first);
+        if (!inserted.second && inserted.first->second != entry.first)
+            ambiguousNames.insert(key);
+    }
+    for (const auto& entry : items_) {
+        const ItemInfo& item = entry.second;
+        if (item.scriptAction != "AddPlayerSkill" || item.type != 34 ||
+            skillBooks_.count(item.id)) continue;
+        const std::string key = lowerCopy(item.name);
+        const auto skill = skillsByName.find(key);
+        if (skill == skillsByName.end() || ambiguousNames.count(key)) continue;
+        // PORT_APPROX: the Lua callback has no Server.Player.Skill row for
+        // this book. A unique exact name match in iteminfo/skillinfo supplies
+        // its ID; eligibility still uses the existing historical skill rule.
+        skillBooks_[item.id] = skill->second;
+        inferredSkillBooks_.insert(item.id);
+    }
+}
+
+void Play::loadLifeSkillBooks(const std::string& path) {
+    FILE* file = std::fopen(path.c_str(), "rb");
+    if (!file) return;
+    char raw[4096];
+    while (std::fgets(raw, sizeof raw, file)) {
+        const char* begin = std::strstr(raw, "Server.Life.Skill[");
+        if (!begin) continue;
+        LifeSkillBookRule rule;
+        if (std::sscanf(begin, "Server.Life.Skill[%d] = {Skill = %d, AddLevel = %d, Level = %d",
+                        &rule.itemId, &rule.skillId, &rule.addLevel, &rule.expectedLevel) != 4 ||
+            rule.itemId <= 0 || rule.skillId <= 0 || rule.addLevel <= 0) continue;
+        const char* prerequisite = std::strstr(begin, "Prerequisite = {Skill = ");
+        if (prerequisite) {
+            prerequisite += std::strlen("Prerequisite = {Skill = ");
+            if (std::sscanf(prerequisite, "%d", &rule.prerequisiteSkill) != 1) rule.prerequisiteSkill = 0;
+            const char* level = std::strstr(prerequisite, "Level = ");
+            if (level) std::sscanf(level + std::strlen("Level = "), "%d", &rule.prerequisiteLevel);
+        }
+        const char* give = std::strstr(begin, "Give = ");
+        if (give) std::sscanf(give + std::strlen("Give = "), "%d", &rule.rewardItem);
+        lifeSkillBooks_[rule.itemId] = rule;
+        lifeSkillIds_.insert(rule.skillId);
     }
     std::fclose(file);
 }
@@ -1441,6 +2201,7 @@ void Play::loadSkillRules(const std::string& path) {
         rule.distance = std::max(0, std::atoi(cols[16].c_str()));
         rule.radius = std::max(0, std::atoi(cols[20].c_str()));
         if (cols.size() > 29) rule.effectFormula = cols[29];
+        if (cols.size() > 30 && cols[30]!="0") rule.passiveFormula=cols[30];
         if (rule.effectFormula == "Skill_Sj_End") {
             rule.damageFormula = SkillRule::DamageFormula::Enfeeble;
             rule.damageScaleBase = 100.0;
@@ -1575,6 +2336,14 @@ void Play::loadSkillRules(const std::string& path) {
             std::atoi(cols[65].c_str())>0 || std::atoi(cols[66].c_str())>0;
         if (cols.size() > 47) rule.playActions = parsePoseActions(cols[47]);
         if (cols.size() > 48) rule.actionKeyFrame = std::atoi(cols[48].c_str());
+        auto readItemEffectKeyFrame = [&](std::size_t column) {
+            if (cols.size() <= column) return;
+            int effectId=0,keyFrame=-3;
+            if (std::sscanf(cols[column].c_str(), "%d,%d", &effectId, &keyFrame)==2 &&
+                effectId>0) rule.itemEffectKeyFrames.push_back(keyFrame);
+        };
+        readItemEffectKeyFrame(54);
+        readItemEffectKeyFrame(55);
         if (cols.size() > 56) rule.flightActionKeyFrame = std::atoi(cols[56].c_str());
         if (cols.size() > 59) rule.flightEffectId = std::max(0, std::atoi(cols[59].c_str()));
         if (cols.size() > 60) rule.flightSpeed = std::max(0.f, std::min(300.f,
@@ -1601,7 +2370,17 @@ equipment_stats::Bonus Play::gearBonuses() const {
         if (uid != wornUid_.end()) {
             for (const Stack& stack : bag_) {
                 if (stack.uid == uid->second && stack.id == equipped.second) {
+                    if(it->second.type==59 && stack.durability<50) {
+                        b={};break; // Take_ElfURE -> SetChaEquipValid(16,0)
+                    }
                     b += stack.extra; // atributos individuais nao relacionados as gemas
+                    // Fairy fruits persist their primary values separately
+                    // from equipment extra rolls. ChangeItem adds these item
+                    // attributes before the normal derived-stat formulas.
+                    if(it->second.type==59) {
+                        b.str+=stack.fairyStats[0];b.con+=stack.fairyStats[1];
+                        b.agi+=stack.fairyStats[2];b.dex+=stack.fairyStats[3];b.sta+=stack.fairyStats[4];
+                    }
                     // forge.lua check_item_final_data: efeito por nivel, em cada encaixe.
                     // Somente gemas reconhecidas e compativeis com o item equipado.
                     if(forge_rules::validSockets(stack.socketCount,stack.gemIds,stack.gemLevels)) {

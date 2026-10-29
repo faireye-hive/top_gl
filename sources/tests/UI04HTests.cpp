@@ -32,7 +32,7 @@ void drawSkills(HudComposer& compositor, UIManager& ui, int sw, int sh) {
     UIRenderer geom(sw,sh);
     HudDrawList list;
     const float x=ui.windows.skillX_<0.f?sw-206.f:ui.windows.skillX_;
-    SkillsUI::draw(geom,x,ui.windows.skillY_,ui.skills.page(),int(ui.skills.rows().size()));
+    SkillsUI::draw(geom,x,ui.windows.skillY_,ui.skills.page(),ui.skills.rows(),UITheme{});
     ui.skills.appendSprites(list,ui.windows,sw);
     ui.skills.appendText(list,ui.windows,sw,16.f);
     compositor.layer(geom,list,{x,ui.windows.skillY_,198.f,394.f});

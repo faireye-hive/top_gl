@@ -159,7 +159,14 @@ void buildTerrainMesh(MapFile& map, int originX, int originY, int span, TerrainM
                     const int cx = sx + kCorner[i][0] * kSeaTile;
                     const int cy = sy + kCorner[i][1] * kSeaTile;
                     const Tile shore = map.at(cx, cy);
-                    const float alpha = shore.valid && shore.height <= -.5f ? 207.f / 255.f : 0.f;
+                    // MPMap::GetTile returns _pDefaultTile (-2 m) outside
+                    // the map. RenderSea samples it for corner alpha, so the
+                    // shoreline should remain opaque at the outer map edge.
+                    // A corrupted section is different: keep its safe alpha=0
+                    // instead of inventing valid world data.
+                    const bool outsideMap = cx < 0 || cy < 0 || cx >= map.width() || cy >= map.height();
+                    const bool underwater = shore.valid ? shore.height <= -.5f : outsideMap;
+                    const float alpha = underwater ? 207.f / 255.f : 0.f;
                     // MPMap::_dwSeaDefaultColor = ARGB(207, 140, 140, 220).
                     // Cada quadra de 4 m repete um quadro ocean_h inteiro.
                     sheet[i] = makeVertex(static_cast<float>(cx), 0.f, static_cast<float>(cy),

@@ -1,10 +1,12 @@
 #pragma once
-// SK2.17-B: opt-in deterministic positions/lifetimes for less common CMPPartSys
+// SK2.17-B: deterministic positions/lifetimes for less common CMPPartSys
 // modes, transcribed from the creation and frame movement routines of the
 // original DX9 MPParticleSys.cpp. All local positions are DX9 (Z-up).
-// This is NOT full DX9 simulation: native RNG, per-frame wind/step cadence,
-// nested emitter orientation and RANGE2 collision callbacks remain different.
+// This is NOT full DX9 simulation: native RNG, per-frame wind/step cadence
+// and nested emitter orientation remain different. RANGE2 collision and
+// recycled-slot callbacks are modeled separately by HistoricalRange2Collision.
 #include "top/HistoricalParticlePool.h"
+#include "top/HistoricalBlast2.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -14,12 +16,10 @@
 namespace top { namespace historical_particle_extended {
 using V3=std::array<float,3>;
 constexpr float pi=3.14159265358979323846f;
-inline bool enabled() {
-    const char* p=std::getenv("TOP_HISTORICAL_PARTICLE_EXTENDED");
-    return p && p[0]=='1' && p[1]=='\0';
-}
+// SK2.18-L: historical behavior is part of normal execution.
+inline constexpr bool enabled() { return true; }
 inline bool supported(int type) {
-    return type==7 || type==8 || type==9 || type==11 || type==14 || type==15;
+    return type==7 || type==8 || type==9 || type==10 || type==11 || type==14 || type==15;
 }
 struct Sample {
     bool alive=false;
@@ -35,12 +35,26 @@ inline float random01(std::uint32_t seed,int slot,int channel) {
 // origin, authored offset and historical path exactly once.
 inline Sample at(int type,int slot,int count,float seconds,float life,float step,
                  float stopAt,const V3& range,const V3& direction,
-                 const V3& acceleration,float speed,std::uint32_t seed) {
+                 const V3& acceleration,float speed,std::uint32_t seed,
+                 int frameCount=1,float firstFrameAngleX=0.f) {
     Sample s;
     if(!supported(type) || count<=0 || slot<0 || slot>=count ||
        !std::isfinite(seconds) || !std::isfinite(life) ||
        !std::isfinite(speed) || !std::isfinite(step) ||
        !std::isfinite(stopAt) || seconds<0.f || life<=0.f) return s;
+    if(type==10) {
+        // BLAST2 is an all-at-once state machine, not a continuously
+        // emitted particle group. Unlike BLAST3 it stops at the last
+        // frame; all slots share the same _vFontDir and trajectory.
+        const auto blast=historical_blast2::at(seconds,life,frameCount,
+                                               speed,acceleration,firstFrameAngleX);
+        if(!blast.alive)return s;
+        s.alive=true;
+        s.age=blast.age;
+        s.normalized=blast.normalized;
+        s.position=blast.position;
+        return s;
+    }
     // The old Play() creates ROUND, ARRAW, BLAST3 and RANGE immediately.
     // WIND and RANGE2 instead advance _fCurTime until _fStep, emitting
     // one available slot at a time; the exact DX9 schedule depends on FPS.
@@ -67,7 +81,15 @@ inline Sample at(int type,int slot,int count,float seconds,float life,float step
     // RANGE retains its static positions throughout the active controller.
     s.alive=true; s.age=age; s.normalized=std::clamp(age/life,0.f,1.f);
     auto randomPosition=[&] {
-        for(int i=0;i<3;++i)s.position[i]=range[i]*random01(seed,slot,i);
+        const bool useDx9Randf=(type==7) &&
+            historical_particle_random::randfMappingEnabled();
+        const std::uint32_t particleSeed=seed ^
+            (0x85ebca6bu*static_cast<std::uint32_t>(slot+1));
+        for(int i=0;i<3;++i)
+            s.position[i]=useDx9Randf ?
+                historical_particle_random::deterministicRandf(
+                    range[i],particleSeed,static_cast<unsigned>(i)*4u) :
+                range[i]*random01(seed,slot,i);
     };
     switch(type) {
     case 7: { // WIND: _CreateWind, _FrameMoveWind

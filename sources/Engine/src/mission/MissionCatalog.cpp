@@ -1,4 +1,5 @@
 #include "top/MissionCatalog.h"
+#include "top/HistoricalPaths.h"
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -74,6 +75,26 @@ int gateInteger(const std::string& text) {
     return static_cast<int>(value);
 }
 
+std::vector<std::string> splitDelimited(const std::string& text,char delimiter) {
+    std::vector<std::string> fields;
+    std::size_t at=0;
+    while(at<=text.size()) {
+        const auto end=text.find(delimiter,at);
+        fields.push_back(text.substr(at,end==std::string::npos?std::string::npos:end-at));
+        if(end==std::string::npos)break;
+        at=end+1;
+    }
+    return fields;
+}
+
+bool parsePositive(const std::string& text,int& value,int max=1000000) {
+    char* end=nullptr;
+    const long parsed=std::strtol(text.c_str(),&end,10);
+    if(text.empty() || end==text.c_str() || *end || parsed<0 || parsed>max)return false;
+    value=static_cast<int>(parsed);
+    return true;
+}
+
 } // namespace
 
 void MissionCatalog::reset() {
@@ -81,6 +102,83 @@ void MissionCatalog::reset() {
     missionIndex_.clear(); recordByDisplay_.clear();
     stepIndex_.clear(); stepsByRecord_.clear(); stepCache_.clear();
     displayByRecord_.clear(); missionCache_.clear();
+    customMissionIndexReady_=false;customMissions_.clear();
+}
+
+void MissionCatalog::ensureCustomMissionIndex() const {
+    if(customMissionIndexReady_)return;
+    customMissionIndexReady_=true;
+    FILE* file=nullptr;
+    for(const char* root:{".","..","../.."}) {
+        const std::string path=historicalFilePath(root,"sources/Tools/custom-missions.tsv");
+        if(!path.empty() && (file=std::fopen(path.c_str(),"rb")))break;
+    }
+    for(const char* root:{"Client","../Client","../../Client"}) {
+        if(file)break;
+        const std::string path=historicalFilePath(root,"scripts/offline/custom-missions.tsv");
+        if(!path.empty() && (file=std::fopen(path.c_str(),"rb")))break;
+    }
+    if(!file)return;
+    char raw[8192];
+    while(std::fgets(raw,sizeof raw,file)) {
+        std::string line(raw);
+        while(!line.empty() && (line.back()=='\n'||line.back()=='\r'))line.pop_back();
+        if(line.empty() || line[0]=='#')continue;
+        const auto columns=splitDelimited(line,'\t');
+        // id, title, description, min level, objectives, exp, gold, item rewards
+        if(columns.size()!=8)continue;
+        int id=0,minLevel=0,rewardExp=0,rewardGold=0;
+        if(!parsePositive(columns[0],id,1000000) || id<900000 ||
+           !parsePositive(columns[3],minLevel,100) || minLevel<1 ||
+           !parsePositive(columns[5],rewardExp,1000000000) ||
+           !parsePositive(columns[6],rewardGold,1000000000) ||
+           columns[1].empty() || columns[2].empty() || customMissions_.count(id))continue;
+        HistoricalMission mission;
+        mission.id=id;mission.recordId=id;mission.title=columns[1];
+        mission.beginText=columns[2];mission.objective=columns[2];mission.minLevel=minLevel;
+        mission.rewardExp=rewardExp;mission.rewardGold=rewardGold;mission.turnInRequired=true;
+        mission.gate.unsupported.clear();
+        bool valid=true;
+        int nextFlag=1,triggerId=1,killObjectives=0;
+        for(const auto& spec:splitDelimited(columns[4],';')) {
+            const auto fields=splitDelimited(spec,':');
+            int target=0,count=0;
+            if(fields.size()!=3 || !parsePositive(fields[1],target) || target<1 ||
+               !parsePositive(fields[2],count,255) || count<1) {valid=false;break;}
+            MissionEventKind kind;
+            if(fields[0]=="kill")kind=MissionEventKind::Kill;
+            else if(fields[0]=="item")kind=MissionEventKind::GetItem;
+            else {valid=false;break;}
+            if(nextFlag+count-1>255) {valid=false;break;}
+            mission.eventTriggers.push_back({triggerId++,kind,target,count,nextFlag});
+            const int finalFlag=nextFlag+count-1;
+            nextFlag=finalFlag+1;
+            if(kind==MissionEventKind::Kill) {
+                ++killObjectives;
+                if(killObjectives==1) {mission.targetId=target;mission.targetCount=count;}
+                mission.resultHasFlags.push_back(finalFlag);
+            } else mission.neededItems.push_back({target,count});
+        }
+        if(!valid || mission.eventTriggers.empty())continue;
+        if(killObjectives!=1)mission.targetId=mission.targetCount=0;
+        if(!columns[7].empty())for(const auto& item:splitDelimited(columns[7],';')) {
+            const auto fields=splitDelimited(item,':');
+            int itemId=0,count=0;
+            if(fields.size()!=2 || !parsePositive(fields[0],itemId) || itemId<1 ||
+               !parsePositive(fields[1],count,1000000) || count<1) {valid=false;break;}
+            mission.rewardItems.push_back({itemId,count});
+        }
+        if(valid)customMissions_.emplace(id,std::move(mission));
+    }
+    std::fclose(file);
+}
+
+std::vector<int> MissionCatalog::customMissionIds() const {
+    ensureCustomMissionIndex();
+    std::vector<int> ids;ids.reserve(customMissions_.size());
+    for(const auto& entry:customMissions_)ids.push_back(entry.first);
+    std::sort(ids.begin(),ids.end());
+    return ids;
 }
 void MissionCatalog::ensureMissionIndex() const {
     if (missionIndexReady_) return;
@@ -205,6 +303,8 @@ bool MissionCatalog::missionStep(int displayId, HistoricalMissionStep& step) con
 }
 
 bool MissionCatalog::missionByDisplay(int displayId, HistoricalMission& result) const {
+    ensureCustomMissionIndex();
+    if(customMissions_.count(displayId))return mission(displayId,result);
     ensureMissionIndex();
     const auto found=recordByDisplay_.find(displayId);
     if(found==recordByDisplay_.end()) {result=HistoricalMission{};return false;}
@@ -219,6 +319,9 @@ std::unordered_map<int,std::vector<int>> MissionCatalog::missionRecordIndex() co
 bool MissionCatalog::mission(int id, HistoricalMission& out) const {
     out = HistoricalMission{};
     if (id <= 0) return false;
+    ensureCustomMissionIndex();
+    const auto custom=customMissions_.find(id);
+    if(custom!=customMissions_.end()) {out=custom->second;return true;}
     // O menu de missoes e os marcadores ! consultam centenas de IDs na abertura.
     // Antes, cada missao varria novamente 8 arquivos inteiros (~2.8 MiB).
     // Um indice por instancia evita essa leitura quadratica sem mudar o parser.

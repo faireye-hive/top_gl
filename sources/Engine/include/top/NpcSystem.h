@@ -32,6 +32,7 @@ public:
     // Extrai Weapon/Defence/Other/etc. do bloco InitTrade do script indicado.
     // E um parser de dados, nao um interpretador Lua.
     bool catalog(const std::string& script, std::vector<int>& itemIds) const;
+    bool exchangeRules(const std::string& script, std::vector<NpcLuaData::ExchangeRule>& rules) const;
     // Detecta somente a acao TriggerAction(..., OpenBank) da funcao historica.
     bool bankService(const std::string& script) const;
     // Primeira fala Talk(...) do NPC, usada pelo dialogo offline inicial.

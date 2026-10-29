@@ -96,7 +96,10 @@ int main() {
     assert(!hasSprite(d,"tempbag.png"));
 
     ui.windows.showSkill_=true;
-    ui.skills.setView({{13,"Slash","icons/slash.png",9,true,false,2}},4);
+    SkillView slash;
+    slash.id=13;slash.name="Slash";slash.icon="icons/slash.png";
+    slash.sp=9;slash.learned=true;slash.hotkey=2;
+    ui.skills.setView({slash},4);
     d = {};
     ui.skills.appendSprites(d,ui.windows,w);
     ui.skills.appendText(d,ui.windows,w,16.f);

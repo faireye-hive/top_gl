@@ -18,9 +18,12 @@ public:
     void setWindow(bool shown, const std::string& name = {}, const std::string& text = {}, bool choices = false, bool trade = false, bool forge = false);
     void setTeleportChoices(std::vector<std::string> choices) { teleportChoices_ = std::move(choices); }
     void setDialogOptions(std::vector<std::string> options, bool tutorialMode, bool hasMissions) {
+        if (dialogOptions_ != options) dialogOptionPage_ = 0;
         dialogOptions_ = std::move(options); tutorialMode_ = tutorialMode; tutorialHasMissions_ = hasMissions;
     }
     int dialogOptionHit(int x, int y, int w, int h) const;
+    int dialogOptionPageHit(int x, int y, int w, int h) const;
+    void changeDialogOptionPage(int delta);
     int tutorialGuideHit(int x, int y, int w, int h) const;
     int tutorialFooterHit(int x, int y, int w, int h) const;
     int teleportHit(int x, int y, int w, int h) const;
@@ -49,6 +52,7 @@ private:
     std::vector<std::string> dialogOptions_;
     bool tutorialMode_ = false;
     bool tutorialHasMissions_ = false;
+    int dialogOptionPage_ = 0;
     std::vector<top::NpcQuestView> missions_;
     int selected_=-1, page_=0;
 };

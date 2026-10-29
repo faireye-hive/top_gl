@@ -2,6 +2,7 @@
 #include "top/HistoricalParticleMotion.h"
 #include "top/HistoricalParticleJitter.h"
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
 #include <stdexcept>
 using namespace top;
@@ -54,5 +55,18 @@ int main(){
     auto fire=top::historical_particle_motion::at(2,rangeZero,fireDir,
         rangeZero,4.f,.5f,11,0);
     CHECK(close(fire.position[0],2.f) && close(fire.velocity[0],4.f));
-    std::cout<<"SK2.17-B extended ROUND/BLAST3/RANGE/WIND/ARRAW/RANGE2 rules OK\n";
+    const char* previousRandf=std::getenv("TOP_HISTORICAL_PARTICLE_RANDF");
+    const std::string previousRandfValue=previousRandf?previousRandf:"";
+    unsetenv("TOP_HISTORICAL_PARTICLE_RANDF");
+    CHECK(setenv("TOP_HISTORICAL_PARTICLE_RANDF","1",1)==0);
+    const auto windRandf=at(7,0,2,.2f,1.f,.1f,-1.f,rng,zero,zero,0.f,8u);
+    const std::uint32_t windSeed=8u ^ 0x85ebca6bu;
+    for(int axis=0;axis<3;++axis){
+        const float expectedWind=historical_particle_random::deterministicRandf(
+            rng[axis],windSeed,static_cast<unsigned>(axis)*4u);
+        CHECK(windRandf.alive && close(windRandf.position[axis],expectedWind));
+    }
+    if(previousRandf)setenv("TOP_HISTORICAL_PARTICLE_RANDF",previousRandfValue.c_str(),1);
+    else unsetenv("TOP_HISTORICAL_PARTICLE_RANDF");
+    std::cout<<"SK2.17-B extended WIND Randf mapping and other particle rules OK\n";
 }

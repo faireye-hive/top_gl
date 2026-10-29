@@ -107,6 +107,7 @@ int main() {
     assert(fx.open(root.string()));
     fx.emit({top::EffectEvent::Flight, 0.f,0.f,1.f,0.f,5,.75f});
     top::MapFile map;
+    fx.step(0.f); // FrameMove creates the zero-step FIRE slot before rendering.
     fx.build(map,1.f,0.f);
     auto batch = findTexture(fx, "spark.tga.png");
     assert(batch && batch->verts.size()>=6);

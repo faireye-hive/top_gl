@@ -200,9 +200,884 @@ public:
     skillData.loadSkillBooks("Client/scripts/offline/calculate/variable.lua");
     skillData.loadSkillBooks("../Client/scripts/offline/calculate/variable.lua");
     skillData.loadSkillBooks("../../Client/scripts/offline/calculate/variable.lua");
+    skillData.loadLifeSkillBooks("Client/scripts/offline/script/calculate/variable.lua");
+    skillData.loadLifeSkillBooks("../Client/scripts/offline/script/calculate/variable.lua");
+    skillData.loadLifeSkillBooks("../../Client/scripts/offline/script/calculate/variable.lua");
     skillData.loadSkillRules("Client/scripts/table/skillinfo.txt");
     skillData.loadSkillRules("../Client/scripts/table/skillinfo.txt");
     skillData.loadSkillRules("../../Client/scripts/table/skillinfo.txt");
+    skillData.loadItems("Client/scripts/table/iteminfo.txt",{});
+    skillData.resolveNamedSkillBooks();
+    const int unmappedBooks[]={3169,3171,3181,3182,3183,3184,3189,3199,3200,3201,3213,3214,3221};
+    if(skillData.skillBooks_.size()<85) {
+        std::fprintf(stderr,"skill book mapping: fallback historico nao cobriu os livros nomeados\n");return false;
+    }
+    for(int itemId:unmappedBooks) {
+        if(!skillData.skillBooks_.count(itemId) || !skillData.inferredSkillBooks_.count(itemId)) {
+            std::fprintf(stderr,"skill book mapping: item %d sem match exato unico\n",itemId);return false;
+        }
+    }
+    skillData.job_=2;
+    skillData.player_.level=1;
+    skillData.tp_=5;
+    skillData.bag_={Stack{3189,1}}; // Eagle's Eye: item/skill names match uniquely.
+    skillData.clickBag(0);
+    Play inferredBookWrongJob;
+    inferredBookWrongJob.items_=skillData.items_;
+    inferredBookWrongJob.skillBooks_=skillData.skillBooks_;
+    inferredBookWrongJob.inferredSkillBooks_=skillData.inferredSkillBooks_;
+    inferredBookWrongJob.skillRules_=skillData.skillRules_;
+    inferredBookWrongJob.job_=5;
+    inferredBookWrongJob.player_.level=30;
+    inferredBookWrongJob.tp_=5;
+    inferredBookWrongJob.bag_={Stack{3189,1}};
+    inferredBookWrongJob.clickBag(0);
+    if(skillData.learnedSkills_.count(89)!=1 || skillData.tp_!=4 || skillData.bagCount(3189)!=0 ||
+       inferredBookWrongJob.learnedSkills_.count(89)!=0 || inferredBookWrongJob.tp_!=5 ||
+       inferredBookWrongJob.bagCount(3189)!=1) {
+        std::fprintf(stderr,"skill book mapping: fluxo aproximado nao respeitou classe/consumo\n");return false;
+    }
+    skillData.setSkillTestMode(true);
+    if(!skillData.testIncreaseSkill(97) || skillData.learnedSkills_[97]!=1) {
+        std::fprintf(stderr,"skill test: + gratuito nao aprendeu skill do catalogo\n");
+        return false;
+    }
+    if(!skillData.testIncreaseSkill(338) || skillData.lifeSkills_[338]!=1 || skillData.learnedSkills_.count(338) ||
+       skillData.bagCount(1068)!=1 || skillData.bag_.back().id!=1068 || skillData.bag_.back().extra.str!=1 ||
+       skillData.bag_.back().maxEnergy!=10000 || skillData.bag_.back().energy!=1) {
+        std::fprintf(stderr,"skill test: primeira habilidade profissional nao concedeu a ferramenta historica correta\n");
+        return false;
+    }
+    skillData.setSkillTestMode(false);
+    if(skillData.testIncreaseSkill(97)) {
+        std::fprintf(stderr,"skill test: + gratuito funcionou fora do modo de QA\n");
+        return false;
+    }
+    char skillSaveBlockTemplate[]="/tmp/top-skill-save-block-XXXXXX";
+    const int skillSaveBlockFd=::mkstemp(skillSaveBlockTemplate);
+    if(skillSaveBlockFd<0) {
+        std::fprintf(stderr,"skill test: nao criou bloqueio de save\n");
+        return false;
+    }
+    ::close(skillSaveBlockFd);
+    Play skillSaveFailure;
+    skillSaveFailure.root_=skillSaveBlockTemplate; // an ordinary file cannot contain the character save directory
+    skillSaveFailure.items_=skillData.items_;
+    skillSaveFailure.skillRules_=skillData.skillRules_;
+    skillSaveFailure.lifeSkillBooks_=skillData.lifeSkillBooks_;
+    skillSaveFailure.lifeSkillIds_=skillData.lifeSkillIds_;
+    skillSaveFailure.bagCapacity_=skillData.bagCapacity_;
+    skillSaveFailure.player_.id=1;
+    skillSaveFailure.setSkillTestMode(true);
+    const bool regularSkillSaveRejected=!skillSaveFailure.testIncreaseSkill(97) &&
+        skillSaveFailure.learnedSkills_.count(97)==0;
+    const bool lifeSkillSaveRejected=!skillSaveFailure.testIncreaseSkill(338) &&
+        skillSaveFailure.lifeSkills_.count(338)==0 && skillSaveFailure.bagCount(1068)==0;
+    ::unlink(skillSaveBlockTemplate);
+    if(!regularSkillSaveRejected || !lifeSkillSaveRejected) {
+        std::fprintf(stderr,"skill test: falha de save nao reverteu nivel/ferramenta inicial\n");
+        return false;
+    }
+    Play trainerProbe;
+    if(!trainerProbe.testSetJob(9) || trainerProbe.job_!=9 ||
+       !trainerProbe.testSetJob(18) || trainerProbe.job_!=18) {
+        std::fprintf(stderr,"class test trainer: mudanca imediata de profissao falhou\n");
+        return false;
+    }
+    char donnaDirTemplate[]="/tmp/top-donna-wine-XXXXXX";
+    char* donnaDir=::mkdtemp(donnaDirTemplate);
+    if(!donnaDir) {
+        std::fprintf(stderr,"Donna wine: nao criou pasta temporaria de save\n");
+        return false;
+    }
+    Play donnaWine;
+    donnaWine.root_=donnaDir;
+    donnaWine.profileId_=19001;
+    donnaWine.loadItems("Client/scripts/table/iteminfo.txt",{});
+    donnaWine.gold_=99999;
+    const bool donnaRejectsLowGold=!donnaWine.processNpcRecipe({},100000,{{4072,1}},"Donna - Eight Treasures Wine",true) &&
+        donnaWine.gold_==99999 && donnaWine.bagCount(4072)==0;
+    donnaWine.gold_=100000;
+    donnaWine.bagCapacity_=1;
+    donnaWine.bag_={Stack{1,1}};
+    const bool donnaRejectsFullBag=!donnaWine.processNpcRecipe({},100000,{{4072,1}},"Donna - Eight Treasures Wine",true) &&
+        donnaWine.gold_==100000 && donnaWine.bagCount(1)==1 && donnaWine.bagCount(4072)==0;
+    donnaWine.bag_.clear();
+    donnaWine.gold_=100000;
+    const bool donnaPurchase=donnaWine.processNpcRecipe({},100000,{{4072,1}},"Donna - Eight Treasures Wine",true) &&
+        donnaWine.gold_==0 && donnaWine.bagCount(4072)==1;
+    Play donnaReloaded;
+    donnaReloaded.root_=donnaDir;
+    donnaReloaded.profileId_=19001;
+    donnaReloaded.loadItems("Client/scripts/table/iteminfo.txt",{});
+    donnaReloaded.load(donnaWine.savePath());
+    const bool donnaSaved=donnaReloaded.gold_==0 && donnaReloaded.bagCount(4072)==1;
+    const std::string donnaSave=donnaWine.savePath();
+    std::remove(donnaSave.c_str());std::remove((donnaSave+".bak").c_str());
+    const std::string donnaUser=donnaDir+std::string("/user");
+    ::rmdir(donnaUser.c_str());::rmdir(donnaDir);
+    if(!donnaRejectsLowGold || !donnaRejectsFullBag || !donnaPurchase || !donnaSaved) {
+        std::fprintf(stderr,"Donna wine: compra, preservacao de recursos ou save falhou\n");
+        return false;
+    }
+    Play williamGate;
+    williamGate.historical_.id=248;
+    williamGate.historical_.active=true;
+    const bool williamActiveMissionGate=williamGate.hasActiveHistoricalMission(248);
+    williamGate.historical_.active=false;
+    williamGate.historicalRecords_.insert(249);
+    const bool williamCompletedRecordGate=!williamGate.hasActiveHistoricalMission(248) &&
+        williamGate.hasHistoricalRecord(249) && !williamGate.hasHistoricalRecord(250);
+    char williamDirTemplate[]="/tmp/top-william-token-XXXXXX";
+    char* williamDir=::mkdtemp(williamDirTemplate);
+    if(!williamDir) {
+        std::fprintf(stderr,"William token: nao criou pasta temporaria de save\n");
+        return false;
+    }
+    Play williamSale;
+    williamSale.root_=williamDir;
+    williamSale.profileId_=19003;
+    williamSale.loadItems("Client/scripts/table/iteminfo.txt",{});
+    williamSale.gold_=19999;
+    const bool williamRejectsLowGold=!williamSale.processNpcRecipe({},20000,{{4082,1}},
+        "William - Ancient Bounty Token",true) && williamSale.gold_==19999 && williamSale.bagCount(4082)==0;
+    williamSale.gold_=20000;
+    williamSale.bagCapacity_=1;
+    williamSale.bag_={Stack{1,1}};
+    const bool williamRejectsFullBag=!williamSale.processNpcRecipe({},20000,{{4082,1}},
+        "William - Ancient Bounty Token",true) && williamSale.gold_==20000 &&
+        williamSale.bagCount(1)==1 && williamSale.bagCount(4082)==0;
+    williamSale.bag_.clear();
+    const bool williamPurchase=williamSale.processNpcRecipe({},20000,{{4082,1}},
+        "William - Ancient Bounty Token",true) && williamSale.gold_==0 && williamSale.bagCount(4082)==1;
+    Play williamReloaded;
+    williamReloaded.root_=williamDir;
+    williamReloaded.profileId_=19003;
+    williamReloaded.loadItems("Client/scripts/table/iteminfo.txt",{});
+    williamReloaded.load(williamSale.savePath());
+    const bool williamSaved=williamReloaded.gold_==0 && williamReloaded.bagCount(4082)==1;
+    const std::string williamSave=williamSale.savePath();
+    std::remove(williamSave.c_str());std::remove((williamSave+".bak").c_str());
+    const std::string williamUser=williamDir+std::string("/user");
+    ::rmdir(williamUser.c_str());::rmdir(williamDir);
+    if(!williamActiveMissionGate || !williamCompletedRecordGate || !williamRejectsLowGold ||
+       !williamRejectsFullBag || !williamPurchase || !williamSaved) {
+        std::fprintf(stderr,"William token: gate historico, cobranca, inventario ou save falhou\n");
+        return false;
+    }
+    char furlingtonDirTemplate[]="/tmp/top-furlington-refine-XXXXXX";
+    char* furlingtonDir=::mkdtemp(furlingtonDirTemplate);
+    if(!furlingtonDir) {
+        std::fprintf(stderr,"Furlington: nao criou pasta temporaria de save\n");
+        return false;
+    }
+    Play furlington;
+    furlington.root_=furlingtonDir;
+    furlington.profileId_=19006;
+    furlington.loadItems("Client/scripts/table/iteminfo.txt",{1784,1785});
+    furlington.bagCapacity_=1;
+    furlington.bag_={Stack{1784,10}};
+    furlington.gold_=199;
+    const bool furlingtonRejectsLowGold=!furlington.processNpcRecipe({{1784,10}},200,{{1785,1}},
+        "Furlington - Clarion Fragment",false) && furlington.gold_==199 &&
+        furlington.bagCount(1784)==10 && furlington.bagCount(1785)==0;
+    furlington.gold_=200;
+    const bool furlingtonExchange=furlington.processNpcRecipe({{1784,10}},200,{{1785,1}},
+        "Furlington - Clarion Fragment",false) && furlington.gold_==0 &&
+        furlington.bagCount(1784)==0 && furlington.bagCount(1785)==1;
+    Play furlingtonReloaded;
+    furlingtonReloaded.loadItems("Client/scripts/table/iteminfo.txt",{1784,1785});
+    furlingtonReloaded.load(furlington.savePath());
+    const bool furlingtonSaved=furlingtonReloaded.gold_==0 && furlingtonReloaded.bagCount(1784)==0 &&
+        furlingtonReloaded.bagCount(1785)==1;
+    const std::string furlingtonSave=furlington.savePath();
+    std::remove(furlingtonSave.c_str());std::remove((furlingtonSave+".bak").c_str());
+    const std::string furlingtonUser=furlingtonDir+std::string("/user");
+    ::rmdir(furlingtonUser.c_str());::rmdir(furlingtonDir);
+    char furlingtonSaveBlockTemplate[]="/tmp/top-furlington-save-block-XXXXXX";
+    const int furlingtonSaveBlockFd=::mkstemp(furlingtonSaveBlockTemplate);
+    if(furlingtonSaveBlockFd<0) {
+        std::fprintf(stderr,"Furlington: nao criou bloqueio de save\n");
+        return false;
+    }
+    ::close(furlingtonSaveBlockFd);
+    Play furlingtonSaveFailure;
+    furlingtonSaveFailure.root_=furlingtonSaveBlockTemplate;
+    furlingtonSaveFailure.profileId_=19007;
+    furlingtonSaveFailure.loadItems("Client/scripts/table/iteminfo.txt",{1784,1785});
+    furlingtonSaveFailure.bag_={Stack{1784,10}};
+    furlingtonSaveFailure.gold_=200;
+    const bool furlingtonSaveRollback=!furlingtonSaveFailure.processNpcRecipe({{1784,10}},200,{{1785,1}},
+        "Furlington - Clarion Fragment",false) && furlingtonSaveFailure.gold_==200 &&
+        furlingtonSaveFailure.bagCount(1784)==10 && furlingtonSaveFailure.bagCount(1785)==0;
+    ::unlink(furlingtonSaveBlockTemplate);
+    if(!furlingtonRejectsLowGold || !furlingtonExchange || !furlingtonSaved || !furlingtonSaveRollback) {
+        std::fprintf(stderr,"Furlington: materiais, ouro, espaço na bolsa ou save falhou\n");
+        return false;
+    }
+    char fairySaveBlockTemplate[]="/tmp/top-fairy-save-block-XXXXXX";
+    const int fairySaveBlockFd=::mkstemp(fairySaveBlockTemplate);
+    if(fairySaveBlockFd<0) {
+        std::fprintf(stderr,"fairy fruit: nao criou bloqueio de save\n");
+        return false;
+    }
+    ::close(fairySaveBlockFd);
+    Play fairySaveFailure;
+    fairySaveFailure.root_=fairySaveBlockTemplate;
+    fairySaveFailure.profileId_=19004;
+    fairySaveFailure.loadItems("Client/scripts/table/iteminfo.txt",{183,222});
+    fairySaveFailure.loadFairyFruits("Client/scripts/offline/script/calculate/variable.lua");
+    const bool fairyFruitRuleLoaded=fairySaveFailure.items_.at(222).scriptAction=="FairyFruit" &&
+        fairySaveFailure.items_.at(222).fairyFruitAttribute==0 &&
+        fairySaveFailure.items_.at(222).fairyFruitLevels==1;
+    Stack testFairy{183,1};
+    testFairy.fairyStats={{1,1,1,1,1}};
+    testFairy.maxEnergy=1200;
+    testFairy.energy=1200;
+    testFairy.maxDurability=20000;
+    testFairy.durability=20000;
+    fairySaveFailure.bag_={testFairy,Stack{222,1}};
+    fairySaveFailure.assignItemUids();
+    fairySaveFailure.worn_[16]=183;
+    fairySaveFailure.wornUid_[16]=fairySaveFailure.bag_[0].uid;
+    fairySaveFailure.seed_=13579;
+    const unsigned fairySeedBefore=fairySaveFailure.seed_;
+    fairySaveFailure.clickBag(1);
+    ::unlink(fairySaveBlockTemplate);
+    const bool fairySaveRollback=fairySaveFailure.bagCount(222)==1 &&
+        fairySaveFailure.bag_[0].fairyStats==testFairy.fairyStats &&
+        fairySaveFailure.bag_[0].energy==testFairy.energy &&
+        fairySaveFailure.bag_[0].maxEnergy==testFairy.maxEnergy &&
+        fairySaveFailure.seed_==fairySeedBefore;
+    if(!fairyFruitRuleLoaded || !fairySaveRollback) {
+        std::fprintf(stderr,"fairy fruit: falha de save consumiu fruta ou alterou crescimento\n");
+        return false;
+    }
+    char hairDirTemplate[]="/tmp/top-hair-style-XXXXXX";
+    char* hairDir=::mkdtemp(hairDirTemplate);
+    if(!hairDir) {
+        std::fprintf(stderr,"Cartel hair: nao criou pasta temporaria de save\n");
+        return false;
+    }
+    Play hairTest;
+    hairTest.root_=hairDir;
+    hairTest.profileId_=19002;
+    hairTest.loadItems("Client/scripts/table/iteminfo.txt",{});
+    hairTest.gold_=100000;
+    hairTest.bag_={Stack{1807,1},Stack{1808,1},Stack{1797,5},Stack{1806,1}};
+    const bool hairApplied=hairTest.applyHistoricalHairStyle(2009,{{1807,1},{1808,1},{1797,5},{1806,1}},100000) &&
+        hairTest.hairStyleItemId_==2009 && hairTest.gold_==0 && hairTest.bag_.empty();
+    Play hairReloaded;
+    hairReloaded.root_=hairDir;
+    hairReloaded.profileId_=19002;
+    hairReloaded.loadItems("Client/scripts/table/iteminfo.txt",{});
+    hairReloaded.load(hairTest.savePath());
+    const bool hairSaved=hairReloaded.hairStyleItemId_==2009 && hairReloaded.gold_==0 &&
+        hairReloaded.bagCount(1807)==0 && hairReloaded.bagCount(1808)==0 &&
+        hairReloaded.bagCount(1797)==0 && hairReloaded.bagCount(1806)==0;
+    const std::string hairSave=hairTest.savePath();
+    std::remove(hairSave.c_str());std::remove((hairSave+".bak").c_str());
+    const std::string hairUser=hairDir+std::string("/user");
+    ::rmdir(hairUser.c_str());::rmdir(hairDir);
+    if(!hairApplied || !hairSaved) {
+        std::fprintf(stderr,"Cartel hair: requisitos, cobranca ou persistencia do modelo falhou\n");
+        return false;
+    }
+    char apparelDirTemplate[]="/tmp/top-apparel-converter-XXXXXX";
+    char* apparelDir=::mkdtemp(apparelDirTemplate);
+    if(!apparelDir) {
+        std::fprintf(stderr,"apparel converter: nao criou pasta temporaria de save\n");
+        return false;
+    }
+    const std::string apparelRoot=apparelDir;
+    const std::string apparelUser=apparelRoot+"/user";
+    if(::mkdir(apparelUser.c_str(),0700)!=0) {
+        ::rmdir(apparelRoot.c_str());
+        std::fprintf(stderr,"apparel converter: nao criou pasta de usuario\n");
+        return false;
+    }
+    Play apparelTest;
+    apparelTest.root_=apparelRoot;
+    apparelTest.loadItems("Client/scripts/table/iteminfo.txt",{});
+    apparelTest.bag_={Stack{9602,1},Stack{1,1}}; // historical converter + Short Sword
+    apparelTest.assignItemUids();
+    apparelTest.clickBag(0);
+    apparelTest.clickBag(1);
+    const auto madeApparel=std::find_if(apparelTest.bag_.begin(),apparelTest.bag_.end(),
+        [](const Stack& stack){return stack.id==5291;});
+    if(apparelTest.bag_.size()!=1 || apparelTest.bagCount(9602)!=0 || apparelTest.bagCount(1)!=0 ||
+       madeApparel==apparelTest.bag_.end() || madeApparel->fuseId!=1 ||
+       madeApparel->maxDurability!=25000 || madeApparel->durability!=25000 ||
+       !apparelTest.save(apparelTest.savePath())) {
+        std::remove(apparelTest.savePath().c_str());
+        std::remove((apparelTest.savePath()+".bak").c_str());
+        ::rmdir(apparelUser.c_str());::rmdir(apparelRoot.c_str());
+        std::fprintf(stderr,"apparel converter: conversao historica ou FuseID nao foi persistido\n");
+        return false;
+    }
+    Play apparelReloaded;
+    apparelReloaded.loadItems("Client/scripts/table/iteminfo.txt",{});
+    apparelReloaded.load(apparelTest.savePath());
+    const auto savedApparel=std::find_if(apparelReloaded.bag_.begin(),apparelReloaded.bag_.end(),
+        [](const Stack& stack){return stack.id==5291;});
+    const bool apparelRoundTrip=savedApparel!=apparelReloaded.bag_.end() &&
+        savedApparel->fuseId==1 && apparelReloaded.ensureApparelInfo(savedApparel->id,savedApparel->fuseId) &&
+        apparelReloaded.items_.at(5291).maxDurability==25000 &&
+        apparelReloaded.items_.at(5291).equipSlots==apparelReloaded.items_.at(1).equipSlots;
+    Play apparelNoSpace;
+    apparelNoSpace.items_=apparelTest.items_;
+    apparelNoSpace.bagCapacity_=2;
+    apparelNoSpace.bag_={Stack{9602,2},Stack{1,2}};
+    apparelNoSpace.assignItemUids();
+    apparelNoSpace.clickBag(0);
+    apparelNoSpace.clickBag(1);
+    const bool apparelFailurePreserved=apparelNoSpace.bag_.size()==2 &&
+        apparelNoSpace.bagCount(9602)==2 && apparelNoSpace.bagCount(1)==2 &&
+        apparelNoSpace.bagCount(5291)==0;
+    std::remove(apparelTest.savePath().c_str());
+    std::remove((apparelTest.savePath()+".bak").c_str());
+    ::rmdir(apparelUser.c_str());::rmdir(apparelRoot.c_str());
+    if(!apparelRoundTrip || !apparelFailurePreserved) {
+        std::fprintf(stderr,"apparel converter: save/reload ou falha sem perda nao foi preservado\n");
+        return false;
+    }
+    char randomBoxDirTemplate[]="/tmp/top-05bc-random-box-XXXXXX";
+    char* randomBoxDir=::mkdtemp(randomBoxDirTemplate);
+    if(!randomBoxDir) {
+        std::fprintf(stderr,"05-BC: nao criou pasta temporaria de save\n");
+        return false;
+    }
+    const std::string randomBoxRoot=randomBoxDir;
+    const std::string randomBoxUser=randomBoxRoot+"/user";
+    if(::mkdir(randomBoxUser.c_str(),0700)!=0) {
+        ::rmdir(randomBoxRoot.c_str());
+        std::fprintf(stderr,"05-BC: nao criou pasta de save temporaria\n");
+        return false;
+    }
+    Play randomBox;
+    randomBox.root_=randomBoxRoot;
+    randomBox.profileId_=9056;
+    randomBox.loadItems("Client/scripts/table/iteminfo.txt",{});
+    const bool randomRulesLoaded=randomBox.itemRandomRewards_.load(
+        "Client/scripts/offline/script/calculate/ItemEffect.lua",
+        "Client/scripts/offline/calculate/variable.lua") &&
+        randomBox.itemRandomRewards_.supports(88) &&
+        randomBox.itemRandomRewards_.supports(3302);
+    randomBox.bagCapacity_=2;
+    randomBox.bag_.push_back(Stack{3905,1});
+    randomBox.seed_=6752; // roll(10564)==0: historical first reward is item 3909.
+    randomBox.clickBag(0);
+    const std::string randomBoxSave=randomBox.savePath();
+    Play randomBoxReloaded;
+    randomBoxReloaded.load(randomBoxSave);
+    const bool randomBoxSaved=randomBoxReloaded.bag_.size()==1 && randomBoxReloaded.bag_[0].id==3909 &&
+        randomBoxReloaded.bag_[0].quality==5;
+    Play blackMarketBox;
+    blackMarketBox.root_=randomBoxRoot;
+    blackMarketBox.profileId_=9061;
+    blackMarketBox.loadItems("Client/scripts/table/iteminfo.txt",{});
+    blackMarketBox.itemRandomRewards_.load("Client/scripts/offline/script/calculate/ItemEffect.lua",
+                                           "Client/scripts/offline/calculate/variable.lua");
+    blackMarketBox.bagCapacity_=2;
+    blackMarketBox.bag_={Stack{88,1}};
+    blackMarketBox.seed_=0;
+    blackMarketBox.clickBag(0);
+    const bool blackMarketReward=blackMarketBox.bag_.size()==1 &&
+        blackMarketBox.bag_[0].id==1902 && blackMarketBox.bag_[0].quality==24;
+    Play blackMarketNoSpace;
+    blackMarketNoSpace.loadItems("Client/scripts/table/iteminfo.txt",{});
+    blackMarketNoSpace.itemRandomRewards_.load("Client/scripts/offline/script/calculate/ItemEffect.lua",
+                                                "Client/scripts/offline/calculate/variable.lua");
+    blackMarketNoSpace.bagCapacity_=1;
+    blackMarketNoSpace.bag_={Stack{88,1}};
+    blackMarketNoSpace.clickBag(0);
+    const bool blackMarketPreserved=blackMarketNoSpace.bag_.size()==1 &&
+        blackMarketNoSpace.bag_[0].id==88;
+    if(!randomRulesLoaded || !blackMarketReward || !blackMarketPreserved) {
+        std::fprintf(stderr,"PORT-BLACKMARKET: tabela, recompensa ou preservacao falhou\n");
+        return false;
+    }
+    Play corsairsEquipmentChest;
+    corsairsEquipmentChest.loadItems("Client/scripts/table/iteminfo.txt",{});
+    const bool corsairsChestRulesLoaded=corsairsEquipmentChest.historicalChestRules_.load(
+        "Client/scripts/offline/script/calculate/ItemEffect.lua") &&
+        corsairsEquipmentChest.historicalChestRules_.mappedItems()==53 &&
+        corsairsEquipmentChest.historicalChestRules_.supports(617,"Corsairs_EquipmentChest") &&
+        corsairsEquipmentChest.historicalChestRules_.supports(322,"Corsairs_WeaponChest") &&
+        corsairsEquipmentChest.historicalChestRules_.supports(6350,"Corsairs_WeaponChest2");
+    corsairsEquipmentChest.bagCapacity_=4;
+    corsairsEquipmentChest.bag_={Stack{617,1}};
+    corsairsEquipmentChest.clickBag(0);
+    std::unordered_set<int> corsairsEquipmentIds;
+    for(const Stack& value:corsairsEquipmentChest.bag_)
+        if(value.quality==22)corsairsEquipmentIds.insert(value.id);
+    const bool corsairsEquipmentReward=corsairsEquipmentIds==std::unordered_set<int>{299,475,651};
+    Play corsairsWeaponChest;
+    corsairsWeaponChest.loadItems("Client/scripts/table/iteminfo.txt",{});
+    corsairsWeaponChest.historicalChestRules_.load("Client/scripts/offline/script/calculate/ItemEffect.lua");
+    corsairsWeaponChest.bagCapacity_=3;
+    corsairsWeaponChest.bag_={Stack{6350,1}};
+    corsairsWeaponChest.seed_=0;
+    corsairsWeaponChest.clickBag(0);
+    const bool corsairsWeaponChoice=corsairsWeaponChest.bag_.size()==1 &&
+        corsairsWeaponChest.bag_[0].id==4 && corsairsWeaponChest.bag_[0].quality==22;
+    Play corsairsWeaponNoSpace;
+    corsairsWeaponNoSpace.loadItems("Client/scripts/table/iteminfo.txt",{});
+    corsairsWeaponNoSpace.historicalChestRules_.load("Client/scripts/offline/script/calculate/ItemEffect.lua");
+    corsairsWeaponNoSpace.bagCapacity_=2;
+    corsairsWeaponNoSpace.bag_={Stack{322,1}};
+    corsairsWeaponNoSpace.clickBag(0);
+    const bool corsairsWeaponPreserved=corsairsWeaponNoSpace.bag_.size()==1 &&
+        corsairsWeaponNoSpace.bag_[0].id==322;
+    Play corsairsWeaponAtSea;
+    corsairsWeaponAtSea.loadItems("Client/scripts/table/iteminfo.txt",{});
+    corsairsWeaponAtSea.historicalChestRules_.load("Client/scripts/offline/script/calculate/ItemEffect.lua");
+    corsairsWeaponAtSea.bag_={Stack{617,1}};
+    corsairsWeaponAtSea.usingTicketBoat_=true;
+    corsairsWeaponAtSea.clickBag(0);
+    const bool corsairsAtSeaPreserved=corsairsWeaponAtSea.bag_.size()==1 &&
+        corsairsWeaponAtSea.bag_[0].id==617;
+    if(!corsairsChestRulesLoaded || !corsairsEquipmentReward || !corsairsWeaponChoice ||
+       !corsairsWeaponPreserved || !corsairsAtSeaPreserved) {
+        std::fprintf(stderr,"PORT-CORSAIRS-CHESTS: tabela, conteudo ou protecao falhou\n");
+        return false;
+    }
+    Play birthdayCake;
+    birthdayCake.root_=randomBoxRoot;
+    birthdayCake.profileId_=9070;
+    birthdayCake.loadItems("Client/scripts/table/iteminfo.txt",{3240,3338});
+    birthdayCake.ap_=10;
+    birthdayCake.bag_={Stack{3240,1}};
+    birthdayCake.clickBag(0);
+    Play birthdayCakeReloaded;
+    birthdayCakeReloaded.loadItems("Client/scripts/table/iteminfo.txt",{3240,3338});
+    birthdayCakeReloaded.load(birthdayCake.savePath());
+    const bool birthdayCakeSaved=birthdayCakeReloaded.ap_==13 &&
+        birthdayCakeReloaded.bagCount(3240)==0;
+    Play birthdayCakeBoat;
+    birthdayCakeBoat.loadItems("Client/scripts/table/iteminfo.txt",{3240,3338});
+    birthdayCakeBoat.ap_=10;
+    birthdayCakeBoat.bag_={Stack{3338,1}};
+    birthdayCakeBoat.usingTicketBoat_=true;
+    birthdayCakeBoat.clickBag(0);
+    const bool birthdayCakeBoatPreserved=birthdayCakeBoat.ap_==10 &&
+        birthdayCakeBoat.bagCount(3338)==1;
+    Play birthdayCakeCap;
+    birthdayCakeCap.loadItems("Client/scripts/table/iteminfo.txt",{3240,3338});
+    birthdayCakeCap.ap_=1000000000;
+    birthdayCakeCap.bag_={Stack{3338,1}};
+    birthdayCakeCap.clickBag(0);
+    const bool birthdayCakeCapPreserved=birthdayCakeCap.ap_==1000000000 &&
+        birthdayCakeCap.bagCount(3338)==1;
+    if(!birthdayCakeSaved || !birthdayCakeBoatPreserved || !birthdayCakeCapPreserved) {
+        std::fprintf(stderr,"PORT-BIRTH-CAKE: incremento, save ou recusas falharam\n");return false;
+    }
+    Play goldNote;
+    goldNote.root_=randomBoxRoot;
+    goldNote.profileId_=9071;
+    goldNote.loadItems("Client/scripts/table/iteminfo.txt",{854});
+    goldNote.gold_=123;
+    goldNote.bag_={Stack{854,1}};
+    goldNote.clickBag(0);
+    Play goldNoteReloaded;
+    goldNoteReloaded.loadItems("Client/scripts/table/iteminfo.txt",{854});
+    goldNoteReloaded.load(goldNote.savePath());
+    Play goldNoteCap;
+    goldNoteCap.loadItems("Client/scripts/table/iteminfo.txt",{854});
+    goldNoteCap.gold_=999900000;
+    goldNoteCap.bag_={Stack{854,1}};
+    goldNoteCap.clickBag(0);
+    if(goldNoteReloaded.gold_!=1000123 || goldNoteReloaded.bagCount(854)!=0 ||
+       goldNoteCap.gold_!=999900000 || goldNoteCap.bagCount(854)!=1) {
+        std::fprintf(stderr,"PORT-GOLD-NOTE: ouro, save ou recusa no limite falharam\n");return false;
+    }
+    Play islandTeleporterFare;
+    islandTeleporterFare.root_=randomBoxRoot;
+    islandTeleporterFare.profileId_=9073;
+    islandTeleporterFare.player_.level=40;
+    const bool freeIslandTravel=islandTeleporterFare.historicalNpcTeleportFareReady() &&
+        islandTeleporterFare.payHistoricalNpcTeleportFare() && islandTeleporterFare.gold_==0;
+    islandTeleporterFare.player_.level=41;
+    islandTeleporterFare.gold_=499;
+    const bool rejectedIslandFare=!islandTeleporterFare.historicalNpcTeleportFareReady() &&
+        !islandTeleporterFare.payHistoricalNpcTeleportFare() && islandTeleporterFare.gold_==499;
+    islandTeleporterFare.gold_=500;
+    const bool chargedIslandFare=islandTeleporterFare.historicalNpcTeleportFareReady() &&
+        islandTeleporterFare.payHistoricalNpcTeleportFare() && islandTeleporterFare.gold_==0;
+    Play islandTeleporterReloaded;
+    islandTeleporterReloaded.load(islandTeleporterFare.savePath());
+    const bool savedIslandFare=islandTeleporterReloaded.gold_==0;
+    std::remove(islandTeleporterFare.savePath().c_str());
+    std::remove((islandTeleporterFare.savePath()+".bak").c_str());
+    if(!freeIslandTravel || !rejectedIslandFare || !chargedIslandFare || !savedIslandFare) {
+        std::fprintf(stderr,"PORT-GARNER-TELEPORT: limite de nivel, tarifa ou save falhou\n");return false;
+    }
+    Play happyBook;
+    happyBook.root_=randomBoxRoot;
+    happyBook.profileId_=9072;
+    happyBook.loadItems("Client/scripts/table/iteminfo.txt",{853,2989});
+    happyBook.experience_.load("Client/scripts/offline/calculate/variable.lua");
+    happyBook.player_.level=1;
+    happyBook.expNext_=happyBook.experience_.needed(1);
+    happyBook.bag_={Stack{853,1}};
+    happyBook.clickBag(0);
+    Play happyBookReloaded;
+    happyBookReloaded.loadItems("Client/scripts/table/iteminfo.txt",{853,2989});
+    happyBookReloaded.experience_.load("Client/scripts/offline/calculate/variable.lua");
+    happyBookReloaded.load(happyBook.savePath());
+    Play happyBookBoat;
+    happyBookBoat.loadItems("Client/scripts/table/iteminfo.txt",{853,2989});
+    happyBookBoat.experience_.load("Client/scripts/offline/calculate/variable.lua");
+    happyBookBoat.player_.level=30;
+    happyBookBoat.expNext_=happyBookBoat.experience_.needed(30);
+    happyBookBoat.bag_={Stack{2989,1}};
+    happyBookBoat.usingTicketBoat_=true;
+    happyBookBoat.clickBag(0);
+    Play happyBookTooHigh;
+    happyBookTooHigh.loadItems("Client/scripts/table/iteminfo.txt",{853,2989});
+    happyBookTooHigh.experience_.load("Client/scripts/offline/calculate/variable.lua");
+    happyBookTooHigh.player_.level=86;
+    happyBookTooHigh.expNext_=happyBookTooHigh.experience_.needed(86);
+    happyBookTooHigh.bag_={Stack{2989,1}};
+    happyBookTooHigh.clickBag(0);
+    if(happyBookReloaded.player_.level!=6 || happyBookReloaded.exp_!=0 ||
+       happyBookReloaded.bagCount(853)!=0 || happyBookBoat.player_.level!=30 ||
+       happyBookBoat.bagCount(2989)!=1 || happyBookTooHigh.player_.level!=86 ||
+       happyBookTooHigh.bagCount(2989)!=1) {
+        std::fprintf(stderr,"PORT-HAPPY-BOOK: EXP, save ou recusas falharam\n");return false;
+    }
+    Play aprilFruitExp;
+    aprilFruitExp.root_=randomBoxRoot;
+    aprilFruitExp.profileId_=9074;
+    aprilFruitExp.loadItems("Client/scripts/table/iteminfo.txt",{2953,992});
+    aprilFruitExp.experience_.load("Client/scripts/offline/calculate/variable.lua");
+    aprilFruitExp.player_.level=30;
+    aprilFruitExp.expNext_=aprilFruitExp.experience_.needed(30);
+    const int aprilIncrement=static_cast<int>(std::floor(aprilFruitExp.expNext_*.03));
+    aprilFruitExp.exp_=0;
+    aprilFruitExp.bag_={Stack{2953,1}};
+    aprilFruitExp.clickBag(0);
+    Play aprilFruitReloaded;
+    aprilFruitReloaded.loadItems("Client/scripts/table/iteminfo.txt",{2953,992});
+    aprilFruitReloaded.experience_.load("Client/scripts/offline/calculate/variable.lua");
+    aprilFruitReloaded.load(aprilFruitExp.savePath());
+    const bool aprilFruitLevelSaved=aprilFruitReloaded.player_.level==30 &&
+        aprilFruitReloaded.exp_==aprilIncrement &&
+        aprilFruitReloaded.bagCount(2953)==0;
+    Play fastFoodExp;
+    fastFoodExp.root_=randomBoxRoot;
+    fastFoodExp.profileId_=9076;
+    fastFoodExp.loadItems("Client/scripts/table/iteminfo.txt",{992});
+    fastFoodExp.experience_.load("Client/scripts/offline/calculate/variable.lua");
+    fastFoodExp.player_.level=86;
+    fastFoodExp.expNext_=fastFoodExp.experience_.needed(86);
+    const int fastFoodIncrement=static_cast<int>(std::floor(fastFoodExp.expNext_*.01));
+    fastFoodExp.exp_=fastFoodExp.expNext_-fastFoodIncrement+1;
+    fastFoodExp.bag_={Stack{992,1}};
+    fastFoodExp.clickBag(0);
+    Play fastFoodReloaded;
+    fastFoodReloaded.loadItems("Client/scripts/table/iteminfo.txt",{992});
+    fastFoodReloaded.experience_.load("Client/scripts/offline/calculate/variable.lua");
+    fastFoodReloaded.load(fastFoodExp.savePath());
+    const bool fastFoodLevelUp=fastFoodExp.player_.level==87 && fastFoodExp.exp_==1 &&
+        fastFoodExp.bagCount(992)==0 && fastFoodReloaded.player_.level==87 &&
+        fastFoodReloaded.exp_==1 && fastFoodReloaded.bagCount(992)==0;
+    Play fastFoodLowLevel;
+    fastFoodLowLevel.loadItems("Client/scripts/table/iteminfo.txt",{992});
+    fastFoodLowLevel.experience_.load("Client/scripts/offline/calculate/variable.lua");
+    fastFoodLowLevel.player_.level=85;
+    fastFoodLowLevel.expNext_=fastFoodLowLevel.experience_.needed(85);
+    fastFoodLowLevel.bag_={Stack{992,1}};
+    fastFoodLowLevel.clickBag(0);
+    Play fastFoodAtSea;
+    fastFoodAtSea.loadItems("Client/scripts/table/iteminfo.txt",{992});
+    fastFoodAtSea.experience_.load("Client/scripts/offline/calculate/variable.lua");
+    fastFoodAtSea.player_.level=86;
+    fastFoodAtSea.expNext_=fastFoodAtSea.experience_.needed(86);
+    fastFoodAtSea.bag_={Stack{992,1}};
+    fastFoodAtSea.usingTicketBoat_=true;
+    fastFoodAtSea.clickBag(0);
+    const bool fastFoodGates=fastFoodLowLevel.player_.level==85 && fastFoodLowLevel.bagCount(992)==1 &&
+        fastFoodAtSea.player_.level==86 && fastFoodAtSea.bagCount(992)==1;
+    char expSaveBlockTemplate[]="/tmp/top-april-exp-save-block-XXXXXX";
+    const int expSaveBlockFd=::mkstemp(expSaveBlockTemplate);
+    if(expSaveBlockFd<0) {
+        std::fprintf(stderr,"ItemUse_Foolish: nao criou bloqueio de save\n");return false;
+    }
+    ::close(expSaveBlockFd);
+    Play aprilFruitSaveFailure;
+    aprilFruitSaveFailure.root_=expSaveBlockTemplate;
+    aprilFruitSaveFailure.profileId_=9075;
+    aprilFruitSaveFailure.loadItems("Client/scripts/table/iteminfo.txt",{2953});
+    aprilFruitSaveFailure.experience_.load("Client/scripts/offline/calculate/variable.lua");
+    aprilFruitSaveFailure.player_.level=30;
+    aprilFruitSaveFailure.expNext_=aprilFruitSaveFailure.experience_.needed(30);
+    aprilFruitSaveFailure.exp_=0;
+    aprilFruitSaveFailure.bag_={Stack{2953,1}};
+    const int oldAprilLevel=aprilFruitSaveFailure.player_.level;
+    const int oldAprilExp=aprilFruitSaveFailure.exp_;
+    aprilFruitSaveFailure.clickBag(0);
+    ::unlink(expSaveBlockTemplate);
+    const bool aprilFruitSaveRollback=aprilFruitSaveFailure.player_.level==oldAprilLevel &&
+        aprilFruitSaveFailure.exp_==oldAprilExp && aprilFruitSaveFailure.bagCount(2953)==1;
+    const std::string aprilFruitSave=aprilFruitExp.savePath();
+    std::remove(aprilFruitSave.c_str());std::remove((aprilFruitSave+".bak").c_str());
+    const std::string fastFoodSave=fastFoodExp.savePath();
+    std::remove(fastFoodSave.c_str());std::remove((fastFoodSave+".bak").c_str());
+    if(!aprilFruitLevelSaved || !fastFoodLevelUp || !fastFoodGates || !aprilFruitSaveRollback) {
+        std::fprintf(stderr,"ItemUse_Foolish/CZKC: formula, level up, save/reload ou rollback falhou (%d,%d,%d); result levels %d/%d exp %d/%d\n",
+            aprilFruitLevelSaved?1:0,fastFoodLevelUp?1:0,aprilFruitSaveRollback?1:0,
+            aprilFruitReloaded.player_.level,fastFoodExp.player_.level,
+            aprilFruitReloaded.exp_,fastFoodExp.exp_);
+        return false;
+    }
+    Play amplifiers;
+    amplifiers.loadItems("Client/scripts/table/iteminfo.txt",{1,48,56,578,898,993,998,1006,1128,3039,
+        3094,3095,3096,3097,3844,3845,3880,3881,3882});
+    bool amplifierRulesValidated=true;
+    for(const item_amplifier::Rule& rule:item_amplifier::rules) {
+        Play probe;
+        probe.loadItems("Client/scripts/table/iteminfo.txt",{rule.itemId});
+        probe.player_.level=rule.minimumLevel>0?rule.minimumLevel:30;
+        probe.bag_={Stack{rule.itemId,1}};
+        probe.clickBag(0);
+        if(rule.effect==item_amplifier::Effect::FairyGrowth) {
+            amplifierRulesValidated=amplifierRulesValidated && probe.bagCount(rule.itemId)==0 &&
+                probe.fairyGrowthBoost_.multiplierPercent==rule.multiplierPercent &&
+                probe.fairyGrowthBoost_.remaining==static_cast<float>(rule.durationSeconds);
+        } else {
+            const Play::ItemBoostState& state=rule.effect==item_amplifier::Effect::Experience?
+                probe.experienceBoost_:probe.dropRateBoost_;
+            amplifierRulesValidated=amplifierRulesValidated && probe.bagCount(rule.itemId)==0 &&
+                state.multiplierPercent==rule.multiplierPercent &&
+                state.remaining==static_cast<float>(rule.durationSeconds);
+        }
+    }
+    amplifiers.player_.level=30;
+    amplifiers.expNext_=10000;
+    amplifiers.bag_={Stack{898,1}};
+    amplifiers.clickBag(0);
+    Foe amplifierFoe;
+    amplifierFoe.id=99999;
+    amplifierFoe.name="Amplifier verification target";
+    amplifierFoe.level=10;
+    amplifierFoe.expReward=100;
+    amplifiers.onKill(amplifierFoe);
+    amplifiers.bag_={Stack{1006,1}};
+    amplifiers.clickBag(0);
+    Foe boostedLootFoe;
+    boostedLootFoe.id=99998;
+    boostedLootFoe.level=10;
+    boostedLootFoe.drops.push_back({1,9000});
+    amplifiers.dropLoot(boostedLootFoe);
+    amplifiers.bag_={Stack{998,1}};
+    amplifiers.player_.level=30;
+    amplifiers.clickBag(0);
+    const bool rejectedAmplifierPreserved=amplifiers.bagCount(998)==1;
+    amplifiers.bag_={Stack{578,1}};
+    amplifiers.clickBag(0);
+    const bool fairyGrowthAmplifierConsumed=amplifiers.bagCount(578)==0 &&
+        amplifiers.fairyGrowthBoost_.multiplierPercent==200 && amplifiers.fairyGrowthBoost_.remaining==900.f;
+    amplifiers.experienceBoost_.remaining=0.05f;
+    amplifiers.step(0.05f,nullptr,0.f,0.f);
+    if(amplifiers.exp_!=200 || amplifiers.experienceBoost_.multiplierPercent!=100 ||
+       amplifiers.bagCount(898)!=0 || amplifiers.dropRateBoost_.multiplierPercent!=200 ||
+       amplifiers.bagCount(1006)!=0 || amplifiers.loots_.size()!=1 || !amplifierRulesValidated || !rejectedAmplifierPreserved ||
+       !fairyGrowthAmplifierConsumed || amplifiers.dropRateBoost_.remaining<=0.f) {
+        std::fprintf(stderr,"PORT-AMPLIFIER: EXP/drop, validade ou recusas falharam\n");return false;
+    }
+    Play gemVoucher;
+    gemVoucher.root_=randomBoxRoot;
+    gemVoucher.profileId_=9060;
+    gemVoucher.loadItems("Client/scripts/table/iteminfo.txt",{});
+    const bool gemVoucherRulesLoaded=gemVoucher.itemGemVoucherRules_.load(
+        "Client/scripts/offline/script/calculate/ItemEffect.lua");
+    gemVoucher.bagCapacity_=2;
+    gemVoucher.bag_={Stack{9612,1}};
+    gemVoucher.usingTicketBoat_=true;
+    gemVoucher.clickBag(0);
+    const bool gemVoucherBoatPreserved=gemVoucher.bag_.size()==1 && gemVoucher.bag_[0].id==9612;
+    gemVoucher.usingTicketBoat_=false;
+    gemVoucher.seed_=1;
+    gemVoucher.clickBag(0);
+    const std::string gemVoucherSave=gemVoucher.savePath();
+    Play gemVoucherReloaded;
+    gemVoucherReloaded.load(gemVoucherSave);
+    const int gemVoucherReward=gemVoucherReloaded.bag_.size()==1 ? gemVoucherReloaded.bag_[0].id : 0;
+    const bool gemVoucherCommitted=gemVoucherRulesLoaded && gemVoucherBoatPreserved &&
+        (gemVoucherReward==6832 || gemVoucherReward==6833 || gemVoucherReward==6834) &&
+        gemVoucherReloaded.bag_[0].quality==4 && gemVoucherReloaded.bagCount(9612)==0;
+    Play fullGemVoucher;
+    fullGemVoucher.loadItems("Client/scripts/table/iteminfo.txt",{});
+    fullGemVoucher.itemGemVoucherRules_.load("Client/scripts/offline/script/calculate/ItemEffect.lua");
+    fullGemVoucher.bagCapacity_=1;
+    fullGemVoucher.bag_={Stack{9612,1}};
+    fullGemVoucher.clickBag(0);
+    const bool fullGemVoucherPreserved=fullGemVoucher.bag_.size()==1 &&
+        fullGemVoucher.bag_[0].id==9612 && fullGemVoucher.bag_[0].count==1;
+    Play fullBagBox;
+    fullBagBox.loadItems("Client/scripts/table/iteminfo.txt",{});
+    fullBagBox.itemRandomRewards_.load("Client/scripts/offline/script/calculate/ItemEffect.lua",
+                                       "Client/scripts/offline/calculate/variable.lua");
+    fullBagBox.bagCapacity_=1;
+    fullBagBox.bag_.push_back(Stack{3905,1});
+    fullBagBox.clickBag(0);
+    const bool fullBagPreserved=fullBagBox.bag_.size()==1 &&
+        fullBagBox.bag_[0].id==3905 && fullBagBox.bag_[0].count==1;
+    Play blueprint;
+    blueprint.root_=randomBoxRoot;
+    blueprint.profileId_=9058;
+    blueprint.loadItems("Client/scripts/table/iteminfo.txt",{});
+    const bool productionRulesLoaded=blueprint.itemProductionRules_.load(
+        "Client/scripts/offline/script/calculate/variable.lua");
+    blueprint.bagCapacity_=2;
+    blueprint.bag_.push_back(Stack{1000,1});
+    blueprint.seed_=8291;
+    blueprint.clickBag(0);
+    const std::string blueprintSave=blueprint.savePath();
+    Play blueprintReloaded;
+    blueprintReloaded.load(blueprintSave);
+    const bool blueprintCreated=blueprint.bag_.size()==1 &&
+        (blueprint.bag_[0].id==2300 || blueprint.bag_[0].id==2301 || blueprint.bag_[0].id==2302) &&
+        blueprint.bag_[0].extra.str>0 && blueprint.bag_[0].extra.con>0 &&
+        blueprint.bag_[0].extra.dex>0 && blueprint.bag_[0].extra.agi>0 &&
+        blueprint.bag_[0].blueprintParts[0]>=3 && blueprint.bag_[0].blueprintParts[1]>=2 &&
+        blueprint.bag_[0].blueprintParts[2]>0 && blueprint.bag_[0].itemValStaTenths>=10;
+    const bool blueprintPersisted=blueprintCreated && blueprintReloaded.bag_.size()==1 &&
+        blueprintReloaded.bag_[0].id==blueprint.bag_[0].id &&
+        blueprintReloaded.bag_[0].extra.agi==blueprint.bag_[0].extra.agi &&
+        blueprintReloaded.bag_[0].extra.str==blueprint.bag_[0].extra.str &&
+        blueprintReloaded.bag_[0].itemValStaTenths==blueprint.bag_[0].itemValStaTenths &&
+        blueprintReloaded.bag_[0].blueprintParts==blueprint.bag_[0].blueprintParts;
+    Play production;
+    production.root_=randomBoxRoot;
+    production.profileId_=9059;
+    production.bagCapacity_=24;
+    auto productionItem=[&](int id,int type,int maxStack=1,const char* name="") {
+        ItemInfo info;info.id=id;info.type=type;info.maxStack=maxStack;info.name=name;
+        production.items_[id]=std::move(info);
+    };
+    productionItem(7000,59,1,"Fairy");
+    productionItem(2300,69,1,"Manufacturing Blueprint");
+    productionItem(1068,0,1,"Manufacturing Tool");
+    productionItem(855,0,99,"Fairy Coin");
+    productionItem(501,0,99,"Material A");
+    productionItem(502,0,99,"Material B");
+    productionItem(503,0,99,"Material C");
+    productionItem(9000,1,99,"Production Test Item");
+    production.lifeSkills_[338]=10;
+    Stack productionFairy{7000,1};productionFairy.uid=10001;
+    productionFairy.durability=100;productionFairy.maxDurability=100;
+    productionFairy.fairySkills={13,1,0,0,0,0};
+    Stack productionPaper{2300,1};productionPaper.uid=10002;productionPaper.maxDurability=1;
+    productionPaper.durability=1;productionPaper.maxEnergy=100;productionPaper.itemValStaTenths=20;
+    productionPaper.extra.str=501;productionPaper.extra.con=502;productionPaper.extra.dex=503;
+    productionPaper.extra.agi=9000;productionPaper.blueprintParts={1,1,1};
+    Stack productionTool{1068,1};productionTool.uid=10003;
+    productionTool.extra.str=1;productionTool.durability=100;productionTool.maxDurability=100;
+    productionTool.maxEnergy=10000;
+    production.bag_={productionFairy,productionPaper,productionTool,Stack{855,1},
+                     Stack{501,1},Stack{502,1},Stack{503,1}};
+    production.seed_=1; // star check 9 follows the historical guaranteed-success branch.
+    const auto productionPreview=production.previewProduction(0,1,2);
+    const bool productionPreviewValid=productionPreview.valid && productionPreview.productId==9000 &&
+        productionPreview.fee==1 && productionPreview.materialIds==std::array<int,3>{501,502,503};
+    const bool productionSucceeded=productionPreviewValid && production.processProduction(0,1,2);
+    const std::string productionSave=production.savePath();
+    Play productionReloaded;
+    productionReloaded.items_=production.items_;
+    productionReloaded.load(productionSave);
+    bool productionPersisted=productionSucceeded && productionReloaded.bag_.size()==4;
+    if(productionPersisted) {
+        bool outputFound=false,usedBlueprintFound=false,fairyFound=false,usedToolFound=false;
+        for(const Stack& stack:productionReloaded.bag_) {
+            if(stack.id==9000 && stack.count==3) outputFound=true;
+            if(stack.id==2300 && stack.itemValStaTenths==10) usedBlueprintFound=true;
+            if(stack.id==7000 && stack.durability==100) fairyFound=true;
+            if(stack.id==1068 && stack.durability==50 && stack.energy==1) usedToolFound=true;
+        }
+        productionPersisted=outputFound&&usedBlueprintFound&&fairyFound&&usedToolFound &&
+            productionReloaded.bagCount(855)==0 && productionReloaded.bagCount(501)==0 &&
+            productionReloaded.bagCount(502)==0 && productionReloaded.bagCount(503)==0;
+    }
+    Play productionRejected;
+    productionRejected.items_=production.items_;
+    productionRejected.bagCapacity_=24;
+    productionRejected.bag_={productionFairy,productionPaper,productionTool,Stack{855,1},
+                             Stack{501,1},Stack{502,1}};
+    const bool productionFailurePreserved=!productionRejected.previewProduction(0,1,2).valid &&
+        productionRejected.bagCount(855)==1 && productionRejected.bagCount(501)==1 &&
+        productionRejected.bagCount(502)==1 && productionRejected.bagCount(503)==0 &&
+        !productionRejected.processProduction(0,1,2) && productionRejected.bag_.size()==6 &&
+        productionRejected.bagCount(855)==1 && productionRejected.bagCount(501)==1 &&
+        productionRejected.bagCount(502)==1;
+    std::remove(productionSave.c_str());
+    std::remove((productionSave+".bak").c_str());
+    Play statBook;
+    statBook.root_=randomBoxRoot;
+    statBook.profileId_=9057;
+    statBook.loadItems("Client/scripts/table/iteminfo.txt",{899});
+    const bool statRulesLoaded=statBook.itemStatRules_.load("Client/scripts/offline/calculate/variable.lua");
+    statBook.sheetReady_=true;
+    statBook.bstr_=10;
+    statBook.ap_=0;
+    statBook.player_.level=1;
+    statBook.player_.maxHp=100;
+    statBook.player_.hp=100;
+    statBook.player_.homeX=100.f;
+    statBook.player_.homeY=100.f;
+    statBook.bagCapacity_=2;
+    statBook.bag_.push_back(Stack{899,1});
+    statBook.clickBag(0);
+    const std::string statBookSave=statBook.savePath();
+    Play statBookReloaded;
+    statBookReloaded.load(statBookSave);
+    const bool statBookSaved=statBook.bstr_==9 && statBook.ap_==1 && statBook.bag_.empty() &&
+        statBookReloaded.bstr_==9 && statBookReloaded.ap_==1 && statBookReloaded.bag_.empty();
+    Play statBookBoundary;
+    statBookBoundary.loadItems("Client/scripts/table/iteminfo.txt",{899});
+    statBookBoundary.itemStatRules_.load("Client/scripts/offline/calculate/variable.lua");
+    statBookBoundary.bstr_=5;
+    statBookBoundary.bagCapacity_=2;
+    statBookBoundary.bag_.push_back(Stack{899,1});
+    statBookBoundary.clickBag(0);
+    const bool statBoundaryPreserved=statBookBoundary.bstr_==5 && statBookBoundary.ap_==0 &&
+        statBookBoundary.bag_.size()==1 && statBookBoundary.bag_[0].id==899;
+    Play statBookBoat;
+    statBookBoat.loadItems("Client/scripts/table/iteminfo.txt",{899});
+    statBookBoat.itemStatRules_.load("Client/scripts/offline/calculate/variable.lua");
+    statBookBoat.bstr_=10;
+    statBookBoat.bagCapacity_=2;
+    statBookBoat.bag_.push_back(Stack{899,1});
+    statBookBoat.setTicketBoatMode(true);
+    statBookBoat.clickBag(0);
+    const bool statBoatPreserved=statBookBoat.bstr_==10 && statBookBoat.ap_==0 &&
+        statBookBoat.bag_.size()==1 && statBookBoat.bag_[0].id==899;
+    std::remove(statBookSave.c_str());
+    std::remove((statBookSave+".bak").c_str());
+    std::remove(randomBoxSave.c_str());
+    std::remove((randomBoxSave+".bak").c_str());
+    std::remove(gemVoucherSave.c_str());
+    std::remove((gemVoucherSave+".bak").c_str());
+    std::remove(blueprintSave.c_str());
+    std::remove((blueprintSave+".bak").c_str());
+    ::rmdir(randomBoxUser.c_str());
+    ::rmdir(randomBoxRoot.c_str());
+    if(!randomRulesLoaded || randomBox.bag_.size()!=1 || randomBox.bag_[0].id!=3909 ||
+       !randomBoxSaved || !fullBagPreserved || !gemVoucherRulesLoaded || !gemVoucherCommitted ||
+       !gemVoucherBoatPreserved || !fullGemVoucherPreserved || !productionRulesLoaded || !blueprintCreated ||
+       !blueprintPersisted || !productionPreviewValid || !productionSucceeded ||
+       !productionPersisted || !productionFailurePreserved || !statRulesLoaded || !statBookSaved ||
+       !statBoundaryPreserved || !statBoatPreserved) {
+        std::fprintf(stderr,"05-BC/BE/BF/BD: random=%d saved=%d full=%d voucherRules=%d voucher=%d voucherBoat=%d voucherFull=%d rules=%d blueprint=%d persisted=%d prodPreview=%d prod=%d prodSave=%d prodReject=%d stats=%d statSave=%d boundary=%d boat=%d\n",
+            randomRulesLoaded&&randomBox.bag_.size()==1&&randomBox.bag_[0].id==3909,
+            randomBoxSaved,fullBagPreserved,gemVoucherRulesLoaded,gemVoucherCommitted,
+            gemVoucherBoatPreserved,fullGemVoucherPreserved,productionRulesLoaded,blueprintCreated,
+            blueprintPersisted,productionPreviewValid,productionSucceeded,productionPersisted,
+            productionFailurePreserved,statRulesLoaded,statBookSaved,statBoundaryPreserved,
+            statBoatPreserved);
+        return false;
+    }
     const auto healData = skillData.skillRules_.find(97);
     const auto willOfSteelData = skillData.skillRules_.find(63);
     const auto berserkData = skillData.skillRules_.find(84);
@@ -263,7 +1138,10 @@ public:
         std::fprintf(stderr, "skillinfo: Play Action nao foi lida como 7,8,9\n");
         return false;
     }
-    if (skillData.skillRules_.size() < 400 || skillData.skillBooks_[3206] != 97 || poisonDartData == skillData.skillRules_.end() ||
+    if (skillData.skillRules_.size() < 400 || skillData.skillBooks_[3206] != 97 ||
+        skillData.lifeSkillBooks_.size() != 46 || skillData.lifeSkillBooks_[2679].skillId != 338 ||
+        skillData.lifeSkillBooks_[2679].rewardItem != 1068 || skillData.lifeSkillBooks_[3226].skillId != 200 ||
+        poisonDartData == skillData.skillRules_.end() ||
         enfeebleData == skillData.skillRules_.end() ||
         enfeebleData->second.effectFormula != "Skill_Sj_End" ||
         enfeebleData->second.damageFormula != SkillRule::DamageFormula::Enfeeble ||
@@ -288,6 +1166,12 @@ public:
         fairyBodyData->second.spFormulaMissing || phantomSlashData == skillData.skillRules_.end() ||
         !phantomSlashData->second.spFormulaMissing) {
         std::fprintf(stderr, "skill: formula SP alternativa ou ausencia historica nao foi classificada\n");
+        return false;
+    }
+    if(crippleData==skillData.skillRules_.end() ||
+       crippleData->second.actionKeyFrame!=0 ||
+       crippleData->second.itemEffectKeyFrames!=std::vector<int>({-1,0})) {
+        std::fprintf(stderr,"skill 94: canal Item/-1 nao foi lido separadamente do callback Action/0\n");
         return false;
     }
     if (illusionSlashData == skillData.skillRules_.end() ||
@@ -387,7 +1271,7 @@ public:
     delayedIllusion.resolve(.03f, 0.f, 0.f, nullptr);
     const auto illusionEvents = delayedIllusion.takeEffects();
     const bool castAtAttack = std::any_of(illusionEvents.begin(), illusionEvents.end(), [](const EffectEvent& event) {
-        return event.kind == EffectEvent::Cast && event.variant == 81;
+        return event.kind == EffectEvent::CastAction && event.variant == 81;
     });
     const bool flightAtAttack = std::any_of(illusionEvents.begin(), illusionEvents.end(), [](const EffectEvent& event) {
         return event.kind == EffectEvent::Flight && event.variant == 81 &&
@@ -479,11 +1363,199 @@ public:
     firstFrameSkill.castSkill(0);
     firstFrameSkill.pickFoe(0);
     firstFrameSkill.resolve(0.f, 0.f, 0.f);
+    // Keep this before the unrelated legacy keyframe assertion below so the
+    // ration regression executes even while that existing check is failing.
+    Play fairyRation;
+    fairyRation.loadItems("Client/scripts/table/iteminfo.txt",{227,231});
+    fairyRation.loadFairyRations("Client/scripts/offline/script/calculate/variable.lua");
+    if(!fairyRation.addBag(231,1) || !fairyRation.addBag(227,1))return false;
+    const int fairyUid=fairyRation.bag_[0].uid;
+    fairyRation.bag_[0].durability=100;fairyRation.bag_[0].maxDurability=5000;
+    fairyRation.worn_[16]=231;fairyRation.wornUid_[16]=fairyUid;
+    fairyRation.clickBag(1);
+    const bool fairyRationApplied=fairyRation.bag_[0].durability==2600 &&
+        fairyRation.bagCount(227)==0 && fairyRation.wornUid_[16]==fairyUid;
+    const char* fairyRationSave="/tmp/top-fairy-ration-save.txt";
+    fairyRation.save(fairyRationSave);
+    Play fairyRationReloaded;
+    fairyRationReloaded.loadItems("Client/scripts/table/iteminfo.txt",{227,231});
+    fairyRationReloaded.loadFairyRations("Client/scripts/offline/script/calculate/variable.lua");
+    fairyRationReloaded.load(fairyRationSave);
+    const bool fairyRationPersisted=fairyRationReloaded.bag_.size()==1 &&
+        fairyRationReloaded.bag_[0].id==231 && fairyRationReloaded.bag_[0].durability==2600 &&
+        fairyRationReloaded.wornUid_[16]==fairyUid;
+    std::remove(fairyRationSave);
+    Play fairyRationRejected;
+    fairyRationRejected.loadItems("Client/scripts/table/iteminfo.txt",{227});
+    fairyRationRejected.loadFairyRations("Client/scripts/offline/script/calculate/variable.lua");
+    if(!fairyRationRejected.addBag(227,1))return false;
+    fairyRationRejected.clickBag(0);
+    const bool fairyRationNeedsPet=fairyRationRejected.bagCount(227)==1;
+    Play fairyRationFull;
+    fairyRationFull.loadItems("Client/scripts/table/iteminfo.txt",{227,231});
+    fairyRationFull.loadFairyRations("Client/scripts/offline/script/calculate/variable.lua");
+    if(!fairyRationFull.addBag(231,1) || !fairyRationFull.addBag(227,1))return false;
+    const int fullFairyUid=fairyRationFull.bag_[0].uid;
+    fairyRationFull.bag_[0].durability=5000;fairyRationFull.bag_[0].maxDurability=5000;
+    fairyRationFull.worn_[16]=231;fairyRationFull.wornUid_[16]=fullFairyUid;
+    fairyRationFull.clickBag(1);
+    const bool fairyRationFullPreserved=fairyRationFull.bagCount(227)==1 &&
+        fairyRationFull.bag_[0].durability==5000;
+    if(!fairyRationApplied || !fairyRationPersisted || !fairyRationNeedsPet || !fairyRationFullPreserved) {
+        std::fprintf(stderr,"PORT-FAIRY-RATION: apply=%d save=%d needs_pet=%d full=%d\n",
+            fairyRationApplied,fairyRationPersisted,fairyRationNeedsPet,fairyRationFullPreserved);return false;
+    }
+    Play fairyEgg;
+    fairyEgg.loadItems("Client/scripts/table/iteminfo.txt",{183,422,227});
+    fairyEgg.loadFairyEggs("Client/scripts/offline/script/calculate/variable.lua");
+    fairyEgg.loadFairyRations("Client/scripts/offline/script/calculate/variable.lua");
+    if(!fairyEgg.addBag(422,1))return false;
+    fairyEgg.clickBag(0);
+    if(fairyEgg.bagCount(422)!=0 || fairyEgg.bagCount(183)!=1 ||
+       fairyEgg.bag_.front().quality!=4 || fairyEgg.bag_.front().maxDurability!=5000 ||
+       fairyEgg.bag_.front().maxEnergy!=240) {
+        std::fprintf(stderr,"PORT-FAIRY-EGG: egg/output/quality/stat limits mismatch\n");return false;
+    }
+    if(!fairyEgg.equipBagToSlot(0,16) || !fairyEgg.addBag(227,1))return false;
+    const int hatchedFairyUid=fairyEgg.wornUid_[16];
+    const auto hatchedFairy=std::find_if(fairyEgg.bag_.begin(),fairyEgg.bag_.end(),[&](const Stack& value) {
+        return value.uid==hatchedFairyUid;
+    });
+    if(hatchedFairy==fairyEgg.bag_.end())return false;
+    hatchedFairy->durability=100;
+    const int rationIndex=static_cast<int>(fairyEgg.bag_.size())-1;
+    fairyEgg.clickBag(rationIndex);
+    const auto fedFairy=std::find_if(fairyEgg.bag_.begin(),fairyEgg.bag_.end(),[&](const Stack& value) {
+        return value.uid==hatchedFairyUid;
+    });
+    if(fedFairy==fairyEgg.bag_.end() || fedFairy->durability!=2600 || fairyEgg.bagCount(227)!=0) {
+        std::fprintf(stderr,"PORT-FAIRY-EGG: hatched fairy could not equip/feed\n");return false;
+    }
+    Play fairyEggNoSpace;
+    fairyEggNoSpace.loadItems("Client/scripts/table/iteminfo.txt",{183,422,227});
+    fairyEggNoSpace.loadFairyEggs("Client/scripts/offline/script/calculate/variable.lua");
+    fairyEggNoSpace.bagCapacity_=2;
+    if(!fairyEggNoSpace.addBag(422,1) || !fairyEggNoSpace.addBag(227,1))return false;
+    fairyEggNoSpace.clickBag(0);
+    if(fairyEggNoSpace.bagCount(422)!=1 || fairyEggNoSpace.bagCount(183)!=0) {
+        std::fprintf(stderr,"PORT-FAIRY-EGG: insufficient-space failure consumed egg\n");return false;
+    }
+    Play fairyAutoFeed;
+    fairyAutoFeed.loadItems("Client/scripts/table/iteminfo.txt",{183,422,2312,6842});
+    fairyAutoFeed.loadFairyRations("Client/scripts/offline/script/calculate/variable.lua");
+    if(!fairyAutoFeed.addBag(183,1) || !fairyAutoFeed.addBag(422,1) ||
+       !fairyAutoFeed.addBag(2312,2))return false;
+    const int autoFairyUid=fairyAutoFeed.bag_[0].uid;
+    fairyAutoFeed.bag_[0].durability=2500;fairyAutoFeed.bag_[0].maxDurability=5000;
+    fairyAutoFeed.worn_[16]=183;fairyAutoFeed.wornUid_[16]=autoFairyUid;
+    fairyAutoFeed.step(.01f,nullptr,0.f,0.f);
+    const bool fairyAutoFeedTriggered=fairyAutoFeed.bag_[0].durability==5000 &&
+        fairyAutoFeed.bagCount(2312)==1;
+    fairyAutoFeed.bag_[0].durability=2501;
+    fairyAutoFeed.step(.01f,nullptr,0.f,0.f);
+    const bool fairyAutoFeedAboveThreshold=fairyAutoFeed.bag_[0].durability==2501 &&
+        fairyAutoFeed.bagCount(2312)==1;
+    if(!fairyAutoFeedTriggered || !fairyAutoFeedAboveThreshold) {
+        std::fprintf(stderr,"PORT-FAIRY-AUTOFEED: threshold/consumption mismatch\n");return false;
+    }
+    Play fairySkillBook;
+    fairySkillBook.root_=randomBoxRoot;
+    fairySkillBook.profileId_=9062;
+    fairySkillBook.loadItems("Client/scripts/table/iteminfo.txt",{183,243,244,245,246,249,252});
+    fairySkillBook.loadFairySkills("Client/scripts/offline/script/calculate/variable.lua");
+    if(!fairySkillBook.addBag(183,1) || !fairySkillBook.addBag(243,1) ||
+       !fairySkillBook.addBag(244,1) || !fairySkillBook.addBag(245,1) ||
+       !fairySkillBook.addBag(246,1) || !fairySkillBook.addBag(249,1) ||
+       !fairySkillBook.addBag(252,1) || !fairySkillBook.equipBagToSlot(0,16))return false;
+    auto useFairyBook=[&](Play& owner,int itemId) {
+        const auto found=std::find_if(owner.bag_.begin(),owner.bag_.end(),[&](const Stack& value) {
+            return value.id==itemId;
+        });
+        if(found==owner.bag_.end())return false;
+        owner.clickBag(static_cast<int>(std::distance(owner.bag_.begin(),found)));
+        return true;
+    };
+    useFairyBook(fairySkillBook,244); // Nivel 2 sem nivel 1: preserva.
+    const bool fairySkillPrerequisitePreserved=fairySkillBook.bagCount(244)==1;
+    useFairyBook(fairySkillBook,243);
+    useFairyBook(fairySkillBook,244);
+    useFairyBook(fairySkillBook,245);
+    const auto learnedFairy=std::find_if(fairySkillBook.bag_.begin(),fairySkillBook.bag_.end(),[&](const Stack& value) {
+        return value.id==183;
+    });
+    const bool fairySkillSequence=learnedFairy!=fairySkillBook.bag_.end() &&
+        learnedFairy->fairySkills[0]==1 && learnedFairy->fairySkills[1]==3;
+    Play fairySkillReloaded;
+    fairySkillReloaded.loadItems("Client/scripts/table/iteminfo.txt",{183,243,244,245,246,249,252});
+    fairySkillReloaded.load(fairySkillBook.savePath());
+    const auto loadedFairySkill=std::find_if(fairySkillReloaded.bag_.begin(),fairySkillReloaded.bag_.end(),
+        [&](const Stack& value) { return value.id==183; });
+    const bool fairySkillPersisted=loadedFairySkill!=fairySkillReloaded.bag_.end() &&
+        loadedFairySkill->fairySkills[0]==1 && loadedFairySkill->fairySkills[1]==3;
+    useFairyBook(fairySkillBook,246);
+    useFairyBook(fairySkillBook,249);
+    useFairyBook(fairySkillBook,252); // Quarto grupo: sem quarto espaco, preserva.
+    const bool fairySkillSlotsPreserved=fairySkillBook.bagCount(252)==1;
+    if(!fairySkillPrerequisitePreserved || !fairySkillSequence || !fairySkillPersisted ||
+       !fairySkillSlotsPreserved) {
+        std::fprintf(stderr,"PORT-FAIRY-SKILLS: prerequisito, progressao, save ou limite falhou\n");
+        return false;
+    }
     const auto firstFrameEvents = firstFrameSkill.takeEffects();
     if (firstFrameSkill.pendingAttack_ != 0.f || firstFrameEvents.size() != 1 ||
         firstFrameEvents.front().kind != EffectEvent::Cast ||
         !firstFrameEvents.front().sourceIsPlayer) {
         std::fprintf(stderr, "animacao: keyframe no inicio foi substituido por atraso generico\n");
+        return false;
+    }
+    const bool itemKeyframeCallbacksOK=[&]() {
+        if(::setenv("TOP_HISTORICAL_ITEM_EFFECT_KEYFRAME","1",1)!=0)return false;
+        Play itemKeyframes;
+        itemKeyframes.skillRules_[94]=crippleData->second;
+        itemKeyframes.skillRules_[94].playActions={7};
+        itemKeyframes.skillRules_[94].actionDurations={.8f};
+        itemKeyframes.skillRules_[94].actionImpacts={.2f};
+        itemKeyframes.skillRules_[94].flightEffectId=0;
+        itemKeyframes.skills_[0]={94,"Cripple",0,5.f};
+        itemKeyframes.learnedSkills_[94]=1;
+        itemKeyframes.player_.homeY=100.f;
+        itemKeyframes.player_.range=8.f;
+        Foe target;target.x=1.f;target.hp=target.maxHp=10000;target.cdLeft=100.f;
+        itemKeyframes.foes_.push_back(target);
+        itemKeyframes.castSkill(0);
+        itemKeyframes.pickFoe(0);
+        itemKeyframes.resolve(0.f,0.f,0.f,nullptr);
+        const auto beginEvents=itemKeyframes.takeEffects();
+        const bool began=std::count_if(beginEvents.begin(),beginEvents.end(),[](const EffectEvent& e) {
+            return e.kind==EffectEvent::CastBegin&&e.variant==94;
+        })==1;
+        itemKeyframes.resolve(.19f,0.f,0.f,nullptr);
+        const auto beforeAction=itemKeyframes.takeEffects();
+        const bool held=std::none_of(beforeAction.begin(),beforeAction.end(),[](const EffectEvent& e) {
+            return e.kind==EffectEvent::CastAction&&e.variant==94;
+        });
+        itemKeyframes.resolve(.02f,0.f,0.f,nullptr);
+        const auto actionEvents=itemKeyframes.takeEffects();
+        const bool action=std::count_if(actionEvents.begin(),actionEvents.end(),[](const EffectEvent& e) {
+            return e.kind==EffectEvent::CastAction&&e.variant==94;
+        })==1;
+        SkillVisualCatalog visuals;
+        const bool loaded=visuals.load("Client/scripts/table/skillinfo.txt") ||
+            visuals.load("../Client/scripts/table/skillinfo.txt") ||
+            visuals.load("../../Client/scripts/table/skillinfo.txt");
+        const SkillVisual* visual=loaded?visuals.find(94):nullptr;
+        if(!visual)return false;
+        const auto beginChannels=visual->castChannels(-1);
+        const auto actionChannels=visual->castChannels(0);
+        return began&&held&&action&&beginChannels.size()==1&&
+            beginChannels.front().kind==SkillVisualChannelKind::Item&&
+            beginChannels.front().effectId==256&&actionChannels.size()==1&&
+            actionChannels.front().kind==SkillVisualChannelKind::ItemExtra&&
+            actionChannels.front().effectId==142;
+    }();
+    ::unsetenv("TOP_HISTORICAL_ITEM_EFFECT_KEYFRAME");
+    if(!itemKeyframeCallbacksOK) {
+        std::fprintf(stderr,"skill 94: Item/-1 nao precedeu Action/0 no modo historico opt-in\n");
         return false;
     }
     Play repeatedBuff;
@@ -1227,6 +2299,115 @@ public:
     heal.clickBag(0);
     if (heal.player_.hp != 30 || !heal.bag_.empty()) {
         std::fprintf(stderr, "combate: a fruta nao curou\n");
+        return false;
+    }
+
+    char medkitDirTemplate[]="/tmp/top-medkit-XXXXXX";
+    char* medkitDirPath=::mkdtemp(medkitDirTemplate);
+    if(!medkitDirPath) {
+        std::fprintf(stderr,"medkit: nao criou diretorio temporario\n");
+        return false;
+    }
+    const std::string medkitRoot(medkitDirPath);
+    const std::string medkitUser=medkitRoot+"/user";
+    if(::mkdir(medkitUser.c_str(),0700)!=0) {
+        ::rmdir(medkitRoot.c_str());
+        std::fprintf(stderr,"medkit: nao criou pasta de save\n");
+        return false;
+    }
+    Play historicMedkit;
+    historicMedkit.root_=medkitRoot;
+    historicMedkit.profileId_=9061;
+    historicMedkit.loadItems("Client/scripts/table/iteminfo.txt",{3909,6590,6591,6592});
+    historicMedkit.loadHeals("Client/scripts/offline/calculate/variable.lua");
+    historicMedkit.player_.hp=50;
+    historicMedkit.player_.maxHp=100;
+    historicMedkit.player_.homeX=100.f;
+    historicMedkit.player_.homeY=50.f;
+    historicMedkit.bagCapacity_=2;
+    historicMedkit.bag_={Stack{6590,2}};
+    historicMedkit.clickBag(0);
+    const bool medkitPercentApplied=historicMedkit.player_.hp==60 && historicMedkit.player_.homeY==60.f &&
+        historicMedkit.bagCount(6590)==1 && historicMedkit.itemCooldownRemaining_.count(6590)==1;
+    const std::string medkitSave=historicMedkit.savePath();
+    Play historicMedkitReloaded;
+    historicMedkitReloaded.load(medkitSave);
+    const bool medkitPersisted=historicMedkitReloaded.bagCount(6590)==1 &&
+        historicMedkitReloaded.player_.hp==60 && historicMedkitReloaded.player_.homeY==60.f;
+    historicMedkit.clickBag(0);
+    const bool medkitCooldownPreserved=historicMedkit.player_.hp==60 && historicMedkit.bagCount(6590)==1;
+    for(int tick=0;tick<20;++tick)historicMedkit.step(.05f,nullptr,0.f,0.f);
+    historicMedkit.clickBag(0);
+    const bool medkitCooldownExpired=historicMedkit.player_.hp==70 && historicMedkit.player_.homeY==70.f &&
+        historicMedkit.bagCount(6590)==0;
+    Play percentageKit;
+    percentageKit.loadItems("Client/scripts/table/iteminfo.txt",{3909});
+    percentageKit.loadHeals("Client/scripts/offline/calculate/variable.lua");
+    percentageKit.player_.hp=50;percentageKit.player_.maxHp=100;
+    percentageKit.player_.homeX=100.f;percentageKit.player_.homeY=50.f;
+    percentageKit.bagCapacity_=2;percentageKit.bag_={Stack{3909,1}};
+    percentageKit.clickBag(0);
+    const bool hpPercentKitApplied=percentageKit.player_.hp==80 && percentageKit.player_.homeY==50.f &&
+        percentageKit.bag_.empty();
+    auto prepareFoodStateTest=[](Play& play) {
+        play.player_.id=1;
+        play.player_.level=100;
+        play.job_=0;
+        play.bstr_=play.bagi_=play.bdex_=play.bcon_=play.bsta_=20;
+        play.sheetReady_=true;
+        play.applyAttrs(false);
+        play.player_.hp=1;
+        play.player_.homeY=1.f;
+        play.bagCapacity_=4;
+    };
+    Play cookingHp;
+    cookingHp.loadItems("Client/scripts/table/iteminfo.txt",{4024,4028});
+    cookingHp.loadHeals("Client/scripts/offline/calculate/variable.lua");
+    prepareFoodStateTest(cookingHp);
+    const int cookingBaseHp=cookingHp.player_.maxHp;
+    const int cookingBaseDef=cookingHp.player_.def;
+    cookingHp.bag_={Stack{4028,1}}; // State 165 level 10, 60 seconds
+    cookingHp.clickBag(0);
+    const bool cookingHpApplied=cookingHp.foodStates_[0].level==10 &&
+        cookingHp.player_.maxHp==cookingBaseHp+10000 && cookingHp.player_.def==cookingBaseDef+8 &&
+        cookingHp.bag_.empty();
+    cookingHp.bag_={Stack{4024,1}}; // Lower level must not replace or grant a free heal.
+    const int cookingHpBeforeReject=cookingHp.player_.hp;
+    cookingHp.clickBag(0);
+    const bool cookingLowerRejected=cookingHp.player_.hp==cookingHpBeforeReject && cookingHp.bagCount(4024)==1;
+    for(int tick=0;tick<1201;++tick)cookingHp.step(.05f,nullptr,0.f,0.f);
+    const bool cookingHpExpired=cookingHp.foodStates_[0].level==0 &&
+        cookingHp.player_.maxHp==cookingBaseHp && cookingHp.player_.def==cookingBaseDef;
+    Play cookingAtk;
+    cookingAtk.loadItems("Client/scripts/table/iteminfo.txt",{6407});
+    cookingAtk.loadHeals("Client/scripts/offline/calculate/variable.lua");
+    prepareFoodStateTest(cookingAtk);
+    const int cookingBaseAtk=cookingAtk.player_.minAtk;
+    cookingAtk.bag_={Stack{6407,1}};
+    cookingAtk.clickBag(0);
+    const bool cookingAtkApplied=cookingAtk.foodStates_[1].level==1 &&
+        cookingAtk.player_.minAtk==cookingBaseAtk+50 && cookingAtk.player_.hp==401 &&
+        cookingAtk.bag_.empty();
+    Play cookingSpr;
+    cookingSpr.loadItems("Client/scripts/table/iteminfo.txt",{1084});
+    cookingSpr.loadHeals("Client/scripts/offline/calculate/variable.lua");
+    prepareFoodStateTest(cookingSpr);
+    const float cookingBaseSp=cookingSpr.player_.homeX;
+    cookingSpr.bag_={Stack{1084,1}};
+    cookingSpr.clickBag(0);
+    const bool cookingSprApplied=cookingSpr.foodStates_[2].level==1 &&
+        cookingSpr.player_.homeX>cookingBaseSp && cookingSpr.player_.homeY==201.f &&
+        cookingSpr.bag_.empty();
+    std::remove(medkitSave.c_str());
+    std::remove((medkitSave+".bak").c_str());
+    ::rmdir(medkitUser.c_str());
+    ::rmdir(medkitRoot.c_str());
+    if(!medkitPercentApplied||!medkitPersisted||!medkitCooldownPreserved||
+       !medkitCooldownExpired||!hpPercentKitApplied||!cookingHpApplied||!cookingLowerRejected||
+       !cookingHpExpired||!cookingAtkApplied||!cookingSprApplied) {
+        std::fprintf(stderr,"medkit: percent=%d persisted=%d cooldown=%d expired=%d hp_percent=%d food_hp=%d food_reject=%d food_expire=%d food_atk=%d food_sp=%d\n",
+            medkitPercentApplied,medkitPersisted,medkitCooldownPreserved,medkitCooldownExpired,hpPercentKitApplied,
+            cookingHpApplied,cookingLowerRejected,cookingHpExpired,cookingAtkApplied,cookingSprApplied);
         return false;
     }
 
@@ -3992,3 +5173,48 @@ bool Play::selfTestHistoricalSkillExecution() {
 bool Play::selfTest() { return PlaySelfTest::run(); }
 
 } // namespace top
+
+namespace top {
+bool Play::selfTestPetStats() {
+    Play p;p.setReadOnlyPreview(true);p.root_="Client";
+    p.loadItems("Client/scripts/table/iteminfo.txt",{});
+    p.loadSkillRules("Client/scripts/table/skillinfo.txt");
+    auto check=[](bool ok,const char* text){if(!ok)std::fprintf(stderr,"PET/STATS: %s\n",text);return ok;};
+    if(!check(p.configureStatPreview("base"),"baseline uses current tables"))return false;
+    const float speed=p.moveSpeed(),interval=p.effectiveAttackInterval();
+    const int defense=p.effectiveDefense();
+    if(!check(p.configureStatPreview("necklace") && std::fabs(p.moveSpeed()-speed-.2f)<1e-5f,
+              "Pendant of Sunstone adds authored 20 cm/s"))return false;
+    if(!check(p.configureStatPreview("berserk") &&
+              std::fabs(interval/p.effectiveAttackInterval()-1.215f)<1e-4f,
+              "State_Kb_Add level 1: +0.2+0.015 ASPD for combat and status"))return false;
+    for(int frame=0;frame<1201;++frame)p.step(1.f/60.f,nullptr,0,0);
+    if(!check(std::fabs(p.effectiveAttackInterval()-interval)<1e-5f,
+              "Berserk expires and displayed/combat ASPD returns to baseline"))return false;
+    if(!check(p.configureStatPreview("harden") && p.effectiveDefense()==defense+18,
+              "State_Shpf level 1 defense applied to the shared value"))return false;
+    if(!check(p.configureStatPreview("fairy") && p.equippedFairyItemId()==183 &&
+              p.effectivePrimaryAttributes()==std::array<int,5>{{10,8,7,6,9}},
+              "equipped fairy's persisted STR/CON/AGI/DEX/SPR enter derived stats"))return false;
+    p.bag_.back().durability=49;p.applyAttrs(false);
+    if(!check(p.equippedFairyItemId()==0 && p.effectivePrimaryAttributes()==std::array<int,5>{{5,5,5,5,5}},"RefreshLink hides fairy with stamina below 50"))return false;
+    if(!check(p.configureStatPreview("base"),"passive baseline"))return false;
+    const int hp=p.player_.maxHp,sp=static_cast<int>(p.player_.homeX),hit=p.hit_,dodge=p.player_.dodge;
+    const int hrec=p.hrecGain_,srec=p.srecGain_;
+    if(!check(p.configureStatPreview("passives") && p.player_.maxHp==hp+35 && p.player_.homeX==sp+40 &&
+        p.hit_==hit+1 && p.player_.dodge==dodge+3 && p.hrecGain_==hrec+1 && p.srecGain_==srec+2 &&
+        std::fabs(p.moveSpeed()-4.896f)<1e-5f,"seven authored Use callbacks enter final stats"))return false;
+    p.learnedSkills_[75]=2;p.step(0.f,nullptr,0,0);
+    if(!check(std::fabs(p.moveSpeed()-4.992f)<1e-5f,"learning/upgrading refreshes passives without casting"))return false;
+    p.worldMap_="garner2";p.learnedSkills_[63]=3;p.applyAttrs(false);
+    if(!check(p.player_.resist==p.baseResist_+3,"Strengthen's historical garner2 branch"))return false;
+    // Verify read-only diagnostics cannot clobber an existing file.
+    const auto path=std::string("/tmp/top-pet-stats-readonly-")+std::to_string(::getpid());
+    {std::ofstream out(path);out<<"unchanged";}
+    if(!p.save(path))return false;
+    std::ifstream input(path);std::string text;input>>text;::unlink(path.c_str());
+    if(!check(text=="unchanged","screenshot diagnostics never save mutations"))return false;
+    std::puts("PET/STATS: equipment movement, Berserk/expiry, Harden, fairy attributes/stamina and read-only diagnostics OK");
+    return true;
+}
+}

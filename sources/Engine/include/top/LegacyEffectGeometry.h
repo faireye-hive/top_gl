@@ -5,6 +5,7 @@
 #include "top/LegacyEffFormat.h"
 #include "top/GfxDevice.h"
 #include "top/EffectViewBasis.h"
+#include "top/HistoricalEffectUnits.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -122,9 +123,17 @@ struct ParentTransform {
     std::array<float,3> angle{{0.f,0.f,0.f}};
     bool billboard=false;
     EffectViewBasis view;
+    // Optional DX9 row-vector binding; translation is the caller's origin.
+    const std::array<float,16>* bone = nullptr;
 
     std::array<float,3> apply(std::array<float,3> local) const {
         for(float& v:local)v*=scale;
+        if(bone) {
+            const auto& m=*bone;
+            return {{local[0]*m[0]+local[1]*m[4]+local[2]*m[8],
+                     local[0]*m[1]+local[1]*m[5]+local[2]*m[9],
+                     local[0]*m[2]+local[1]*m[6]+local[2]*m[10]}};
+        }
         return rotate(local,angle);
     }
 };
@@ -134,7 +143,7 @@ struct ParentTransform {
 // No GL context required: returned triangles can be regression-tested.
 inline void emit(const Primitive& mesh, const legacy_eff::Key& key,
                  const std::vector<UV>& animatedUV, float originX,float originY,float originZ,
-                 std::vector<MeshVertex>& out, float modelScale = .3f, float worldYaw = 0.f,
+                 std::vector<MeshVertex>& out, float modelScale = historical_effect_units::mesh, float worldYaw = 0.f,
                  float worldPitch = 0.f, const ParentTransform* parent = nullptr) {
     if (mesh.triangles.empty()) return;
     std::vector<MeshVertex> transformed;

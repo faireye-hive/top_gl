@@ -11,6 +11,8 @@
 #include <cstdint>
 namespace top { namespace historical_particle_jitter {
 using V3=std::array<float,3>;
+// SK2.18-L: historical behavior is part of normal execution.
+inline constexpr bool frameAccelerationEnabled() { return true; }
 inline V3 offset(const V3& acceleration,float age,std::uint32_t seed,
                  int slot,unsigned generation=0) {
     V3 displacement{{0.f,0.f,0.f}};
@@ -25,8 +27,11 @@ inline V3 offset(const V3& acceleration,float age,std::uint32_t seed,
         const float elapsed=dt*float(i);
         const float step=std::min(dt,age-elapsed);
         if(step<=0.f)break;
-        const bool plus=historical_particle_pool::rand01(key ^
-                                (0x9e3779b9u*std::uint32_t(i+1))) <.5f;
+        const bool plus=historical_particle_random::randfMappingEnabled() ?
+            historical_particle_random::deterministicRandModulo(
+                2u,key,static_cast<unsigned>(i)) != 0u :
+            historical_particle_pool::rand01(key ^
+                (0x9e3779b9u*std::uint32_t(i+1))) < .5f;
         const float factor=(plus?1.f:-1.f)*step;
         for(int c=0;c<3;++c) displacement[c]+=acceleration[c]*factor;
     }

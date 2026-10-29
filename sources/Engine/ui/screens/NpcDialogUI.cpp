@@ -29,7 +29,21 @@ int NpcDialogUI::dialogOptionHit(int x, int y, int w, int h) const {
     const auto b = modal_layout::npc(w, h);
     if (x < b.x + 18.f || x >= b.x + 302.f || y < b.y + 105.f || y >= b.y + 232.f) return -1;
     const int row = static_cast<int>((y - (b.y + 105.f)) / 25.f);
-    return row >= 0 && row < std::min(5, static_cast<int>(dialogOptions_.size())) ? row : -1;
+    const int index=dialogOptionPage_*5+row;
+    return row >= 0 && row < 5 && index < static_cast<int>(dialogOptions_.size()) ? index : -1;
+}
+int NpcDialogUI::dialogOptionPageHit(int x, int y, int w, int h) const {
+    if (!visible_ || !tutorialMode_ || dialogOptions_.size() <= 5) return 0;
+    const auto b = modal_layout::npc(w, h);
+    if (y < b.y + 235.f || y >= b.y + 260.f) return 0;
+    if (x >= b.x + 18.f && x < b.x + 84.f && dialogOptionPage_ > 0) return -1;
+    const int maxPage=static_cast<int>((dialogOptions_.size()-1)/5);
+    if (x >= b.x + 236.f && x < b.x + 302.f && dialogOptionPage_ < maxPage) return 1;
+    return 0;
+}
+void NpcDialogUI::changeDialogOptionPage(int delta) {
+    const int maxPage=dialogOptions_.empty()?0:static_cast<int>((dialogOptions_.size()-1)/5);
+    dialogOptionPage_=std::clamp(dialogOptionPage_+delta,0,maxPage);
 }
 int NpcDialogUI::tutorialGuideHit(int x, int y, int w, int h) const {
     if (!visible_ || tutorialMode_ || selected_ >= 0 || !tutorialHasMissions_ || dialogOptions_.empty()) return -1;
@@ -63,10 +77,17 @@ void NpcDialogUI::draw(UIRenderer& r,int width,int height) const {
     chrome::panel(r,b.x,b.y,b.w,b.h);
     if (tutorialMode_) {
         r.border(b.x+14.f,b.y+63.f,b.w-28.f,172.f,1.f,chrome::muted);
-        for (int i=0;i<std::min(5,static_cast<int>(dialogOptions_.size()));++i) {
+        for (int i=0;i<5;++i) {
+            const int index=dialogOptionPage_*5+i;
+            if(index>=static_cast<int>(dialogOptions_.size()))break;
             const float y=b.y+105.f+float(i*25);
             r.rect(b.x+18.f,y,284.f,22.f,chrome::shade);
             r.border(b.x+18.f,y,284.f,22.f,1.f,chrome::muted);
+        }
+        if(dialogOptions_.size()>5) {
+            if(dialogOptionPage_>0)chrome::button(r,b.x+18.f,b.y+235.f,66.f,23.f);
+            if(dialogOptionPage_<static_cast<int>((dialogOptions_.size()-1)/5))
+                chrome::button(r,b.x+236.f,b.y+235.f,66.f,23.f);
         }
         if (tutorialHasMissions_) {
             chrome::button(r,b.x+18.f,b.y+261.f,129.f,29.f);
@@ -147,10 +168,19 @@ void NpcDialogUI::appendText(HudDrawList& out, int width, int height) const {
                     textAt=end;
                     while(textAt<text().size() && text()[textAt]==' ')++textAt;
                 }
-                for(int i=0;i<std::min(5,static_cast<int>(dialogOptions_.size()));++i) {
-                    std::string label=dialogOptions_[static_cast<std::size_t>(i)];
+                for(int i=0;i<5;++i) {
+                    const int index=dialogOptionPage_*5+i;
+                    if(index>=static_cast<int>(dialogOptions_.size()))break;
+                    std::string label=dialogOptions_[static_cast<std::size_t>(index)];
                     if(label.size()>42)label.resize(42);
                     out.addText(label,left+25.f,top+110.f+float(i*25),.08f,.20f,.28f);
+                }
+                if(dialogOptions_.size()>5) {
+                    const int count=static_cast<int>((dialogOptions_.size()+4)/5);
+                    out.addText(dialogOptionPage_>0?"< Anterior":" ",left+28.f,top+240.f,.12f,.24f,.28f);
+                    out.addText("Pagina "+std::to_string(dialogOptionPage_+1)+"/"+std::to_string(count),
+                                left+130.f,top+240.f,.12f,.24f,.28f);
+                    out.addText(dialogOptionPage_+1<count?"Proxima >":" ",left+246.f,top+240.f,.12f,.24f,.28f);
                 }
                 if(tutorialHasMissions_) {
                     out.addText("Missoes",left+54.f,top+268.f,.12f,.24f,.28f);

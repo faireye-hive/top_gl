@@ -118,6 +118,8 @@ void CharacterStatusUI::appendText(HudDrawList& out, const UIContentState& conte
             out.addText("ASPD", box.x + 96.f, box.y + 312.f, pr, pg, pb);
             out.addText(fieldAt(content.statLines_, 23), box.x + 62.f, box.y + 312.f, pr, pg, pb);
             out.addText(fieldAt(content.statLines_, 19), box.x + 150.f, box.y + 312.f, pr, pg, pb);
+            out.addText("MSPD", box.x+12.f, box.y+342.f, pr, pg, pb);
+            out.addText(fieldAt(content.statLines_,24), box.x+62.f, box.y+342.f, pr, pg, pb);
             auto choice = [&](const char* text, float x, float y, int job) {
                 const bool on = content.jobMark_ == job;
                 out.addText(text, box.x + x, box.y + y, on ? 0.05f : 0.2f, on ? 0.28f : 0.28f, on ? 0.55f : 0.4f);

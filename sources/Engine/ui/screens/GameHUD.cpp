@@ -35,7 +35,9 @@ void slot(UIRenderer& r, float x, float y, float w = 32.f, float h = 32.f) {
 
 void GameHUD::drawStatus(UIRenderer& r,float x,float y,int mx,int my,const UITheme& t) { CharacterStatusUI::draw(r,x,y,mx,my,t); }
 void GameHUD::drawQuests(UIRenderer& r, float x, float y, const UITheme& t) { QuestUI::draw(r,x,y,t); }
-void GameHUD::drawSkills(UIRenderer& r,float x,float y,int page,int count,const UITheme& t) { SkillsUI::draw(r,x,y,page,count,t); }
+void GameHUD::drawSkills(UIRenderer& r,float x,float y,int page,const std::vector<SkillView>& skills,const UITheme& t,bool testMode) {
+    SkillsUI::draw(r,x,y,page,skills,t,testMode);
+}
 void GameHUD::drawInventory(UIRenderer& r,float x,float y,const UITheme& t,int page,int capacity) { InventoryUI::draw(r,x,y,t,page,capacity); }
 void GameHUD::drawFunctionBar(UIRenderer& r,float x,float y,int mx,int my,bool down,const UITheme& t) { ShortcutBarUI::drawFunctionBar(r,x,y,mx,my,down,t); }
 void GameHUD::drawSkillBar(UIRenderer& r,int sw,int sh,const UITheme& t) { ShortcutBarUI::drawSkillBar(r,sw,sh,t); }

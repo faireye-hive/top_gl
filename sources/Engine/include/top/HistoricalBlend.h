@@ -8,21 +8,10 @@
 namespace top { namespace historic_blend {
 struct Pair { int source = 0, destination = 0; }; // {0,0}: legacy mode
 
-inline bool enabled() {
-    const char* value = std::getenv("TOP_HISTORICAL_BLEND");
-    // SK2.11: use the authored factors by default. In particular, treating
-    // (5,7) as straight alpha makes opaque black glow backgrounds visible;
-    // D3D factor 7 is destination alpha, not inverse source alpha.
-    // Keep an explicit compatibility switch for comparisons.
-    return !value || std::strcmp(value,"0") != 0;
-}
-inline bool opaqueDestination() {
-    // MPRender::Init uses the display format for the backbuffer (normally
-    // X8R8G8B8/RGB). Keep alpha=1 instead of accumulating alpha from shadows
-    // in the GL RGBA window. The old experimental RGBA path remains available.
-    const char* value=std::getenv("TOP_HISTORICAL_DEST_ALPHA");
-    return enabled() && (!value || std::strcmp(value,"framebuffer")!=0);
-}
+// SK2.18-L: historical behavior is part of normal execution.
+inline constexpr bool enabled() { return true; }
+// SK2.18-L: historical behavior is part of normal execution.
+inline constexpr bool opaqueDestination() { return true; }
 // D3DBLEND_SRCALPHASAT is only valid as a source factor.
 constexpr bool validSource(int f) { return f >= 1 && f <= 11; }
 constexpr bool validDestination(int f) { return f >= 1 && f <= 10; }

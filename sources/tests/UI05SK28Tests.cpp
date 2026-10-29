@@ -16,6 +16,16 @@ int main(){
  assert(hm::shadeAt(3,.60f).copies==1);
  assert(hm::shadeAt(3,.61f).copies==2);
  assert(hm::shadeAt(3,1.21f).copies==3);
+ hm::ShadeTimeline frameCount;
+ frameCount.advance(.61f);
+ assert(frameCount.copies==2 && near(frameCount.accumulated,0.f));
+ frameCount.advance(1.21f); // DX9 drops overshoot and increments once per call.
+ assert(frameCount.copies==3 && near(frameCount.accumulated,0.f));
+ frameCount.advance(.3f);
+ frameCount.advance(.3f); // DX9 uses strictly greater than .6 s.
+ assert(frameCount.copies==3 && near(frameCount.accumulated,.6f));
+ frameCount.advance(.001f);
+ assert(frameCount.copies==4 && near(frameCount.accumulated,0.f));
  assert(hm::shadeAt(2,1.5f).mainScale==1.f && hm::shadeAt(2,1.5f).copies==0);
  assert(near(hm::shadeAlpha(0,2),.5f));
  assert(near(hm::shadeAlpha(1,2),0.f));

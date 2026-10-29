@@ -1,11 +1,28 @@
 #include "top/Play.h"
 #include "top/MonsterAI.h"
 #include "top/HistoricalSkillExecution.h"
+#include "top/PopulationIdentity.h"
 
 #include <algorithm>
 #include <cmath>
 
 namespace top {
+bool Play::historicalNpcTeleportFareReady() const {
+    return player_.level <= 40 || gold_ >= 500;
+}
+
+bool Play::payHistoricalNpcTeleportFare() {
+    if (player_.level <= 40) return true;
+    if (gold_ < 500) {
+        say("You need at least 500G to teleport.");
+        return false;
+    }
+    gold_ -= 500;
+    say("500G teleport fee paid.");
+    save(savePath());
+    return true;
+}
+
 void Play::snapshotWorldMonsters() {
     for (const Foe& foe : foes_)
         if (foe.spawnKey != 0)
@@ -17,6 +34,69 @@ void Play::setWorldMap(const std::string& mapName) {
     if (worldMap_ == mapName) return;
     snapshotWorldMonsters();
     worldMap_ = mapName;
+}
+
+bool Play::hasTransientSummons() const {
+    return std::any_of(foes_.begin(), foes_.end(), [](const Foe& foe) {
+        return foe.summoned || foe.followsPlayer;
+    });
+}
+
+bool Play::refreshPopulation(const ActorSkin& actors) {
+    if (root_.empty() || actors.playerId() != player_.id || hasTransientSummons()) return false;
+    snapshotWorldMonsters();
+    std::vector<Foe> updated;
+    const int count = actors.monsterCount();
+    updated.reserve(static_cast<std::size_t>(count));
+    std::vector<int> mapping(foes_.size(), -1);
+    std::vector<bool> used(foes_.size(), false);
+    for (int i = 0; i < count; ++i) {
+        const MonsterSlot slot = actors.monsterSlot(i);
+        int match = -1;
+        for (std::size_t j = 0; j < foes_.size(); ++j) {
+            if (used[j]) continue;
+            if (population_identity::same(
+                    {foes_[j].id, foes_[j].homeX, foes_[j].homeY, false, foes_[j].spawnKey},
+                    {slot.id, slot.x, slot.y, false, slot.spawnKey})) {
+                match = static_cast<int>(j); break;
+            }
+        }
+        if (match >= 0) {
+            used[static_cast<std::size_t>(match)] = true;
+            mapping[static_cast<std::size_t>(match)] = i;
+            updated.push_back(std::move(foes_[static_cast<std::size_t>(match)]));
+        } else {
+            // Rows are cached at bind time; request an unfamiliar historical
+            // character row only when a new ID first enters the local sector.
+            ensureWorldFoeRow(slot.id);
+            updated.push_back(createWorldFoe(slot, actors, i));
+        }
+        updated.back().actorSlot = -1; // standard index follows visual monster ordinal
+    }
+    auto remap = [&](int& index) {
+        index = index >= 0 && static_cast<std::size_t>(index) < mapping.size() ?
+            mapping[static_cast<std::size_t>(index)] : -1;
+    };
+    remap(target_);
+    const int oldPendingTarget = pendingTarget_;
+    remap(pendingTarget_);
+    if (oldPendingTarget >= 0 && pendingTarget_ < 0) {
+        pendingAttack_ = 0.f;
+        pendingSkill_ = -1;
+    }
+    // Scheduled effects own a foe index. A disappeared owner must not turn
+    // into the player (-1) or affect an unrelated foe after reordering.
+    scheduledEffects_.erase(std::remove_if(scheduledEffects_.begin(), scheduledEffects_.end(),
+        [&](ScheduledEffect& effect) {
+            if (effect.owner < 0) return false;
+            if (static_cast<std::size_t>(effect.owner) >= mapping.size() ||
+                mapping[static_cast<std::size_t>(effect.owner)] < 0) return true;
+            effect.owner = mapping[static_cast<std::size_t>(effect.owner)];
+            return false;
+        }), scheduledEffects_.end());
+    foes_ = std::move(updated);
+    // No bind(), no save(), no skill/mission/item catalog reload on walking.
+    return true;
 }
 
 bool Play::rebindWorld(const ActorSkin& actors) {
@@ -42,6 +122,39 @@ bool Play::rebindWorld(const ActorSkin& actors) {
     const float keepBerserkAttackSpeed = berserkAttackSpeedBonus_;
     const float keepHarden = hardenFor_;
     const int keepHardenDefense = hardenDefense_;
+    const float keepEtherClover = itemEtherCloverFor_;
+    const int keepEtherCloverDodge = itemEtherCloverDodge_;
+    const int keepBodyStateId = itemBodyStateId_;
+    const float keepBodyStateFor = itemBodyStateFor_;
+    const float keepBlessedPotionFor = itemBlessedPotionFor_;
+    const float keepBodyMoveSpeedBonus = itemBodyMoveSpeedBonus_;
+    const int keepBodyAttackBonus = itemBodyAttackBonus_;
+    const int keepBodyDefenseBonus = itemBodyDefenseBonus_;
+    const ItemAttributeState keepStrengthState = itemStrengthState_;
+    const ItemAttributeState keepConstitutionState = itemConstitutionState_;
+    const ItemAttributeState keepAgilityState = itemAgilityState_;
+    const ItemAttributeState keepAccuracyState = itemAccuracyState_;
+    const ItemAttributeState keepSpiritState = itemSpiritState_;
+    const ItemAttributeState keepPotionStrengthState = itemPotionStrengthState_;
+    const ItemAttributeState keepPotionAgilityState = itemPotionAgilityState_;
+    const ItemAttributeState keepPotionConstitutionState = itemPotionConstitutionState_;
+    const ItemAttributeState keepPotionAccuracyState = itemPotionAccuracyState_;
+    const ItemAttributeState keepPotionSpiritState = itemPotionSpiritState_;
+    const ItemAttributeState keepPotionMspdState = itemPotionMspdState_;
+    const ItemAttributeState keepPotionAttackState = itemPotionAttackState_;
+    const ItemAttributeState keepPotionAspdState = itemPotionAspdState_;
+    const ItemAttributeState keepPotionHitState = itemPotionHitState_;
+    const ItemAttributeState keepPotionMaxHpState = itemPotionMaxHpState_;
+    const ItemAttributeState keepKaraVictoryState = itemKaraVictoryState_;
+    const ItemAttributeState keepLotteryDefenseState = itemLotteryDefenseState_;
+    const ItemAttributeState keepLanternDefenseState = itemLanternDefenseState_;
+    const ItemAttributeState keepFairyMarchState = itemFairyMarchState_;
+    const ItemAttributeState keepMaliciousHornState = itemMaliciousHornState_;
+    const ItemAllAttributeState keepInnocenceState = itemInnocenceState_;
+    const float keepForgeBoostFor = itemForgeBoostFor_;
+    const int keepForgeBoostLevel = itemForgeBoostLevel_;
+    const float keepCombineBoostFor = itemCombineBoostFor_;
+    const int keepCombineBoostLevel = itemCombineBoostLevel_;
     const float keepWillOfSteel = willOfSteelFor_;
     const int keepWillOfSteelDefense = willOfSteelDefense_;
     const float keepGeneric = genericBuffFor_;
@@ -68,6 +181,39 @@ bool Play::rebindWorld(const ActorSkin& actors) {
     berserkAttackSpeedBonus_ = keepBerserkAttackSpeed;
     hardenFor_ = keepHarden;
     hardenDefense_ = keepHardenDefense;
+    itemEtherCloverFor_ = keepEtherClover;
+    itemEtherCloverDodge_ = keepEtherCloverDodge;
+    itemBodyStateId_ = keepBodyStateId;
+    itemBodyStateFor_ = keepBodyStateFor;
+    itemBlessedPotionFor_ = keepBlessedPotionFor;
+    itemBodyMoveSpeedBonus_ = keepBodyMoveSpeedBonus;
+    itemBodyAttackBonus_ = keepBodyAttackBonus;
+    itemBodyDefenseBonus_ = keepBodyDefenseBonus;
+    itemStrengthState_ = keepStrengthState;
+    itemConstitutionState_ = keepConstitutionState;
+    itemAgilityState_ = keepAgilityState;
+    itemAccuracyState_ = keepAccuracyState;
+    itemSpiritState_ = keepSpiritState;
+    itemPotionStrengthState_ = keepPotionStrengthState;
+    itemPotionAgilityState_ = keepPotionAgilityState;
+    itemPotionConstitutionState_ = keepPotionConstitutionState;
+    itemPotionAccuracyState_ = keepPotionAccuracyState;
+    itemPotionSpiritState_ = keepPotionSpiritState;
+    itemPotionMspdState_ = keepPotionMspdState;
+    itemPotionAttackState_ = keepPotionAttackState;
+    itemPotionAspdState_ = keepPotionAspdState;
+    itemPotionHitState_ = keepPotionHitState;
+    itemPotionMaxHpState_ = keepPotionMaxHpState;
+    itemKaraVictoryState_ = keepKaraVictoryState;
+    itemLotteryDefenseState_ = keepLotteryDefenseState;
+    itemLanternDefenseState_ = keepLanternDefenseState;
+    itemFairyMarchState_ = keepFairyMarchState;
+    itemMaliciousHornState_ = keepMaliciousHornState;
+    itemInnocenceState_ = keepInnocenceState;
+    itemForgeBoostFor_ = keepForgeBoostFor;
+    itemForgeBoostLevel_ = keepForgeBoostLevel;
+    itemCombineBoostFor_ = keepCombineBoostFor;
+    itemCombineBoostLevel_ = keepCombineBoostLevel;
     willOfSteelFor_ = keepWillOfSteel;
     willOfSteelDefense_ = keepWillOfSteelDefense;
     genericBuffFor_ = keepGeneric;
@@ -77,12 +223,31 @@ bool Play::rebindWorld(const ActorSkin& actors) {
     player_.cdLeft = keepPlayerCooldown;
     boatCannonCd_ = keepBoatCooldown;
     sitting_ = keepSitting;
+    if (itemStrengthState_.remaining > 0.f || itemConstitutionState_.remaining > 0.f ||
+        itemAgilityState_.remaining > 0.f || itemAccuracyState_.remaining > 0.f ||
+        itemSpiritState_.remaining > 0.f || itemPotionStrengthState_.remaining > 0.f ||
+        itemPotionAgilityState_.remaining > 0.f || itemPotionConstitutionState_.remaining > 0.f ||
+        itemPotionAccuracyState_.remaining > 0.f || itemPotionSpiritState_.remaining > 0.f ||
+        itemPotionMspdState_.remaining > 0.f ||
+        itemPotionAttackState_.remaining > 0.f || itemPotionAspdState_.remaining > 0.f ||
+        itemPotionHitState_.remaining > 0.f ||
+        itemPotionMaxHpState_.remaining > 0.f ||
+        itemKaraVictoryState_.remaining > 0.f ||
+        itemLanternDefenseState_.remaining > 0.f ||
+        itemFairyMarchState_.remaining > 0.f ||
+        itemMaliciousHornState_.remaining > 0.f ||
+        itemEtherCloverDodge_ > 0 || itemBodyStateFor_ > 0.f || itemInnocenceState_.remaining > 0.f) {
+        applyAttrs(false);
+    } else {
+        player_.dodge = flee_;
+    }
     for (int i = 0; i < 8; ++i) skillCd_[i] = keepSkills[static_cast<std::size_t>(i)];
     return true;
 }
 
 void Play::pickFoe(int index) {
-    if(index<0 || index>=static_cast<int>(foes_.size()) || foes_[static_cast<std::size_t>(index)].hp<=0) return;
+    if(index<0 || index>=static_cast<int>(foes_.size()) || foes_[static_cast<std::size_t>(index)].hp<=0 ||
+       foes_[static_cast<std::size_t>(index)].followsPlayer) return;
     target_=index;
     requestedLoot_=-1;
     // Skill hotkey + enemy click only sets an explicit request. The movement
@@ -98,7 +263,7 @@ void Play::pickFoe(int index) {
 bool Play::selectedMonster(float& x, float& y, float& radius) const {
     if (target_ < 0 || target_ >= static_cast<int>(foes_.size())) return false;
     const Foe& foe = foes_[static_cast<std::size_t>(target_)];
-    if (foe.hp <= 0) return false;
+    if (foe.hp <= 0 || foe.followsPlayer) return false;
     x = foe.x;
     y = foe.y;
     radius = std::clamp(foe.radius + .54f, .85f, 3.f);
@@ -109,7 +274,7 @@ screen_pick::Hit Play::rayHit(const screen_pick::Ray& ray, float terrainT, const
     screen_pick::Hit hit;
     for(int i=0;i<static_cast<int>(foes_.size());++i) {
         const Foe& foe=foes_[static_cast<std::size_t>(i)];
-        if(foe.hp<=0) continue;
+        if(foe.hp<=0 || foe.followsPlayer) continue;
         // O modelo pode ser maior que o circulo no terreno: selecionar o corpo inteiro.
         const float t=screen_pick::actor(ray,foe.x,map?map->heightAt(foe.x,foe.y):0.f,foe.y,std::max(.58f,foe.radius+.32f),2.1f);
         if(t<hit.t && screen_pick::visible(t,terrainT)) hit={1,i,t};
@@ -140,7 +305,7 @@ void Play::pick(float x, float y) {
     float bestD=2.2f;
     for(int i=0;i<static_cast<int>(foes_.size());++i) {
         const Foe& foe=foes_[static_cast<std::size_t>(i)];
-        if(foe.hp<=0) continue;
+        if(foe.hp<=0 || foe.followsPlayer) continue;
         const float d=std::hypot(foe.x-x,foe.y-y);
         if(d<bestD) { bestD=d; best=i; }
     }
@@ -160,7 +325,7 @@ int Play::cursorOver(float x, float y) const {
     float best = 2.2f;
     bool hit = false;
     for (const Foe& mob : foes_) {
-        if (mob.hp <= 0) continue;
+        if (mob.hp <= 0 || mob.followsPlayer) continue;
         const float dx = mob.x - x;
         const float dy = mob.y - y;
         const float dist = std::sqrt(dx * dx + dy * dy);
@@ -184,7 +349,7 @@ void Play::clearTarget() {
 bool Play::aim(float px, float py, float& yaw) const {
     if (target_ < 0 || target_ >= static_cast<int>(foes_.size())) return false;
     const Foe& foe = foes_[static_cast<std::size_t>(target_)];
-    if (foe.hp <= 0) return false;
+    if (foe.hp <= 0 || foe.followsPlayer) return false;
     const float dx = foe.x - px;
     const float dy = foe.y - py;
     if (dx * dx + dy * dy < 1e-6f) return false;
@@ -195,7 +360,7 @@ bool Play::aim(float px, float py, float& yaw) const {
 bool Play::chasePoint(float px, float py, float& outX, float& outY) const {
     if (target_ < 0 || target_ >= static_cast<int>(foes_.size())) return false;
     const Foe& foe = foes_[static_cast<std::size_t>(target_)];
-    if (foe.hp <= 0) return false;
+    if (foe.hp <= 0 || foe.followsPlayer) return false;
     const float dx = foe.x - px;
     const float dy = foe.y - py;
     const float dist = std::sqrt(dx * dx + dy * dy);

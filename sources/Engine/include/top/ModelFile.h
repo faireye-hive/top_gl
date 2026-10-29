@@ -45,6 +45,12 @@ struct ModelGeom {
     // Cada quadro e uma lwMatrix43 expandida para a matriz 4x4 do MindPower.
     std::vector<float> matrixAnimation;
     int matrixFrames = 0;
+    // Preserve the embedded lwAnimDataBone block. Effect meshes decode it
+    // separately; character/world readers keep their existing LAB policy.
+    std::uint32_t embeddedBoneVersion = 0;
+    std::vector<std::uint8_t> embeddedBoneData;
+    int effectBoneCount = 0, effectBoneFrames = 0;
+    std::vector<float> effectBoneMatrices; // frame-major inverse-bind * pose
 };
 
 struct Model {

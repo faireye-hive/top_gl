@@ -13,7 +13,13 @@ struct Stack {
     std::array<int,3> gemIds{};
     top::equipment_stats::Bonus extra;
     int quality = 0, durability = 0, maxDurability = 0, energy = 0, maxEnergy = 0;
+    int itemValStaTenths = 0;
+    std::array<int,3> blueprintParts{};
     bool tradable = true;
+    std::array<int,6> fairySkills{};
+    std::array<int,5> fairyStats{};
+    int fairySystemTick=0,expDisableFlag=0,altarSacrifice=0,cloakLevel=0,fuseId=0;
+    int equipmentUpgradeLevel=0;
 };
 int main() {
     using namespace top::item_instance;
@@ -25,6 +31,7 @@ int main() {
     bag[0].extra.str=4; bag[0].extra.aspdCoefficient=70;
     bag[0].extra.minAttackCoefficient=35; bag[0].extra.maxAttackCoefficient=55;
     bag[1].extra.str=7; bag[1].extra.defense=11;
+    bag[0].itemValStaTenths=15; bag[0].blueprintParts={7,4,6};
     const auto encoded=encodeStacks(bag);
     std::vector<Stack> restored(2);
     restored[0].id=restored[1].id=1;
@@ -37,6 +44,9 @@ int main() {
         restored[0].extra.str!=4 || restored[1].extra.str!=7 ||
         restored[1].extra.defense!=11) {
         std::cerr << "Metadados da mesma espada se misturaram\n"; return 1;
+    }
+    if (restored[0].itemValStaTenths!=15 || restored[0].blueprintParts!=std::array<int,3>{7,4,6}) {
+        std::cerr << "Atributos fracionarios de blueprint nao persistiram\n"; return 3;
     }
     auto mismatched=restored;
     mismatched[1].id=8; mismatched[1].uid=0; mismatched[1].extra={};

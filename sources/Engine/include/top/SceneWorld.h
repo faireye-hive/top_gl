@@ -4,6 +4,7 @@
 // e CSceneObj::_UpdatePos / _UpdateYaw. O modelo sai de sceneobjinfo.txt.
 
 #include "top/GfxDevice.h"
+#include "top/HistoricalMapSceneEffects.h"
 #include "top/MapFile.h"
 #include "top/ModelFile.h"
 
@@ -38,6 +39,7 @@ struct SceneMesh {
     std::vector<SceneBatch> batches;
     std::vector<std::string> missingTextures;
     std::vector<SceneSlab> slabs;
+    std::vector<MapSceneEffectPlacement> mapEffects;
     // Triangulos de piso dos predios, 9 floats (x, y, altura) por triangulo.
     std::vector<float> walk;
     std::unordered_map<std::uint64_t, std::vector<int>> walkCell;

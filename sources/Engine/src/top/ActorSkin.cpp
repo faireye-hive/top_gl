@@ -8,6 +8,8 @@
 #include "top/ActionPose.h"
 #include "top/CharacterPoseBinding.h"
 #include "top/ActorFrameCache.h"
+#include "top/HistoricalCharacterHeight.h"
+#include "top/PopulationIdentity.h"
 
 #include <algorithm>
 #include <array>
@@ -15,6 +17,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <chrono>
 #include <dirent.h>
 #include <unordered_map>
 
@@ -701,14 +704,18 @@ void radarPixel(float playerX, float playerY, float worldX, float worldY, int& p
 
 struct ActorSkin::Body {
     int id = 0;
+    int territory = 0;          // characterinfo.txt chTerritory, DX9
+    int seaHeightCm = 0;        // characterinfo.txt sSeaHeight (centimeters)
     bool player = false;
     bool passive = false;
     std::uint64_t spawnKey = 0;
     int respawnSeconds = 0;
     float spawnFacing = 0.f; // graus do CreateCha, independente da matriz visual
+    float spawnX = 0.f, spawnY = 0.f; // stable location even while AI moves
     BoneClip bone;
     std::vector<Model> parts;
     int cachedPoseFrame = -1;
+    int cachedDrawFrame = -1;
     int cachedDrawPose = -1;
     std::vector<float> cachedPoseMatrices;
     std::vector<std::vector<actor_frame_cache::IndexedVertices>> cachedGeometry;
@@ -937,6 +944,27 @@ bool ActorSkin::selfTest() {
     if(!poseB.count(6) || std::fabs(poseB.at(6)[12]-4.f)>.001f) return false;
     swords.setPlayerPose(0);swords.setPlayer(0,0,0,0,false,0);swords.build(emptyMap);
     if(!bladesAt(10.f))return false; // idle safely returns to the back
+    ActorSkin targetActor;
+    Body targetBody;
+    targetBody.player=false;
+    targetBody.bone.boneNum=1;targetBody.bone.frameNum=6;targetBody.bone.keyType=1;
+    targetBody.bone.parent={0xffffffffu};targetBody.bone.inv.resize(16);
+    identity(targetBody.bone.inv.data());
+    for(int f=0;f<6;++f) {
+        const float m[12]={1,0,0,0,1,0,0,0,1,static_cast<float>(f),0,0};
+        targetBody.bone.mat43.insert(targetBody.bone.mat43.end(),m,m+12);
+    }
+    BoneClip::Dummy hitDummy;hitDummy.id=55;hitDummy.parent=0;identity(hitDummy.matrix);
+    hitDummy.matrix[12]=2.f;targetBody.bone.dummies.push_back(hitDummy);
+    targetBody.variants.action[0][1]={0,5,0};targetBody.variants.action[0][12]={0,5,1};
+    targetBody.usePoseMode(0);targetActor.bodies_.push_back(targetBody);
+    targetActor.setPlayer(0,0,0,0,false,.1f);
+    targetActor.setMonster(0,5,7,0,false,2,false,1.f,12,1.f,1);
+    targetActor.build(emptyMap);
+    const auto targetPose=targetActor.monsterDummyWorldMatrices(0);
+    if(!targetPose.count(55) || std::fabs(targetPose.at(55)[12]-10.f)>.001f ||
+       std::fabs(targetPose.at(55)[13]-7.f)>.001f ||
+       std::fabs(targetPose.at(55)[14])>.001f) return false;
     ActorSkin hud;
     const int stateX = 1280 - 215 + 7 + 4;
     const int stateY = 720 - 30 + 4 + 4;
@@ -1130,7 +1158,16 @@ bool ActorSkin::open(const std::string& clientRoot, const std::string& mapName, 
     root_ = clientRoot;
     mapName_ = mapName;
     playerId_ = playerId >= 1 && playerId <= 4 ? playerId : 1;
+    roster_ = monsters;
+    // Finishing the previous background task is only needed for a full
+    // map/character transition; regular sector refreshes never wait here.
+    populationPreload_ = {};
+    populationPreloadIds_.clear();
+    populationPreloadFailures_.clear();
+    lastPrefetchStats_ = {};
     bodies_.clear();
+    cachedPopulationTypes_.clear();
+    lastPopulationUpdate_ = {};
     drives_.clear();
     placed_ = false;
     equipLines_.clear();
@@ -1203,6 +1240,10 @@ bool ActorSkin::open(const std::string& clientRoot, const std::string& mapName, 
         std::snprintf(labName, sizeof labName, "%04d.lab", row.model);
         Body body;
         body.id = id;
+        // Same columns already used by our historical ship renderer. Do not
+        // infer water status from terrain color/model name or negative ground.
+        body.territory = field(cols, 26);
+        body.seaHeightCm = field(cols, 27);
         body.shadow = row.shadow;
         body.shadowLength = row.length;
         body.shadowWidth = row.width;
@@ -1214,6 +1255,8 @@ bool ActorSkin::open(const std::string& clientRoot, const std::string& mapName, 
             body.spawnKey = roster[thisActor - 1].spawnKey;
             body.respawnSeconds = roster[thisActor - 1].respawnSeconds;
             body.spawnFacing = roster[thisActor - 1].yaw;
+            body.spawnX = roster[thisActor - 1].x;
+            body.spawnY = roster[thisActor - 1].y;
             // npc.txt guarda graus no mesmo eixo de CSceneObj::_UpdateYaw.
             // 180 - angulo virava de costas quem foi gravado em 180.
             if (body.passive) body.yawDeg = roster[thisActor - 1].yaw;
@@ -1429,12 +1472,66 @@ std::unordered_map<int, std::array<float, 16>> ActorSkin::playerDummyWorldMatric
     return result;
 }
 
+std::unordered_map<int, std::array<float, 16>> ActorSkin::monsterDummyWorldMatrices(int index) const {
+    std::unordered_map<int, std::array<float, 16>> result;
+    if (index < 0 || boatMode_) return result;
+    int seen = 0;
+    for (const Body& body : bodies_) {
+        if (body.player || body.passive) continue;
+        if (seen++ != index) continue;
+        if (body.cachedDrawFrame < 0 || body.bone.boneNum <= 0) return result;
+        std::vector<float> sampledPose;
+        const std::vector<float>* pose = &body.cachedPoseMatrices;
+        if (body.cachedPoseFrame != body.cachedDrawFrame ||
+            body.cachedPoseMatrices.size() != static_cast<std::size_t>(body.bone.boneNum) * 16) {
+            body.bone.matrices(body.cachedDrawFrame, sampledPose);
+            pose = &sampledPose;
+        }
+        if (pose->size() != static_cast<std::size_t>(body.bone.boneNum) * 16) return result;
+        float node[16];
+        nodeMatrix(node, body.yawDeg, body.x, body.y, body.z);
+        for (const auto& dummy : body.bone.dummies) {
+            if (dummy.id > 255) continue;
+            float boneDummy[16];
+            if (!body.bone.dummyMatrixFromPose(*pose, static_cast<int>(dummy.id), boneDummy)) continue;
+            std::array<float, 16> world{};
+            multiply(boneDummy, node, world.data());
+            if (std::all_of(world.begin(), world.end(), [](float value) {
+                    return std::isfinite(value);
+                })) result[static_cast<int>(dummy.id)] = world;
+        }
+        return result;
+    }
+    return result;
+}
+
+std::array<float, 3> ActorSkin::monsterWorldRoot(int index) const {
+    int seen = 0;
+    for (const Body& body : bodies_) {
+        if (body.player || body.passive) continue;
+        if (seen++ == index) return {body.x, body.z, body.y};
+    }
+    return {};
+}
+
 std::unordered_map<int,std::array<float,16>> ActorSkin::playerItemDummyWorldMatrices() const {
+    return actorItemDummyWorldMatrices(-1);
+}
+
+std::unordered_map<int,std::array<float,16>> ActorSkin::actorItemDummyWorldMatrices(int index) const {
     std::unordered_map<int,std::array<float,16>> result;
     if(boatMode_)return result;
+    int seen=0;
     for(const Body& body:bodies_){
-        if(!body.player || body.cachedDrawPose<0 ||
-           body.cachedPoseMatrices.size()!=static_cast<std::size_t>(body.bone.boneNum)*16)continue;
+        if(index==-1 ? !body.player : (body.player || body.passive || seen++!=index))continue;
+        if(body.cachedDrawPose<0 ||
+           body.cachedDrawFrame<0)continue;
+        std::vector<float> sampled;
+        const auto* pose=&body.cachedPoseMatrices;
+        if(body.cachedPoseFrame!=body.cachedDrawFrame || pose->size()!=static_cast<std::size_t>(body.bone.boneNum)*16) {
+            body.bone.matrices(body.cachedDrawFrame,sampled);pose=&sampled;
+        }
+        if(pose->size()!=static_cast<std::size_t>(body.bone.boneNum)*16)continue;
         // Right weapon is the historical primary item for ordinary item cast
         // events. A left-only weapon is accepted when no right weapon exists.
         for(int requestedSlot:{9,6}){
@@ -1444,9 +1541,9 @@ std::unordered_map<int,std::array<float,16>> ActorSkin::playerItemDummyWorldMatr
                 if(!model.hasItemDummy || model.itemDummies.empty())continue;
                 const int back=requestedSlot==9?body.rightWeaponBackDummy:body.leftWeaponBackDummy;
                 const int attachId=weaponAttachmentDummy(requestedSlot,back,
-                                                           playerWeaponsDrawn_,body.cachedDrawPose);
+                                                           body.player?playerWeaponsDrawn_:true,body.cachedDrawPose);
                 float attachment[16];
-                if(!body.bone.dummyMatrixFromPose(body.cachedPoseMatrices,attachId,attachment))continue;
+                if(!body.bone.dummyMatrixFromPose(*pose,attachId,attachment))continue;
                 float inverseGrip[16];
                 if(!inverseAffine(model.itemDummy,inverseGrip))continue;
                 float itemToBone[16],node[16],itemToWorld[16];
@@ -1559,12 +1656,265 @@ void ActorSkin::ensurePlaced(MapFile& map) {
     placed_ = true;
 }
 
+bool ActorSkin::hasPopulationType(int id) const {
+    if (cachedPopulationTypes_.count(id)) return true;
+    for (const Body& body : bodies_)
+        if (!body.player && body.id == id) return true;
+    return false;
+}
+
+bool ActorSkin::pollPopulationPrefetch() {
+    if (!populationPreload_.valid() ||
+        populationPreload_.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+        return false;
+    lastPrefetchStats_ = {};
+    lastPrefetchStats_.requested = static_cast<int>(populationPreloadIds_.size());
+    lastPrefetchStats_.elapsedMs =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - populationPreloadStart_).count();
+    std::unique_ptr<ActorSkin> loaded;
+    try { loaded = populationPreload_.get(); }
+    catch (...) { /* Bad assets/failed I/O must not crash the renderer. */ }
+    std::unordered_set<int> completed;
+    if (loaded) {
+        constexpr std::size_t kLimit = 48; // Identical to PERF-01 cache cap.
+        for (Body& body : loaded->bodies_) {
+            if (body.player || !body.id || completed.count(body.id)) continue;
+            completed.insert(body.id);
+            if (hasPopulationType(body.id)) continue;
+            if (cachedPopulationTypes_.size() >= kLimit) continue;
+            const int id = body.id;
+            body.cachedPoseMatrices.clear();
+            body.cachedGeometry.clear();
+            cachedPopulationTypes_.emplace(id, std::make_shared<Body>(std::move(body)));
+            ++lastPrefetchStats_.loaded;
+        }
+    }
+    for (int id : populationPreloadIds_) {
+        if (completed.count(id) == 0 && !hasPopulationType(id)) {
+            populationPreloadFailures_.insert(id);
+            ++lastPrefetchStats_.failed;
+        }
+    }
+    populationPreloadIds_.clear();
+    return true;
+}
+
+int ActorSkin::beginPopulationPrefetch(const std::vector<MonsterSlot>& candidates, int maxTypes) {
+    if (root_.empty() || bodies_.empty() || maxTypes <= 0 || populationPreload_.valid()) return 0;
+    constexpr std::size_t kLimit = 48;
+    if (cachedPopulationTypes_.size() >= kLimit) return 0;
+    std::unordered_set<int> chosen;
+    std::vector<MonsterSlot> subset;
+    const auto available = kLimit - cachedPopulationTypes_.size();
+    const auto capacity = std::min<std::size_t>(available, static_cast<std::size_t>(maxTypes));
+    for (const MonsterSlot& slot : candidates) {
+        if (slot.id <= 0 || hasPopulationType(slot.id) || populationPreloadFailures_.count(slot.id) ||
+            !chosen.insert(slot.id).second) continue;
+        subset.push_back(slot);
+        if (subset.size() >= capacity) break;
+    }
+    if (subset.empty()) return 0;
+    populationPreloadIds_.clear();
+    for (const MonsterSlot& slot : subset) populationPreloadIds_.push_back(slot.id);
+    populationPreloadStart_ = std::chrono::steady_clock::now();
+    // All captured values are immutable. No live actor, Play, OpenGL context,
+    // texture cache, or renderer is accessed from the worker.
+    const std::string clientRoot = root_;
+    const std::string mapName = mapName_;
+    const int playerId = playerId_;
+    populationPreload_ = std::async(std::launch::async,
+        [clientRoot, mapName, playerId, subset = std::move(subset)]() mutable -> std::unique_ptr<ActorSkin> {
+            auto loader = std::make_unique<ActorSkin>();
+            if (!loader->open(clientRoot, mapName, subset, playerId)) return {};
+            return loader;
+        });
+    return static_cast<int>(populationPreloadIds_.size());
+}
+
+ActorSkin::PrefetchState ActorSkin::ensurePopulationPrefetched(const std::vector<MonsterSlot>& required) {
+    pollPopulationPrefetch();
+    std::unordered_set<int> missingIds;
+    std::vector<MonsterSlot> missing;
+    for (const MonsterSlot& slot : required) {
+        if (slot.id <= 0 || hasPopulationType(slot.id) || !missingIds.insert(slot.id).second) continue;
+        if (populationPreloadFailures_.count(slot.id)) return PrefetchState::Fallback;
+        missing.push_back(slot);
+    }
+    if (missing.empty()) return PrefetchState::Ready;
+    // Avoid occupying the cache with unrelated types before the required ones.
+    if (missing.size() + cachedPopulationTypes_.size() > 48) return PrefetchState::Fallback;
+    if (populationPreload_.valid()) return PrefetchState::Pending;
+    return beginPopulationPrefetch(missing, static_cast<int>(missing.size())) > 0 ?
+        PrefetchState::Pending : PrefetchState::Fallback;
+}
+
+bool ActorSkin::updatePopulation(const std::vector<MonsterSlot>& monsters) {
+    if (root_.empty() || bodies_.empty()) return false;
+    // Body can outlive the original tile. Match stable historical spawn keys,
+    // falling back to the original source coordinates for keyless GM/NPC slots.
+    auto matches = [](const Body& body, const MonsterSlot& slot) {
+        return population_identity::same(
+            {body.id, body.spawnX, body.spawnY, body.passive, body.spawnKey},
+            {slot.id, slot.x, slot.y, slot.passive, slot.spawnKey});
+    };
+    std::vector<bool> taken(bodies_.size(), false);
+    std::vector<int> oldIndex(monsters.size(), -1);
+    // A parsed type can be reused when walking back to an earlier sector.
+    // Avoid caching every NPC in the map: at most 48 types per open/map.
+    constexpr std::size_t kPopulationTypeLimit = 48;
+    for (const Body& body : bodies_) {
+        if (body.player || cachedPopulationTypes_.count(body.id) ||
+            cachedPopulationTypes_.size() >= kPopulationTypeLimit) continue;
+        Body prototype = body;
+        prototype.cachedPoseMatrices.clear();
+        prototype.cachedGeometry.clear();
+        cachedPopulationTypes_[body.id] = std::make_shared<Body>(std::move(prototype));
+    }
+    std::unordered_map<int, const Body*> prototypes;
+    for (const auto& entry : cachedPopulationTypes_)
+        prototypes.emplace(entry.first, entry.second.get());
+    std::vector<MonsterSlot> loadTypes;
+    for (std::size_t i = 0; i < monsters.size(); ++i) {
+        const MonsterSlot& slot = monsters[i];
+        for (std::size_t j = 0; j < bodies_.size(); ++j) {
+            if (!taken[j] && !bodies_[j].player && matches(bodies_[j], slot)) {
+                oldIndex[i] = static_cast<int>(j);
+                taken[j] = true;
+                break;
+            }
+        }
+        if (oldIndex[i] >= 0 || prototypes.count(slot.id)) continue;
+        bool known = false;
+        for (const Body& body : bodies_) {
+            if (!body.player && body.id == slot.id) {
+                prototypes.emplace(slot.id, &body);
+                known = true;
+                break;
+            }
+        }
+        if (!known && std::none_of(loadTypes.begin(), loadTypes.end(), [&](const MonsterSlot& candidate) {
+                return candidate.id == slot.id;
+            })) loadTypes.push_back(slot);
+    }
+    const int newTypeCount = static_cast<int>(loadTypes.size());
+    if (!loadTypes.empty()) {
+        // Load only new character IDs; leave the live scene untouched if I/O
+        // fails. The temporary renderer is never exposed to the active Play.
+        ActorSkin loader;
+        if (!loader.open(root_, mapName_, loadTypes, playerId_)) return false;
+        for (const Body& body : loader.bodies_)
+            if (!body.player && !prototypes.count(body.id)) {
+                if (cachedPopulationTypes_.size() < kPopulationTypeLimit) {
+                    Body prototype = body;
+                    prototype.cachedPoseMatrices.clear();
+                    prototype.cachedGeometry.clear();
+                    auto stored = std::make_shared<Body>(std::move(prototype));
+                    prototypes.emplace(body.id, stored.get());
+                    cachedPopulationTypes_.emplace(body.id, std::move(stored));
+                } else {
+                    // New type beyond cache capacity: the caller can use
+                    // its existing full-open path, without partial mutation.
+                    return false;
+                }
+            }
+    }
+    // Keep the old animation drives attached to their original spawn identity.
+    std::vector<int> oldDriveIndex(bodies_.size(), -1);
+    int driveNo = 0;
+    for (std::size_t j = 0; j < bodies_.size(); ++j)
+        if (!bodies_[j].player && !bodies_[j].passive) oldDriveIndex[j] = driveNo++;
+    std::vector<Body> next;
+    std::vector<MobDrive> nextDrives;
+    next.reserve(monsters.size() + 1);
+    nextDrives.reserve(monsters.size());
+    // Player and its equipment/boat must never be rebuilt for streaming.
+    for (Body& body : bodies_)
+        if (body.player) { next.push_back(std::move(body)); break; }
+    if (next.empty()) return false;
+    int retained = 0;
+    int created = 0;
+    for (std::size_t i = 0; i < monsters.size(); ++i) {
+        const MonsterSlot& slot = monsters[i];
+        Body body;
+        MobDrive drive;
+        if (oldIndex[i] >= 0) {
+            const int index = oldIndex[i];
+            body = std::move(bodies_[static_cast<std::size_t>(index)]);
+            const int oldDrive = oldDriveIndex[static_cast<std::size_t>(index)];
+            if (oldDrive >= 0 && static_cast<std::size_t>(oldDrive) < drives_.size())
+                drive = drives_[static_cast<std::size_t>(oldDrive)];
+            ++retained;
+        } else {
+            const auto it = prototypes.find(slot.id);
+            if (it == prototypes.end()) continue; // same rule as open(): invalid character skipped
+            body = *it->second;
+            ++created;
+            body.x = slot.x;
+            body.y = slot.y;
+            body.cursor = 8.f;
+            body.cachedPoseFrame = body.cachedDrawFrame = body.cachedDrawPose = -1;
+            body.cachedPoseMatrices.clear();
+            body.cachedGeometry.clear();
+        }
+        body.spawnKey = slot.spawnKey;
+        body.respawnSeconds = slot.respawnSeconds;
+        body.spawnFacing = slot.yaw;
+        body.spawnX = slot.x;
+        body.spawnY = slot.y;
+        body.passive = slot.passive;
+        if (slot.passive) body.yawDeg = slot.yaw;
+        next.push_back(std::move(body));
+        if (!slot.passive) nextDrives.push_back(std::move(drive));
+    }
+    bodies_ = std::move(next);
+    drives_ = std::move(nextDrives);
+    roster_ = monsters;
+    report_.actors = static_cast<int>(bodies_.size());
+    report_.parts = report_.bones = report_.monsterPoseReady = report_.monsterPoseMissing = 0;
+    for (const Body& body : bodies_) {
+        report_.parts += static_cast<int>(body.parts.size());
+        report_.bones += body.bone.boneNum;
+        if (!body.player) {
+            if (body.idle.ok() || body.run.ok()) ++report_.monsterPoseReady;
+            else ++report_.monsterPoseMissing;
+        }
+    }
+    // Newly materialized bodies need placement, but do not touch the player's
+    // cached geometry/pose, boat mesh, equipped items or UI state.
+    placed_ = false;
+    lastPopulationUpdate_ = {retained, created, newTypeCount,
+                             static_cast<int>(cachedPopulationTypes_.size())};
+    return true;
+}
+
 int ActorSkin::monsterCount() const {
     int count = 0;
     for (const Body& body : bodies_) {
         if (!body.player && !body.passive) ++count;
     }
     return count;
+}
+
+int ActorSkin::appendMonsterModel(int id, bool duplicate) {
+    if (id <= 0 || root_.empty()) return -1;
+    if (!duplicate) {
+        for (int i = 0; i < monsterCount(); ++i)
+            if (monsterSlot(i).id == id) return i;
+    }
+    const bool restoreBoat = boatMode_;
+    const int savedBoatId = boatId_;
+    std::vector<MonsterSlot> expanded = roster_;
+    MonsterSlot slot;
+    slot.id = id;
+    slot.passive = false;
+    slot.x = playerX_ + 1.f;
+    slot.y = playerY_ + 1.f;
+    slot.yaw = 145.f;
+    expanded.push_back(slot);
+    if (!open(root_, mapName_, expanded, playerId_)) return -1;
+    if (restoreBoat) setBoatMode(true, savedBoatId);
+    const int last = monsterCount() - 1;
+    return last >= 0 && monsterSlot(last).id == id ? last : -1;
 }
 
 float ActorSkin::playerAttackWindup() const {
@@ -1802,6 +2152,7 @@ bool ActorSkin::setBoatMode(bool enabled, int shipId) {
         player->cachedGeometry.clear();
         report_.parts += static_cast<int>(player->parts.size());
         boatMode_ = false;
+        boatMoveSpeed_ = 0.f;
         return true;
     }
 
@@ -1833,6 +2184,34 @@ bool ActorSkin::setBoatMode(bool enabled, int shipId) {
     const int hullId = field(ship->second, 5);
     const auto hull = parts.find(hullId);
     if (hull == parts.end()) return false;
+    // CCharBoat::Create selects the first authored option for each component.
+    // ShipSet sets byIsUpdate=1, so GetData sums hull, fore, engine and its
+    // motors, cannon and equipment into ATTR_BMSPD.
+    auto firstId = [](const std::vector<std::string>& row, int column) {
+        if (column < 0 || column >= static_cast<int>(row.size())) return 0;
+        const std::string& value = row[static_cast<std::size_t>(column)];
+        const std::size_t comma = value.find(',');
+        return std::atoi(value.substr(0, comma).c_str());
+    };
+    int shipSpeed = field(ship->second, 25);
+    auto addPartSpeed = [&](int id) {
+        const auto part = parts.find(id);
+        if (id > 0 && part != parts.end()) shipSpeed += field(part->second, 21);
+    };
+    addPartSpeed(hullId);
+    addPartSpeed(firstId(ship->second, 7)); // fore
+    const int engineId = firstId(ship->second, 6); // mobility
+    addPartSpeed(engineId);
+    const auto engine = parts.find(engineId);
+    if (engine != parts.end()) {
+        for (int column = 3; column <= 6; ++column) {
+            const int motorId = field(engine->second, column);
+            if (motorId <= 0) break;
+            addPartSpeed(motorId);
+        }
+    }
+    addPartSpeed(firstId(ship->second, 8)); // artillery
+    addPartSpeed(firstId(ship->second, 9)); // component/equipment
     int modelId = field(hull->second, 2);
     if (modelId <= 0) return false;
     char fileName[32];
@@ -1885,6 +2264,7 @@ bool ActorSkin::setBoatMode(bool enabled, int shipId) {
     player->cachedGeometry.clear();
     report_.parts += 1;
     boatSeaHeight_ = seaHeight;
+    boatMoveSpeed_ = static_cast<float>(std::max(0, shipSpeed)) / 100.f;
     boatMode_ = true;
     ui_.boat.close();
     return true;
@@ -2012,6 +2392,7 @@ void ActorSkin::build(MapFile& map, const SceneMesh* ground) {
         } else {
             frame = sampleFrame(pose.ok() ? pose : body.idle, body.cursor, body.bone.frameNum);
         }
+        body.cachedDrawFrame = frame;
         // Atualize sempre pose, posicao e altura, mesmo fora da camera.
         // Somente a montagem visual (matrizes, skinning e sombras) e descartada;
         // a IA, combate, spawns e colisao continuam no Play/NpcSystem.
@@ -2023,7 +2404,22 @@ void ActorSkin::build(MapFile& map, const SceneMesh* ground) {
             body.yawDeg = 180.f - playerYaw_ * (180.f / kPi);
         } else {
             const float terrain = map.heightAt(body.x, body.y);
-            body.z = ground ? ground->surfaceAt(body.x, body.y, terrain, terrain) : terrain;
+            const float groundHeight = ground ?
+                ground->surfaceAt(body.x, body.y, terrain, terrain) : terrain;
+            body.z = historical_character_height::baseHeight(
+                body.territory, body.seaHeightCm, groundHeight);
+            if (body.territory == 1) {
+                // Opt-in, once per character ID: prove which historical
+                // character records are actually visible in the OpenGL scene.
+                const char* trace = std::getenv("TOP_TRACE_SEA_ACTORS");
+                if (trace && trace[0] == '1') {
+                    static std::unordered_map<int, bool> seen;
+                    if (seen.size() < 128 && seen.emplace(body.id, true).second)
+                        std::fprintf(stderr,
+                            "[sea-actor] id=%d territory=%d sea_cm=%d model_z=%.3f terrain_z=%.3f\n",
+                            body.id, body.territory, body.seaHeightCm, body.z, groundHeight);
+                }
+            }
             if (drivenPose < 0 && !body.passive) {
                 const float dx = playerX_ - body.x;
                 const float dy = playerY_ - body.y;

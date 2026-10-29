@@ -11,6 +11,12 @@ struct PersistedStack {
     top::equipment_stats::Bonus extra;
     int quality=0, durability=0, maxDurability=0, energy=0, maxEnergy=0;
     bool tradable=true;
+    int itemValStaTenths=0;
+    std::array<int,3> blueprintParts{};
+    std::array<int,6> fairySkills{};
+    std::array<int,5> fairyStats{};
+    int fairySystemTick=0,expDisableFlag=0,altarSacrifice=0,cloakLevel=0,fuseId=0;
+    int equipmentUpgradeLevel=0;
 };
 
 int main() {
@@ -97,13 +103,14 @@ int main() {
     assert(!resolveAffix(HistoricalEvent::PlayerXsBox, 5, 20, 3, 1, 1).valid);
     assert(!resolveAffix(HistoricalEvent::PlayerXsBox, 22, 20, 3, 2, 81).valid);
 
-    // Y2 conserva os novos campos de instancia e ainda aceita registros Y1.
+    // Y3 conserva o estado de blueprint e aceita os registros Y1/Y2.
     PersistedStack saved;
     saved.id=123; saved.count=1; saved.uid=42; saved.forgeLevel=3;
     saved.gemIds={8,9,10}; saved.extra.str=17;
     saved.extra.minAttackCoefficient=8; saved.extra.maxAttackCoefficient=12;
     saved.quality=3; saved.durability=75; saved.maxDurability=80;
     saved.energy=110; saved.maxEnergy=120; saved.tradable=false;
+    saved.itemValStaTenths=15; saved.blueprintParts={7,4,6};
     const std::string encoded=top::item_instance::encodeStacks(std::vector<PersistedStack>{saved});
     PersistedStack restored; restored.id=123; restored.count=1;
     std::vector<PersistedStack> target{restored};
@@ -112,6 +119,7 @@ int main() {
            target[0].extra.minAttackCoefficient==8 && target[0].extra.maxAttackCoefficient==12 &&
            target[0].durability==75 && target[0].maxDurability==80 && target[0].energy==110 &&
            target[0].maxEnergy==120 && !target[0].tradable);
+    assert(target[0].itemValStaTenths==15 && (target[0].blueprintParts==std::array<int,3>{7,4,6}));
     // Y1 tinha 25 campos: os dados de stats/UID continuam legíveis, os campos
     // que nao existiam permanecem nos defaults sem inventar estado atual.
     const char* y1="123,1,42,3,8,9,10,17,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0";

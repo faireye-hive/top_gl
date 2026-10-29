@@ -83,25 +83,25 @@ int main() {
     const auto h=edge(1),up=edge(2);
     float h2=0,u2=0,dot=0,plane=0;
     for(int i=0;i<3;++i){h2+=h[i]*h[i];u2+=up[i]*up[i];dot+=h[i]*up[i];plane+=up[i]*normal[i];}
-    assert(near(h2,2.4f*2.4f)&&near(u2,h2)&&near(dot,0)&&near(plane,0));
-    assert(near(up[1],2.4f*c)&&near(up[2],-2.4f*c)); // tilted camera, no world-up flattening
+    assert(near(h2,4.f*4.f)&&near(u2,h2)&&near(dot,0)&&near(plane,0));
+    assert(near(up[1],4.f*c)&&near(up[2],-4.f*c)); // tilted camera, no world-up flattening
     top::EffectSystem direct;assert(direct.open(root.string()));
     direct.emit({top::EffectEvent::Cast,0,0,0,0,505});direct.step(.1f);direct.build(map,basis);
     const auto& d=geometry(direct);assert(d.size()==6);
-    assert(near(d[1].x-d[0].x,1.2f));
-    assert(near(d[2].y-d[0].y,1.2f*c)&&near(d[2].z-d[0].z,-1.2f*c));
+    assert(near(d[1].x-d[0].x,2.f));
+    assert(near(d[2].y-d[0].y,2.f*c)&&near(d[2].z-d[0].z,-2.f*c));
     glow.build(map,1,0);assert(near(geometry(glow)[2].z-geometry(glow)[0].z,0)); // old CPU API remains available
     glow.step(.31f);glow.build(map,basis); // controller .61, NOT delay+.6
     for(const auto& batch:glow.batches())assert(batch.verts.empty());
     top::EffectSystem beam;assert(beam.open(root.string()));
     beam.emit({top::EffectEvent::Cast,0,0,0,0,502});beam.step(.1f);beam.build(map,basis);
     const auto& b=geometry(beam);assert(b.size()==6);
-    assert(near(b[1].x-b[0].x,1.2f*std::sin(.2f)));
-    assert(near(b[1].y-b[0].y,1.2f*std::cos(.2f)));
+    assert(near(b[1].x-b[0].x,4.f*std::sin(.2f)));
+    assert(near(b[1].y-b[0].y,4.f*std::cos(.2f)));
     // Child translation is scaled/rotated too. The Rect diagonal center is
-    // local (1,2,3.3), then the parent's scale 2 and yaw .2, then world anchor.
-    assert(near((b[0].x+b[2].x)*.5f,2*std::cos(.2f)+6.6f*std::sin(.2f)));
-    assert(near((b[0].y+b[2].y)*.5f,.9f-2*std::sin(.2f)+6.6f*std::cos(.2f)));
+    // local (1,2,4), then the parent's scale 2 and yaw .2, then world anchor.
+    assert(near((b[0].x+b[2].x)*.5f,2*std::cos(.2f)+8.f*std::sin(.2f)));
+    assert(near((b[0].y+b[2].y)*.5f,.9f-2*std::sin(.2f)+8.f*std::cos(.2f)));
     assert(near((b[0].z+b[2].z)*.5f,4));
     top::EffectSystem ground;assert(ground.open(root.string()));
     ground.emit({top::EffectEvent::SkillHit,0,0,0,0,503});ground.step(.1f);ground.build(map,basis);

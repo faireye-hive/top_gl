@@ -107,6 +107,16 @@ public:
         std::memcpy(&v, &u, 4);
         return std::isfinite(v);
     }
+    // I_Effect::LoadFromFile reads the authored model parameters verbatim.
+    // Some Client .eff files store non-finite values here even for models
+    // whose geometry never consumes these fields (for example RectPlane).
+    // Keep those bits; native Cone/Cylinder generation validates them before use.
+    bool rawF32(float& v) {
+        std::uint32_t u = 0;
+        if (!u32(u)) return false;
+        std::memcpy(&v, &u, 4);
+        return true;
+    }
     bool uvList(std::vector<Subeffect::UV>& out, std::size_t n) {
         out.resize(n);
         for (auto& uv : out) if (!array(uv)) return false;
@@ -156,7 +166,8 @@ inline bool header(const std::vector<unsigned char>& bytes, Document& out, int& 
     count = subCount;
     return true;
 }
-inline bool decode(const std::vector<unsigned char>& bytes, Document& output) {
+inline bool decode(const std::vector<unsigned char>& bytes, Document& output,
+                   bool allowRawModelParams = false) {
     Reader read(bytes);
     Document doc;
     int subCount = 0;
@@ -204,9 +215,12 @@ inline bool decode(const std::vector<unsigned char>& bytes, Document& output) {
         part.billboard = flag != 0;
         if (doc.version > 1) {
             if (!read.i32(part.modelParams.segments) ||
-                !read.f32(part.modelParams.height) ||
-                !read.f32(part.modelParams.topRadius) ||
-                !read.f32(part.modelParams.bottomRadius)) return false;
+                !(allowRawModelParams ? read.rawF32(part.modelParams.height) :
+                                         read.f32(part.modelParams.height)) ||
+                !(allowRawModelParams ? read.rawF32(part.modelParams.topRadius) :
+                                         read.f32(part.modelParams.topRadius)) ||
+                !(allowRawModelParams ? read.rawF32(part.modelParams.bottomRadius) :
+                                         read.f32(part.modelParams.bottomRadius))) return false;
         }
         if (doc.version > 2) {
             std::uint16_t texFrames = 0;
@@ -336,16 +350,8 @@ inline float duration(const Subeffect& part) {
     }
     return std::isfinite(result) && result<=3600.0 ? static_cast<float>(result) : 0.f;
 }
-// Compare with the pre-SK2.7 sampler without rebuilding the game.
-// The default is the DX9 duration timeline; TOP_EFF_TIME_MODE=absolute restores
-// the old OpenGL interpretation for an A/B comparison.
-inline bool historicalTimeMode() {
-    static const bool historical=[] {
-        const char* mode=std::getenv("TOP_EFF_TIME_MODE");
-        return !(mode && std::string(mode)=="absolute");
-    }();
-    return historical;
-}
+// EFF key times are durations, as consumed by CMPModelEff::FrameMove.
+inline constexpr bool historicalTimeMode() { return true; }
 inline FramePhase absoluteFramePhase(const Subeffect& part, float seconds) {
     FramePhase phase;
     if(part.keys.size()<2 || !std::isfinite(seconds))return phase;
@@ -386,14 +392,15 @@ inline FramePhase framePhase(const Subeffect& part, float seconds) {
     return phase;
 }
 
-inline Key sample(const Subeffect& part, float seconds) {
+inline Key samplePhase(const Subeffect& part, const FramePhase& phase) {
     if(part.keys.empty())return {};
-    const auto phase=framePhase(part,seconds);
-    const Key& left=part.keys[phase.from];
-    const Key& right=part.keys[phase.to];
-    const float t=phase.fraction;
+    const std::size_t from=std::min(phase.from,part.keys.size()-1);
+    const std::size_t to=std::min(phase.to,part.keys.size()-1);
+    const Key& left=part.keys[from];
+    const Key& right=part.keys[to];
+    const float t=std::clamp(phase.fraction,0.f,1.f);
     Key result;
-    result.time=std::isfinite(seconds)?std::max(0.f,seconds):0.f;
+    result.time=left.time;
     for(int j=0;j<3;++j){
         result.size[j]=left.size[j]+(right.size[j]-left.size[j])*t;
         result.angle[j]=left.angle[j]+(right.angle[j]-left.angle[j])*t;
@@ -401,6 +408,12 @@ inline Key sample(const Subeffect& part, float seconds) {
     }
     for(int j=0;j<4;++j)
         result.color[j]=left.color[j]+(right.color[j]-left.color[j])*t;
+    return result;
+}
+inline Key sample(const Subeffect& part, float seconds) {
+    if(part.keys.empty())return {};
+    auto result=samplePhase(part,framePhase(part,seconds));
+    result.time=std::isfinite(seconds)?std::max(0.f,seconds):0.f;
     return result;
 }
 

@@ -22,7 +22,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 21,Charging Sword,2,0,equipable_data,9
 22,Crescent Sword,1,0,equipable_data,"9,6"
 23,Delusion Sword,1,0,equipable_data,"9,6"
-24,Chest of Cabal,31,ItemUse_IDBOX,lua_callback_not_implemented,-1
+24,Chest of Cabal,31,ItemUse_IDBOX,ended_event_box_D1,-1
 25,Short Bow,3,0,equipable_data,6
 26,Long Bow,3,0,equipable_data,6
 27,Tribal Bow,3,0,equipable_data,6
@@ -43,7 +43,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 44,Token Pistol,4,0,equipable_data,9
 45,Gattling Firegun,4,0,equipable_data,9
 46,Cabal Voucher,26,0,non_click_item_or_other_system,-1
-48,Hairy Crab,31,AmplifierItem,lua_callback_not_implemented,-1
+48,Hairy Crab,31,AmplifierItem,amplifier_PORT_APPROX,-1
 49,Falchion,31,0,equipable_data,9
 50,Long Falchion,31,0,equipable_data,9
 51,Katana,31,0,equipable_data,9
@@ -51,7 +51,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 53,Crystal Falchion,31,0,equipable_data,9
 54,Phantom Falchion,31,0,equipable_data,9
 55,Nefarious Falchion,31,0,equipable_data,9
-56,Steamed Crab,31,AmplifierItem,lua_callback_not_implemented,-1
+56,Steamed Crab,31,AmplifierItem,amplifier_PORT_APPROX,-1
 57,Rope for Crab,41,0,non_click_item_or_other_system,-1
 58,Crab Fry,41,0,non_click_item_or_other_system,-1
 59,King Crab,41,0,non_click_item_or_other_system,-1
@@ -75,8 +75,8 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 82,Pointed Kris,7,0,equipable_data,9
 83,Crystalline Kris,7,0,equipable_data,9
 84,Vampiric Kris,7,0,equipable_data,9
-88,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-89,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
+88,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+89,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
 97,Mystic Branch,9,0,equipable_data,9
 98,Wooden Stick,9,0,equipable_data,9
 99,Magical Staff,9,0,equipable_data,9
@@ -162,7 +162,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 189,Fairy of Hope,59,0,equipable_data,16
 190,Fairy of Woe,59,0,equipable_data,16
 191,Fairy of Love,59,0,equipable_data,16
-192,Chest of Kylin,41,ItemUse_SaintCloth,lua_callback_not_implemented,-1
+192,Chest of Kylin,41,ItemUse_SaintCloth,fixed_historical_chest_D1,-1
 193,Map Switching 1,0,0,non_click_item_or_other_system,-1
 194,G,0,0,non_click_item_or_other_system,-1
 195,Tax,0,0,non_click_item_or_other_system,-1
@@ -179,25 +179,25 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 206,Left Hand of Death,6,0,equipable_data,9
 207,Gold Axe,18,0,equipable_data,9
 208,Gold Pickaxe,19,0,equipable_data,9
-209,Relic Armor Box (Night),41,ItemUse_SCBoxYXTZ,lua_callback_not_implemented,-1
-210,Relic Armor Box (Hercules),41,ItemUse_SCBoxLSTZ,lua_callback_not_implemented,-1
-211,Relic Armor Box (Progeny),41,ItemUse_SCBoxHYTZ,lua_callback_not_implemented,-1
-212,Relic Armor Box (Wise/Panda),41,ItemUse_SCBoxFYSTZ,lua_callback_not_implemented,-1
-213,Relic Armor Box (Fairy/Gold Fish),41,ItemUse_SCBoxSZZTZ,lua_callback_not_implemented,-1
-214,Relic Armor Box (Tidal/Dragon),41,ItemUse_SCBoxHHSTZ,lua_callback_not_implemented,-1
-215,Relic Weapon Box (Wonders),41,ItemUse_SCBoxRYBZ,lua_callback_not_implemented,-1
-216,Relic Weapon Box (Demon Bane),41,ItemUse_SCBoxXMC,lua_callback_not_implemented,-1
-217,Relic Weapon Box (Draco),41,ItemUse_SCBoxLQJ,lua_callback_not_implemented,-1
-218,Relic Weapon Box (Crag),41,ItemUse_SCBoxLYJ,lua_callback_not_implemented,-1
-219,Relic Weapon Box (Rainbow),41,ItemUse_SCBoxFHG,lua_callback_not_implemented,-1
-220,Relic Weapon Box (Meteor),41,ItemUse_SCBoxLXHZ,lua_callback_not_implemented,-1
-221,Relic Weapon Box (Visceral),41,ItemUse_SCBoxYCJ,lua_callback_not_implemented,-1
-222,Snow Dragon Fruit,58,FairyFruit,lua_callback_not_implemented,-1
-223,Icespire Plum,58,FairyFruit,lua_callback_not_implemented,-1
-224,Zephyr Fish Floss,58,FairyFruit,lua_callback_not_implemented,-1
-225,Argent Mango,58,FairyFruit,lua_callback_not_implemented,-1
-226,Shaitan Biscuit,58,FairyFruit,lua_callback_not_implemented,-1
-227,Fairy Ration,57,FairyRation,lua_callback_not_implemented,-1
+209,Relic Armor Box (Night),41,ItemUse_SCBoxYXTZ,fixed_historical_chest_D1,-1
+210,Relic Armor Box (Hercules),41,ItemUse_SCBoxLSTZ,fixed_historical_chest_D1,-1
+211,Relic Armor Box (Progeny),41,ItemUse_SCBoxHYTZ,fixed_historical_chest_D1,-1
+212,Relic Armor Box (Wise/Panda),41,ItemUse_SCBoxFYSTZ,fixed_historical_chest_D1,-1
+213,Relic Armor Box (Fairy/Gold Fish),41,ItemUse_SCBoxSZZTZ,fixed_historical_chest_D1,-1
+214,Relic Armor Box (Tidal/Dragon),41,ItemUse_SCBoxHHSTZ,fixed_historical_chest_D1,-1
+215,Relic Weapon Box (Wonders),41,ItemUse_SCBoxRYBZ,fixed_historical_chest_D1,-1
+216,Relic Weapon Box (Demon Bane),41,ItemUse_SCBoxXMC,fixed_historical_chest_D1,-1
+217,Relic Weapon Box (Draco),41,ItemUse_SCBoxLQJ,fixed_historical_chest_D1,-1
+218,Relic Weapon Box (Crag),41,ItemUse_SCBoxLYJ,fixed_historical_chest_D1,-1
+219,Relic Weapon Box (Rainbow),41,ItemUse_SCBoxFHG,fixed_historical_chest_D1,-1
+220,Relic Weapon Box (Meteor),41,ItemUse_SCBoxLXHZ,fixed_historical_chest_D1,-1
+221,Relic Weapon Box (Visceral),41,ItemUse_SCBoxYCJ,fixed_historical_chest_D1,-1
+222,Snow Dragon Fruit,58,FairyFruit,fairy_fruit_PORT_PARTIAL,-1
+223,Icespire Plum,58,FairyFruit,fairy_fruit_PORT_PARTIAL,-1
+224,Zephyr Fish Floss,58,FairyFruit,fairy_fruit_PORT_PARTIAL,-1
+225,Argent Mango,58,FairyFruit,fairy_fruit_PORT_PARTIAL,-1
+226,Shaitan Biscuit,58,FairyFruit,fairy_fruit_PORT_PARTIAL,-1
+227,Fairy Ration,57,FairyRation,fairy_ration_supported,-1
 228,Raging Bull Tattoo,22,0,equipable_data,2
 229,Savage Bull Tattoo,22,0,equipable_data,2
 230,Primal Tattoo,22,0,equipable_data,2
@@ -209,47 +209,47 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 236,Fairy of Agility,59,0,equipable_data,16
 237,Fairy of Evil,59,0,equipable_data,16
 238,Open Sesame,31,ItemUse_CJBOX,lua_callback_not_implemented,-1
-239,Novice Fairy Possession,34,AddFairyBody,lua_callback_not_implemented,-1
-240,Reincarnation Pagoda,31,ItemUse_wxlh,lua_callback_not_implemented,-1
-241,Level 65 Boss Equipment Box,31,ItemUse_65BBBox,lua_callback_not_implemented,-1
-243,Novice Protection,58,AddFairySkill,lua_callback_not_implemented,-1
-244,Standard Protection,58,AddFairySkill,lua_callback_not_implemented,-1
-245,Expert Protection,58,AddFairySkill,lua_callback_not_implemented,-1
-246,Novice Berserk,58,AddFairySkill,lua_callback_not_implemented,-1
-247,Standard Berserk,58,AddFairySkill,lua_callback_not_implemented,-1
-248,Expert Berserk,58,AddFairySkill,lua_callback_not_implemented,-1
-249,Novice Magic,58,AddFairySkill,lua_callback_not_implemented,-1
-250,Standard Magic,58,AddFairySkill,lua_callback_not_implemented,-1
-251,Expert Magic,58,AddFairySkill,lua_callback_not_implemented,-1
-252,Novice Recover,58,AddFairySkill,lua_callback_not_implemented,-1
-253,Standard Recover,58,AddFairySkill,lua_callback_not_implemented,-1
-254,Expert Recover,58,AddFairySkill,lua_callback_not_implemented,-1
+239,Novice Fairy Possession,34,AddFairyBody,fairy_possession_book_D1,-1
+240,Reincarnation Pagoda,31,ItemUse_wxlh,reincarnation_pagoda_D1,-1
+241,Level 65 Boss Equipment Box,31,ItemUse_65BBBox,class_boss_box_PORT_APPROX,-1
+243,Novice Protection,58,AddFairySkill,fairy_skill_book_supported,-1
+244,Standard Protection,58,AddFairySkill,fairy_skill_book_supported,-1
+245,Expert Protection,58,AddFairySkill,fairy_skill_book_supported,-1
+246,Novice Berserk,58,AddFairySkill,fairy_skill_book_supported,-1
+247,Standard Berserk,58,AddFairySkill,fairy_skill_book_supported,-1
+248,Expert Berserk,58,AddFairySkill,fairy_skill_book_supported,-1
+249,Novice Magic,58,AddFairySkill,fairy_skill_book_supported,-1
+250,Standard Magic,58,AddFairySkill,fairy_skill_book_supported,-1
+251,Expert Magic,58,AddFairySkill,fairy_skill_book_supported,-1
+252,Novice Recover,58,AddFairySkill,fairy_skill_book_supported,-1
+253,Standard Recover,58,AddFairySkill,fairy_skill_book_supported,-1
+254,Expert Recover,58,AddFairySkill,fairy_skill_book_supported,-1
 255,Smile 1,21,0,equipable_data,1
 256,Stare 1,21,0,equipable_data,1
 257,Grimace 1,21,0,equipable_data,1
 258,Sad 1,21,0,equipable_data,1
-259,Novice Meditation,58,AddFairySkill,lua_callback_not_implemented,-1
-260,Standard Meditation,58,AddFairySkill,lua_callback_not_implemented,-1
-261,Expert Meditation,58,AddFairySkill,lua_callback_not_implemented,-1
-262,Fairy Box,31,ItemUse_JingLingBOX,lua_callback_not_implemented,-1
+259,Novice Meditation,58,AddFairySkill,fairy_skill_book_supported,-1
+260,Standard Meditation,58,AddFairySkill,fairy_skill_book_supported,-1
+261,Expert Meditation,58,AddFairySkill,fairy_skill_book_supported,-1
+262,Fairy Box,31,ItemUse_JingLingBOX,fairy_box_PORT_APPROX,-1
 263,Dumpling,31,ItemMedKit,heal_amount_supported,-1
-264,Festive Wine,31,ItemUse_XiongHJ,lua_callback_not_implemented,-1
-265,Ether Clover,31,ItemUse_AiCao,lua_callback_not_implemented,-1
-266,Black Dragon Altar,65,BlackDragon_Altar,lua_callback_not_implemented,-1
-267,Power of Flame,66,BlackDragon_Power,lua_callback_not_implemented,-1
-268,Power of Wind,66,BlackDragon_Power,lua_callback_not_implemented,-1
-269,Power of Thunder,66,BlackDragon_Power,lua_callback_not_implemented,-1
-270,Power of Frost,66,BlackDragon_Power,lua_callback_not_implemented,-1
-271,Angelic Dice,66,BlackDragon_Dice,lua_callback_not_implemented,-1
-272,Grand Prize,31,ItemUse_tedengjiang,lua_callback_not_implemented,-1
-273,First Prize,31,ItemUse_yidengjiang,lua_callback_not_implemented,-1
-274,Second Prize,31,ItemUse_erdengjiang,lua_callback_not_implemented,-1
-275,Third Prize,31,ItemUse_sandengjiang,lua_callback_not_implemented,-1
-276,Great Snow Dragon Fruit,58,FairyFruit,lua_callback_not_implemented,-1
-277,Great Icespire Plum,58,FairyFruit,lua_callback_not_implemented,-1
-278,Great Zephyr Fish Floss,58,FairyFruit,lua_callback_not_implemented,-1
-279,Great Argent Mango,58,FairyFruit,lua_callback_not_implemented,-1
-280,Great Shaitan Biscuit,58,FairyFruit,lua_callback_not_implemented,-1
+264,Festive Wine,31,ItemUse_XiongHJ,festive_wine_D1,-1
+265,Ether Clover,31,ItemUse_AiCao,ether_clover_D1,-1
+266,Black Dragon Altar,65,BlackDragon_Altar,black_dragon_altar_PORT_APPROX,-1
+267,Power of Flame,66,BlackDragon_Power,black_dragon_altar_PORT_APPROX,-1
+268,Power of Wind,66,BlackDragon_Power,black_dragon_altar_PORT_APPROX,-1
+269,Power of Thunder,66,BlackDragon_Power,black_dragon_altar_PORT_APPROX,-1
+270,Power of Frost,66,BlackDragon_Power,black_dragon_altar_PORT_APPROX,-1
+271,Angelic Dice,66,BlackDragon_Dice,black_dragon_altar_PORT_APPROX,-1
+272,Grand Prize,31,ItemUse_tedengjiang,black_dragon_grand_prize_D1,-1
+273,First Prize,31,ItemUse_yidengjiang,black_dragon_first_prize_D1,-1
+274,Second Prize,31,ItemUse_erdengjiang,black_dragon_second_prize_PORT_PARTIAL,-1
+275,Third Prize,31,ItemUse_sandengjiang,black_dragon_third_prize_D1,-1
+276,Great Snow Dragon Fruit,58,FairyFruit,fairy_fruit_PORT_PARTIAL,-1
+277,Great Icespire Plum,58,FairyFruit,fairy_fruit_PORT_PARTIAL,-1
+278,Great Zephyr Fish Floss,58,FairyFruit,fairy_fruit_PORT_PARTIAL,-1
+279,Great Argent Mango,58,FairyFruit,fairy_fruit_PORT_PARTIAL,-1
+280,Great Shaitan Biscuit,58,FairyFruit,fairy_fruit_PORT_PARTIAL,-1
 281,Final Perseverance,26,0,equipable_data,"7,8"
 282,Bandit Scoop,26,0,equipable_data,"7,8"
 283,Hunter's Strength,26,0,equipable_data,"7,8"
@@ -288,10 +288,10 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 316,Ringdove Vest,22,0,equipable_data,2
 317,Raptor Vest,22,0,equipable_data,2
 318,Nightmare Vest,31,0,equipable_data,2
-319,Monster Summoning Scoll,31,ItemUse_MonsterSummon,lua_callback_not_implemented,-1
+319,Monster Summoning Scoll,31,ItemUse_MonsterSummon,monster_summon_D1,-1
 320,Seaman Vest,31,0,equipable_data,2
 321,Saint Loop,26,0,equipable_data,"7,8"
-322,Lv 70 Seal Master Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
+322,Lv 70 Seal Master Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
 323,Shark Hide Armor,31,0,equipable_data,2
 324,Seal of Strength,26,0,equipable_data,"7,8"
 325,Sailor Vest,31,0,equipable_data,2
@@ -301,7 +301,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 329,Unicorn's Blessing,26,0,equipable_data,"7,8"
 330,Angel's Grief,26,0,equipable_data,"7,8"
 331,Captain's Jacket,31,0,equipable_data,2
-332,Ticket to Spring Town,36,Ticket,lua_callback_not_implemented,-1
+332,Ticket to Spring Town,36,Ticket,ticket_destination_PORT_APPROX,-1
 333,Unique Gem Voucher,41,0,non_click_item_or_other_system,-1
 334,Hammer of Thunder,26,0,equipable_data,"7,8"
 335,Cloth Shirt,22,0,equipable_data,2
@@ -391,28 +391,28 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 419,Platinum Necklace,25,0,equipable_data,5
 420,Nebulous Ray,25,0,equipable_data,5
 421,Messenger of the Wind,25,0,equipable_data,5
-422,Egg of Life,31,ItemUse_Egg,lua_callback_not_implemented,-1
-423,Egg of Darkness,31,ItemUse_Egg,lua_callback_not_implemented,-1
-424,Egg of Virtue,31,ItemUse_Egg,lua_callback_not_implemented,-1
-425,Egg of Kudos,31,ItemUse_Egg,lua_callback_not_implemented,-1
-426,Egg of Faith,31,ItemUse_Egg,lua_callback_not_implemented,-1
-427,Egg of Valor,31,ItemUse_Egg,lua_callback_not_implemented,-1
-428,Egg of Hope,31,ItemUse_Egg,lua_callback_not_implemented,-1
-429,Egg of Woe,31,ItemUse_Egg,lua_callback_not_implemented,-1
-430,Egg of Love,31,ItemUse_Egg,lua_callback_not_implemented,-1
-431,Egg of Heart,31,ItemUse_Egg,lua_callback_not_implemented,-1
+422,Egg of Life,31,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+423,Egg of Darkness,31,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+424,Egg of Virtue,31,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+425,Egg of Kudos,31,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+426,Egg of Faith,31,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+427,Egg of Valor,31,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+428,Egg of Hope,31,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+429,Egg of Woe,31,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+430,Egg of Love,31,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+431,Egg of Heart,31,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
 432,Mystery Piece 1,41,0,non_click_item_or_other_system,-1
 433,Mystery Piece 2,41,0,non_click_item_or_other_system,-1
 434,Mystery Piece 3,41,0,non_click_item_or_other_system,-1
 435,Mystery Piece 4,41,0,non_click_item_or_other_system,-1
-436,Newbie Chest,31,NewbieChest,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-437,Winged Chest,31,NewbieChest,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-438,Flowery Chest,31,NewbieChest,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-439,Researching Chest,31,NewbieChest,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-440,Smelting Chest,31,NewbieChest,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-441,Exploring Chest,31,NewbieChest,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-442,Guiding Chest,31,NewbieChest,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-443,Advancement Chest,31,NewbieChest,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+436,Newbie Chest,31,NewbieChest,newbie_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+437,Winged Chest,31,NewbieChest,newbie_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+438,Flowery Chest,31,NewbieChest,newbie_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+439,Researching Chest,31,NewbieChest,newbie_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+440,Smelting Chest,31,NewbieChest,newbie_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+441,Exploring Chest,31,NewbieChest,newbie_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+442,Guiding Chest,31,NewbieChest,newbie_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+443,Advancement Chest,31,NewbieChest,newbie_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 444,Tier 1 Promotion Manual,41,0,non_click_item_or_other_system,-1
 445,Ticket Manual,41,0,non_click_item_or_other_system,-1
 446,Emoticon Manual,41,0,non_click_item_or_other_system,-1
@@ -493,7 +493,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 522,Expert Wind Coral,29,0,equipable_data,5
 523,Wind Coral of Fujin,29,0,equipable_data,5
 524,Meditating Monk,26,0,equipable_data,"7,8"
-525,Lv 70 Champion Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
+525,Lv 70 Champion Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
 526,Crabby Gloves,23,0,equipable_data,3
 527,Rooroo Muffs,23,0,equipable_data,3
 528,Playful Racoon Muffs,23,0,equipable_data,3
@@ -531,7 +531,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 560,Deer Muffs,23,0,equipable_data,3
 561,Otter Muffs,23,0,equipable_data,3
 562,Racoon Muffs,23,0,equipable_data,3
-563,Pass to Summer Island,36,Ticket,lua_callback_not_implemented,-1
+563,Pass to Summer Island,36,Ticket,ticket_destination_PORT_APPROX,-1
 564,Happy Bunny Muffs,23,0,equipable_data,3
 565,Night Owl Muffs,23,0,equipable_data,3
 566,Kangaroo Muffs,23,0,equipable_data,3
@@ -539,18 +539,18 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 568,Bunny Baby Muffs,23,0,equipable_data,3
 569,Lucky Bunny Muffs,23,0,equipable_data,3
 570,Heavenly Gloves,23,0,equipable_data,3
-571,Egg of Luck,67,ItemUse_Egg,lua_callback_not_implemented,-1
-572,Egg of Constitution,67,ItemUse_Egg,lua_callback_not_implemented,-1
-573,Egg of Strength,67,ItemUse_Egg,lua_callback_not_implemented,-1
-574,Egg of Spirit,67,ItemUse_Egg,lua_callback_not_implemented,-1
-575,Egg of Accuracy,67,ItemUse_Egg,lua_callback_not_implemented,-1
-576,Egg of Agility,67,ItemUse_Egg,lua_callback_not_implemented,-1
-577,Egg of Evil,67,ItemUse_Egg,lua_callback_not_implemented,-1
-578,Fruit of Growth,31,AmplifierItem,lua_callback_not_implemented,-1
-582,Unique Coral Voucher,31,GiveRandomItems,lua_callback_not_implemented,-1
-583,Pass to Autumn Island,36,Ticket,lua_callback_not_implemented,-1
-584,Super Lollipop,31,ItemUse_Crbbt,lua_callback_not_implemented,-1
-585,Huge Chocolate,31,ItemUse_Jrqkl,lua_callback_not_implemented,-1
+571,Egg of Luck,67,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+572,Egg of Constitution,67,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+573,Egg of Strength,67,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+574,Egg of Spirit,67,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+575,Egg of Accuracy,67,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+576,Egg of Agility,67,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+577,Egg of Evil,67,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+578,Fruit of Growth,31,AmplifierItem,amplifier_fairy_growth_pending,-1
+582,Unique Coral Voucher,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+583,Pass to Autumn Island,36,Ticket,ticket_destination_PORT_APPROX,-1
+584,Super Lollipop,31,ItemUse_Crbbt,super_lollipop_D1,-1
+585,Huge Chocolate,31,ItemUse_Jrqkl,huge_chocolate_D1,-1
 586,Bear Gloves,23,0,equipable_data,3
 587,Gloves of Night,23,0,equipable_data,3
 588,Gloves of Secrets,23,0,equipable_data,3
@@ -573,33 +573,33 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 605,Movie Ticket Chip,31,0,non_click_item_or_other_system,-1
 606,Ice Cube,31,0,non_click_item_or_other_system,-1
 607,Birthday Candle,31,0,non_click_item_or_other_system,-1
-608,Standard Fairy Possession,34,AddFairyBody,lua_callback_not_implemented,-1
-609,Expert Fairy Possession,34,AddFairyBody,lua_callback_not_implemented,-1
-610,Novice Self Destruct,34,AddFairyBody,lua_callback_not_implemented,-1
-611,Standard Self Destruct,34,AddFairyBody,lua_callback_not_implemented,-1
-612,Expert Self Destruct,34,AddFairyBody,lua_callback_not_implemented,-1
-613,Lv 70 Crusader Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
-614,Lv 70 Sharpshooter Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
-615,Lv 70 Voyager Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
-616,Lv 70 Cleric Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
-617,Lv 50 Crusader Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-618,Lv 60 Crusader Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-619,Lv 70 Crusader Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-620,Lv 50 Champion Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-621,Lv 60 Champion Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-622,Lv 70 Champion Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-623,Lv 50 Cleric Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-624,Lv 60 Cleric Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-625,Lv 70 Cleric Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-626,Lv 50 Ami Cleric Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-627,Lv 60 Ami Cleric Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-628,Lv 70 Ami Cleric Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-629,Lv 50 Ami Seal Master Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-630,Lv 60 Ami Seal Master Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-631,Lv 70 Ami Seal Master Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-632,Lv 50 Ami Voyager Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-633,Lv 60 Ami Voyager Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-634,Lv 70 Ami Voyager Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
+608,Standard Fairy Possession,34,AddFairyBody,fairy_possession_book_D1,-1
+609,Expert Fairy Possession,34,AddFairyBody,fairy_possession_book_D1,-1
+610,Novice Self Destruct,34,AddFairyBody,fairy_possession_book_D1,-1
+611,Standard Self Destruct,34,AddFairyBody,fairy_possession_book_D1,-1
+612,Expert Self Destruct,34,AddFairyBody,fairy_possession_book_D1,-1
+613,Lv 70 Crusader Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
+614,Lv 70 Sharpshooter Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
+615,Lv 70 Voyager Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
+616,Lv 70 Cleric Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
+617,Lv 50 Crusader Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+618,Lv 60 Crusader Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+619,Lv 70 Crusader Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+620,Lv 50 Champion Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+621,Lv 60 Champion Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+622,Lv 70 Champion Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+623,Lv 50 Cleric Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+624,Lv 60 Cleric Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+625,Lv 70 Cleric Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+626,Lv 50 Ami Cleric Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+627,Lv 60 Ami Cleric Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+628,Lv 70 Ami Cleric Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+629,Lv 50 Ami Seal Master Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+630,Lv 60 Ami Seal Master Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+631,Lv 70 Ami Seal Master Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+632,Lv 50 Ami Voyager Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+633,Lv 60 Ami Voyager Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+634,Lv 70 Ami Voyager Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
 635,Lv 1 Strike Coral,29,0,equipable_data,6
 636,Lv 2 Strike Coral,29,0,equipable_data,6
 637,Lv 3 Strike Coral,29,0,equipable_data,6
@@ -636,22 +636,22 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 668,Ringdove Boots,24,0,equipable_data,4
 669,Raptor Boots,24,0,equipable_data,4
 670,Nightmare Boots,31,0,equipable_data,4
-671,Lv 50 Sharpshooter Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
+671,Lv 50 Sharpshooter Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
 672,Seaman Boots,31,0,equipable_data,4
-673,Lv 60 Sharpshooter Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-674,Lv 70 Sharpshooter Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
+673,Lv 60 Sharpshooter Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+674,Lv 70 Sharpshooter Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
 675,Shark Hide Boots,31,0,equipable_data,4
-676,Lv 50 Voyager Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
+676,Lv 50 Voyager Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
 677,Sailor Boots,31,0,equipable_data,4
 678,Navy Boots,31,0,equipable_data,4
-679,Egg of Mordo,31,ItemUse_Egg,lua_callback_not_implemented,-1
+679,Egg of Mordo,31,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
 680,Mordo,59,0,equipable_data,16
 681,Mordo Junior,59,0,equipable_data,16
 682,Caribbean Treasure Map,31,ItemUse_JLB_GoldenMap,lua_callback_not_implemented,-1
 683,Captain's Boots,31,0,equipable_data,4
 684,New Sheepskin Scroll,31,ItemUse_Map_JLBYPJ,lua_callback_not_implemented,-1
 685,Emblem of Richie,41,0,non_click_item_or_other_system,-1
-686,Lv 60 Voyager Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
+686,Lv 60 Voyager Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
 687,Cloth Boots,24,0,equipable_data,4
 688,Tough Boots,24,0,equipable_data,4
 689,Explorer Boots,24,0,equipable_data,4
@@ -663,10 +663,10 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 695,Hurricane Boots,24,0,equipable_data,4
 696,Whirlpool Boots,24,0,equipable_data,4
 697,Wind Boots,24,0,equipable_data,4
-698,Lv 70 Voyager Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-699,Lv 50 Seal Master Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-700,Lv 60 Seal Master Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
-701,Lv 70 Seal Master Chest,31,Corsairs_EquipmentChest,lua_callback_not_implemented,-1
+698,Lv 70 Voyager Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+699,Lv 50 Seal Master Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+700,Lv 60 Seal Master Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
+701,Lv 70 Seal Master Chest,31,Corsairs_EquipmentChest,corsairs_chest_PORT_APPROX,-1
 702,Crabby Shoes,24,0,equipable_data,4
 703,Rooroo Shoes,24,0,equipable_data,4
 704,Playful Racoon Shoes,24,0,equipable_data,4
@@ -814,24 +814,24 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 846,Black Dragon Claw,23,0,equipable_data,3
 847,Black Dragon Wing,24,0,equipable_data,4
 848,Black Dragon Helm,20,0,equipable_data,0
-849,Party EXP Fruit,31,ItemUse_PartyFruit,lua_callback_not_implemented,-1
-850,Weightless Potion,31,ItemUse_MspdYSB,lua_callback_not_implemented,-1
-851,Battle Array,31,ItemUse_XEZJB,lua_callback_not_implemented,-1
-852,Full Body Armor,31,ItemUse_DenglongB,lua_callback_not_implemented,-1
-853,Happy Holiday Magazine,31,ItemUse_HappyBook,lua_callback_not_implemented,-1
-854,Million Dollar Note,31,ItemUse_CZHe,lua_callback_not_implemented,-1
+849,Party EXP Fruit,31,ItemUse_PartyFruit,party_exp_fruit_PORT_APPROX,-1
+850,Weightless Potion,31,ItemUse_MspdYSB,weightless_potion_D1,-1
+851,Battle Array,31,ItemUse_XEZJB,battle_array_D1,-1
+852,Full Body Armor,31,ItemUse_DenglongB,full_body_armor_D1,-1
+853,Happy Holiday Magazine,31,ItemUse_HappyBook,happy_book_supported,-1
+854,Million Dollar Note,31,ItemUse_CZHe,gold_note_D1,-1
 855,Fairy Coin,41,0,non_click_item_or_other_system,-1
-856,Fiery Gem Voucher,31,ItemUse_lieyanBook,lua_callback_not_implemented,-1
-857,Furious Gem Voucher,31,ItemUse_zhiyanBook,lua_callback_not_implemented,-1
-858,Explosive Gem Voucher,31,ItemUse_huoyaoBook,lua_callback_not_implemented,-1
-859,Lustrious Gem Voucher,31,ItemUse_manaoBook,lua_callback_not_implemented,-1
+856,Fiery Gem Voucher,31,ItemUse_lieyanBook,fixed_gem_voucher_D1,-1
+857,Furious Gem Voucher,31,ItemUse_zhiyanBook,fixed_gem_voucher_D1,-1
+858,Explosive Gem Voucher,31,ItemUse_huoyaoBook,fixed_gem_voucher_D1,-1
+859,Lustrious Gem Voucher,31,ItemUse_manaoBook,fixed_gem_voucher_D1,-1
 860,Gem of the Wind,49,0,non_click_item_or_other_system,-1
 861,Gem of Striking,49,0,non_click_item_or_other_system,-1
 862,Gem of Colossus,49,0,non_click_item_or_other_system,-1
 863,Gem of Rage,49,0,non_click_item_or_other_system,-1
-864,Eye of Black Dragon,49,BlackDragon_Gem,lua_callback_not_implemented,-1
-865,Soul of Black Dragon,49,BlackDragon_Gem,lua_callback_not_implemented,-1
-866,Heart of Black Dragon,49,BlackDragon_Gem,lua_callback_not_implemented,-1
+864,Eye of Black Dragon,49,BlackDragon_Gem,black_dragon_altar_PORT_APPROX,-1
+865,Soul of Black Dragon,49,BlackDragon_Gem,black_dragon_altar_PORT_APPROX,-1
+866,Heart of Black Dragon,49,BlackDragon_Gem,black_dragon_altar_PORT_APPROX,-1
 867,Lv 1 Thunder Coral,29,0,equipable_data,7
 868,Lv 2 Thunder Coral,29,0,equipable_data,7
 869,Lv 3 Thunder Coral,29,0,equipable_data,7
@@ -858,32 +858,32 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 890,Equipment Stabilizer,51,0,non_click_item_or_other_system,-1
 891,Equipment Catalyst,52,0,non_click_item_or_other_system,-1
 892,Weed Killer,31,ItemUse_Ant_Hzcr,lua_callback_not_implemented,-1
-893,Potion of Monkey,31,ItemUse_SPLhyj,lua_callback_not_implemented,-1
-894,Potion of Eagle,31,ItemUse_SPYyyj,lua_callback_not_implemented,-1
-895,Potion of Bull,31,ItemUse_SPMnyj,lua_callback_not_implemented,-1
-896,Potion of Soul,31,ItemUse_SPSlyj,lua_callback_not_implemented,-1
-897,Potion of Lion,31,ItemUse_SPXsyj,lua_callback_not_implemented,-1
-898,Mystical Fruit,31,AmplifierItem,lua_callback_not_implemented,-1
-899,Book of Strength Reset,31,ItemStat,lua_callback_not_implemented,-1
-900,Book of Consitution Reset,31,ItemStat,lua_callback_not_implemented,-1
-901,Book of Agility Reset,31,ItemStat,lua_callback_not_implemented,-1
-902,Book of Accuracy Reset,31,ItemStat,lua_callback_not_implemented,-1
-903,Book of Spirit Reset,31,ItemStat,lua_callback_not_implemented,-1
+893,Potion of Monkey,31,ItemUse_SPLhyj,attribute_potion_D1,-1
+894,Potion of Eagle,31,ItemUse_SPYyyj,attribute_potion_D1,-1
+895,Potion of Bull,31,ItemUse_SPMnyj,attribute_potion_D1,-1
+896,Potion of Soul,31,ItemUse_SPSlyj,attribute_potion_D1,-1
+897,Potion of Lion,31,ItemUse_SPXsyj,attribute_potion_D1,-1
+898,Mystical Fruit,31,AmplifierItem,amplifier_PORT_APPROX,-1
+899,Book of Strength Reset,31,ItemStat,item_stat_rule_PORT_APPROX,-1
+900,Book of Consitution Reset,31,ItemStat,item_stat_rule_PORT_APPROX,-1
+901,Book of Agility Reset,31,ItemStat,item_stat_rule_PORT_APPROX,-1
+902,Book of Accuracy Reset,31,ItemStat,item_stat_rule_PORT_APPROX,-1
+903,Book of Spirit Reset,31,ItemStat,item_stat_rule_PORT_APPROX,-1
 907,Emerald Demon,51,0,equipable_data,10
 908,Silver Dolphin,51,0,equipable_data,10
 909,Great White Shark,51,0,equipable_data,10
-910,Egg of Mordo Junior,67,ItemUse_Egg,lua_callback_not_implemented,-1
-911,Spirit Gem Voucher,31,ItemUse_shengguangBook,lua_callback_not_implemented,-1
+910,Egg of Mordo Junior,67,ItemUse_Egg,fairy_egg_PORT_APPROX,-1
+911,Spirit Gem Voucher,31,ItemUse_shengguangBook,fixed_gem_voucher_D1,-1
 912,Torrent,51,0,equipable_data,10
 913,Goddess,51,0,equipable_data,10
-914,Glowing Gem Voucher,31,ItemUse_hanyuBook,lua_callback_not_implemented,-1
-915,Shining Gem Voucher,31,ItemUse_yuezhixinBook,lua_callback_not_implemented,-1
-916,Shadow Gem Voucher,31,ItemUse_xianlingBook,lua_callback_not_implemented,-1
+914,Glowing Gem Voucher,31,ItemUse_hanyuBook,fixed_gem_voucher_D1,-1
+915,Shining Gem Voucher,31,ItemUse_yuezhixinBook,fixed_gem_voucher_D1,-1
+916,Shadow Gem Voucher,31,ItemUse_xianlingBook,fixed_gem_voucher_D1,-1
 917,Swordfish,51,0,equipable_data,10
-918,Gem of the Wind Voucher,31,ItemUse_fenglingBook,lua_callback_not_implemented,-1
-919,Gem of Striking Voucher,31,ItemUse_yingyanBook,lua_callback_not_implemented,-1
-920,Gem of Colossus Voucher,31,ItemUse_yanyuBook,lua_callback_not_implemented,-1
-921,Gem of Rage Voucher,31,ItemUse_tanyuBook,lua_callback_not_implemented,-1
+918,Gem of the Wind Voucher,31,ItemUse_fenglingBook,fixed_gem_voucher_D1,-1
+919,Gem of Striking Voucher,31,ItemUse_yingyanBook,fixed_gem_voucher_D1,-1
+920,Gem of Colossus Voucher,31,ItemUse_yanyuBook,fixed_gem_voucher_D1,-1
+921,Gem of Rage Voucher,31,ItemUse_tanyuBook,fixed_gem_voucher_D1,-1
 922,Ark,51,0,equipable_data,10
 923,Attack Boat 1,51,0,equipable_data,10
 924,Attack Boat 2,51,0,equipable_data,10
@@ -898,20 +898,20 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 933,Phyllis Trendy Hairstyle Book,41,0,non_click_item_or_other_system,-1
 934,Ami Trendy Hairstyle Book,41,0,non_click_item_or_other_system,-1
 938,Goddess's Favor,41,0,non_click_item_or_other_system,-1
-939,Lv 50 Crusader Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
-940,Lv 50 Champion Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
-941,Lv 50 Sharpshooter Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
-942,Lv 50 Voyager Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
-943,Lv 50 Cleric Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
-944,Lv 50 Seal Master Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
-945,Lv 60 Crusader Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
-946,Lv 60 Champion Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
-947,Lv 60 Sharpshooter Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
+939,Lv 50 Crusader Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
+940,Lv 50 Champion Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
+941,Lv 50 Sharpshooter Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
+942,Lv 50 Voyager Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
+943,Lv 50 Cleric Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
+944,Lv 50 Seal Master Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
+945,Lv 60 Crusader Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
+946,Lv 60 Champion Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
+947,Lv 60 Sharpshooter Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
 948,Sang Di Account Book,42,0,non_click_item_or_other_system,-1
 949,Herbal Pouch,42,0,non_click_item_or_other_system,-1
-950,Lv 60 Voyager Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
-951,Lv 60 Cleric Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
-952,Lv 60 Seal Master Chest of Magenta,31,Corsairs_WeaponChest,lua_callback_not_implemented,-1
+950,Lv 60 Voyager Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
+951,Lv 60 Cleric Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
+952,Lv 60 Seal Master Chest of Magenta,31,Corsairs_WeaponChest,corsairs_chest_PORT_APPROX,-1
 953,Eye of the Black Dragon Gem Voucher,41,0,non_click_item_or_other_system,-1
 954,Soul of the Black Dragon Gem Voucher,41,0,non_click_item_or_other_system,-1
 955,Heart of Black Dragon Gem Voucher,41,0,non_click_item_or_other_system,-1
@@ -944,58 +944,58 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 982,Lucky Card X,41,0,non_click_item_or_other_system,-1
 983,Lucky Card Y,41,0,non_click_item_or_other_system,-1
 984,Lucky Card Z,41,0,non_click_item_or_other_system,-1
-985,35 Ultimate Chest,31,ItemUse_SANWUBOX,lua_callback_not_implemented,-1
-986,45 Ultimate Chest,31,ItemUse_SIWUBOX,lua_callback_not_implemented,-1
-987,55 Ultimate Chest,31,ItemUse_WUWUBOX,lua_callback_not_implemented,-1
-988,65 Grand Chest,31,ItemUse_LIUWUBOX,lua_callback_not_implemented,-1
+985,35 Ultimate Chest,31,ItemUse_SANWUBOX,ultimate_chest_D1,-1
+986,45 Ultimate Chest,31,ItemUse_SIWUBOX,ultimate_chest_D1,-1
+987,55 Ultimate Chest,31,ItemUse_WUWUBOX,ultimate_chest_D1,-1
+988,65 Grand Chest,31,ItemUse_LIUWUBOX,ultimate_chest_D1,-1
 989,Emerald Demon Bow,52,0,equipable_data,11
 990,Silver Dolphin Bow,52,0,equipable_data,11
 991,White Shark Bow,52,0,equipable_data,11
-992,Growth Fast Food,31,ItemUse_CZKC,lua_callback_not_implemented,-1
-993,Super Booster,31,AmplifierItem,lua_callback_not_implemented,-1
+992,Growth Fast Food,31,ItemUse_CZKC,growth_fast_food_exp_supported,-1
+993,Super Booster,31,AmplifierItem,amplifier_PORT_APPROX,-1
 994,Torrent Bow,52,0,equipable_data,11
 995,Goddess Bow,52,0,equipable_data,11
-996,Book of Skill Reset,34,Book_SkillReset,lua_callback_not_implemented,-1
-997,Book of Stat Reset,34,Book_StatReset,lua_callback_not_implemented,-1
-998,Thruster of Mystic,31,AmplifierItem,lua_callback_not_implemented,-1
+996,Book of Skill Reset,34,Book_SkillReset,combat_skill_reset_D1,-1
+997,Book of Stat Reset,34,Book_StatReset,stat_reset_supported,-1
+998,Thruster of Mystic,31,AmplifierItem,amplifier_PORT_APPROX,-1
 999,Swordfish Bow,52,0,equipable_data,11
-1000,Blurry Blueprint,31,Blueprint,lua_callback_not_implemented,-1
-1001,Encrypted Blueprint,31,Blueprint,lua_callback_not_implemented,-1
-1002,Sealed Blueprint,31,Blueprint,lua_callback_not_implemented,-1
-1003,Invocation Blueprint,31,Blueprint,lua_callback_not_implemented,-1
+1000,Blurry Blueprint,31,Blueprint,blueprint_generator_PORT_APPROX,-1
+1001,Encrypted Blueprint,31,Blueprint,blueprint_generator_PORT_APPROX,-1
+1002,Sealed Blueprint,31,Blueprint,blueprint_generator_PORT_APPROX,-1
+1003,Invocation Blueprint,31,Blueprint,blueprint_generator_PORT_APPROX,-1
 1004,Ark Bow,52,0,equipable_data,11
 1005,Flower's Letter,42,0,non_click_item_or_other_system,-1
-1006,Loveless Tear,31,AmplifierItem,lua_callback_not_implemented,-1
+1006,Loveless Tear,31,AmplifierItem,amplifier_PORT_APPROX,-1
 1007,Golden Jade Bottle,41,0,non_click_item_or_other_system,-1
 1008,Reverse Love Potion,41,0,non_click_item_or_other_system,-1
-1009,Heart of Innocence,31,ItemUse_CZZX,lua_callback_not_implemented,-1
+1009,Heart of Innocence,31,ItemUse_CZZX,innocence_heart_D1,-1
 1010,Withered Heart,41,0,non_click_item_or_other_system,-1
-1011,Grandiose Salute,31,ItemUse_HHLP,lua_callback_not_implemented,-1
+1011,Grandiose Salute,31,ItemUse_HHLP,grandiose_salute_PORT_APPROX,-1
 1012,Gem of Soul,49,0,non_click_item_or_other_system,-1
-1013,Heart of Reborn,31,ItemUse_CZZX,lua_callback_not_implemented,-1
-1014,Goddess Summon Scroll,31,ItemUse_NSSN,lua_callback_not_implemented,-1
-1015,Mysterious Pet Egg,31,ItemUse_JNJLD,lua_callback_not_implemented,-1
-1016,Goddess's Pouch,31,ItemUse_NSDXB,lua_callback_not_implemented,-1
-1017,Chest of Ascaron,31,ItemUse_JaNaBox,lua_callback_not_implemented,-1
+1013,Heart of Reborn,31,ItemUse_CZZX,innocence_heart_D1,-1
+1014,Goddess Summon Scroll,31,ItemUse_NSSN,goddess_guardian_D1,-1
+1015,Mysterious Pet Egg,31,ItemUse_JNJLD,fairy_mystery_egg_PORT_APPROX,-1
+1016,Goddess's Pouch,31,ItemUse_NSDXB,goddess_pouch_PORT_APPROX,-1
+1017,Chest of Ascaron,31,ItemUse_JaNaBox,ascaron_chest_D1,-1
 1018,Sewing Scroll,41,0,non_click_item_or_other_system,-1
-1019,Mini Black Dragon Bag,31,ItemUse_minibh,lua_callback_not_implemented,-1
+1019,Mini Black Dragon Bag,31,ItemUse_minibh,mini_black_dragon_bag_PORT_APPROX,-1
 1020,1st Slot Blacksmith's Plier,41,0,non_click_item_or_other_system,-1
-1021,Kara's Victory,31,ItemUse_kala,lua_callback_not_implemented,-1
+1021,Kara's Victory,31,ItemUse_kala,kala_stamina_state_D1,-1
 1022,Rechargeable Battery,41,0,non_click_item_or_other_system,-1
 1023,Sewing Thread Ball,41,0,non_click_item_or_other_system,-1
 1024,Super Rechargeable Battery,41,0,non_click_item_or_other_system,-1
 1025,Mask of Zorro,42,0,non_click_item_or_other_system,-1
 1026,Argent Medical Report,41,0,non_click_item_or_other_system,-1
-1027,Blury Medical Report,31,ItemUse_MHDYSD,lua_callback_not_implemented,-1
+1027,Blury Medical Report,31,ItemUse_MHDYSD,medical_report_summon_D1,-1
 1028,Morph Runestone,41,0,non_click_item_or_other_system,-1
 1029,Red High Heels,1,0,equipable_data,9
 1030,Bloodied High Heels,42,0,non_click_item_or_other_system,-1
 1031,Saint of the Ring Emblem,31,0,non_click_item_or_other_system,-1
 1032,King of the Ring Emblem,31,0,non_click_item_or_other_system,-1
-1033,Star of Unity Chest,31,ItemUse_TunDuiZhiXing,lua_callback_not_implemented,-1
+1033,Star of Unity Chest,31,ItemUse_TunDuiZhiXing,star_of_unity_chest_D1,-1
 1034,Star of Unity,26,0,equipable_data,8
-1035,Enchanting Card Chest,31,ItemUse_MoHuanBox,lua_callback_not_implemented,-1
-1036,Enchanting Goddess Card,31,ItemUse_mohuan,lua_callback_not_implemented,-1
+1035,Enchanting Card Chest,31,ItemUse_MoHuanBox,enchanting_card_chest_PORT_APPROX,-1
+1036,Enchanting Goddess Card,31,ItemUse_mohuan,enchanting_goddess_card_PORT_APPROX,-1
 1037,Skill - Defecate,34,Sk_Script_DBs,lua_callback_not_implemented,-1
 1038,Skill - Undergarment,34,Sk_Script_NKs,lua_callback_not_implemented,-1
 1039,Skill - Garment,34,Sk_Script_XZs,lua_callback_not_implemented,-1
@@ -1014,18 +1014,18 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 1052,Sacred Soul Amulet,42,0,non_click_item_or_other_system,-1
 1053,Piety Treasure Map,42,0,non_click_item_or_other_system,-1
 1054,Lotus Clover,42,0,non_click_item_or_other_system,-1
-1055,Novice Pet Manufacturing,58,AddFairySkill,lua_callback_not_implemented,-1
-1056,Standard Pet Manufacturing,58,AddFairySkill,lua_callback_not_implemented,-1
-1057,Expert Pet Manufacturing,58,AddFairySkill,lua_callback_not_implemented,-1
-1058,Novice Pet Crafting,58,AddFairySkill,lua_callback_not_implemented,-1
-1059,Standard Pet Crafting,58,AddFairySkill,lua_callback_not_implemented,-1
-1060,Expert Pet Crafting,58,AddFairySkill,lua_callback_not_implemented,-1
-1061,Novice Pet Analyze,58,AddFairySkill,lua_callback_not_implemented,-1
-1062,Standard Pet Analyze,58,AddFairySkill,lua_callback_not_implemented,-1
-1063,Expert Pet Analyze,58,AddFairySkill,lua_callback_not_implemented,-1
-1064,Novice Pet Cooking,58,AddFairySkill,lua_callback_not_implemented,-1
-1065,Standard Pet Cooking,58,AddFairySkill,lua_callback_not_implemented,-1
-1066,Expert Pet Cooking,58,AddFairySkill,lua_callback_not_implemented,-1
+1055,Novice Pet Manufacturing,58,AddFairySkill,fairy_skill_book_supported,-1
+1056,Standard Pet Manufacturing,58,AddFairySkill,fairy_skill_book_supported,-1
+1057,Expert Pet Manufacturing,58,AddFairySkill,fairy_skill_book_supported,-1
+1058,Novice Pet Crafting,58,AddFairySkill,fairy_skill_book_supported,-1
+1059,Standard Pet Crafting,58,AddFairySkill,fairy_skill_book_supported,-1
+1060,Expert Pet Crafting,58,AddFairySkill,fairy_skill_book_supported,-1
+1061,Novice Pet Analyze,58,AddFairySkill,fairy_skill_book_supported,-1
+1062,Standard Pet Analyze,58,AddFairySkill,fairy_skill_book_supported,-1
+1063,Expert Pet Analyze,58,AddFairySkill,fairy_skill_book_supported,-1
+1064,Novice Pet Cooking,58,AddFairySkill,fairy_skill_book_supported,-1
+1065,Standard Pet Cooking,58,AddFairySkill,fairy_skill_book_supported,-1
+1066,Expert Pet Cooking,58,AddFairySkill,fairy_skill_book_supported,-1
 1067,Crystal Cauldron,70,0,non_click_item_or_other_system,-1
 1068,Black Hole Crystal,70,0,non_click_item_or_other_system,-1
 1069,Anti Matter Crystal,70,0,non_click_item_or_other_system,-1
@@ -1036,46 +1036,46 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 1074,Seed of Love,41,0,non_click_item_or_other_system,-1
 1076,Torrent Engine,53,0,equipable_data,12
 1077,Goddess Engine,53,0,equipable_data,12
-1078,Steam Bun,31,ItemMedKit,heal_amount_supported,-1
-1079,Bun,31,ItemMedKit,heal_amount_supported,-1
-1080,Biscuit,31,ItemMedKit,heal_amount_supported,-1
+1078,Steam Bun,31,ItemMedKit,heal_state_supported,-1
+1079,Bun,31,ItemMedKit,heal_state_supported,-1
+1080,Biscuit,31,ItemMedKit,heal_state_supported,-1
 1081,Swordfish Engine,53,0,equipable_data,12
-1082,Fried Dough,31,ItemMedKit,heal_amount_supported,-1
-1083,Spring Roll,31,ItemMedKit,heal_amount_supported,-1
-1084,Maiden Wine,31,ItemMedKit,heal_amount_supported,-1
-1085,Scholar Wine,31,ItemMedKit,heal_amount_supported,-1
+1082,Fried Dough,31,ItemMedKit,heal_state_supported,-1
+1083,Spring Roll,31,ItemMedKit,heal_state_supported,-1
+1084,Maiden Wine,31,ItemMedKit,heal_state_supported,-1
+1085,Scholar Wine,31,ItemMedKit,heal_state_supported,-1
 1086,Ark Engine,53,0,equipable_data,12
-1087,Mao Wine,31,ItemMedKit,heal_amount_supported,-1
-1088,Dukan Wine,31,ItemMedKit,heal_amount_supported,-1
-1089,Ginseng Wine,31,ItemMedKit,heal_amount_supported,-1
-1090,Tiger Bone Tonic,31,ItemMedKit,heal_amount_supported,-1
+1087,Mao Wine,31,ItemMedKit,heal_state_supported,-1
+1088,Dukan Wine,31,ItemMedKit,heal_state_supported,-1
+1089,Ginseng Wine,31,ItemMedKit,heal_state_supported,-1
+1090,Tiger Bone Tonic,31,ItemMedKit,heal_state_supported,-1
 1091,Heart of Black Dragon,0,0,equipable_data,12
 1092,Old Sheepskin Scroll,31,ItemUse_Map_YPJ,lua_callback_not_implemented,-1
 1093,Ancient Pirate Treasure Map,31,ItemUse_GoldenMap,lua_callback_not_implemented,-1
-1094,Lucky Gift Parcel,31,GiveRandomItems,lua_callback_not_implemented,-1
-1095,99 Parcel,31,GiveRandomItems,lua_callback_not_implemented,-1
-1096,Anniversary Chest,31,GiveRandomItems,lua_callback_not_implemented,-1
+1094,Lucky Gift Parcel,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+1095,99 Parcel,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+1096,Anniversary Chest,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
 1097,Cake Sampling Voucher,42,0,non_click_item_or_other_system,-1
 1098,Novice Gale Coral,29,0,equipable_data,5
 1099,Common Gale Coral,29,0,equipable_data,5
 1100,Standard Gale Coral,29,0,equipable_data,5
 1101,Expert Gale Coral,29,0,equipable_data,5
 1102,Gale Coral of Susanoo,29,0,equipable_data,5
-1103,Lv20 Unique Ring Voucher,31,GiveRandomItems,lua_callback_not_implemented,-1
-1104,Lv30 Unique Ring Voucher,31,GiveRandomItems,lua_callback_not_implemented,-1
-1105,Lv40 Unique Ring Voucher,31,GiveRandomItems,lua_callback_not_implemented,-1
-1106,Lv50 Unique Ring Voucher,31,GiveRandomItems,lua_callback_not_implemented,-1
-1107,Lv60 Unique Ring Voucher,31,GiveRandomItems,lua_callback_not_implemented,-1
-1108,Lv20 Unique Necklace Voucher,31,GiveRandomItems,lua_callback_not_implemented,-1
-1109,Lv30 Unique Necklace Voucher,31,GiveRandomItems,lua_callback_not_implemented,-1
-1110,Lv40 Unique Necklace Voucher,31,GiveRandomItems,lua_callback_not_implemented,-1
-1111,Lv50 Unique Necklace Voucher,31,GiveRandomItems,lua_callback_not_implemented,-1
-1112,Lv60 Unique Necklace Voucher,31,GiveRandomItems,lua_callback_not_implemented,-1
+1103,Lv20 Unique Ring Voucher,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+1104,Lv30 Unique Ring Voucher,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+1105,Lv40 Unique Ring Voucher,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+1106,Lv50 Unique Ring Voucher,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+1107,Lv60 Unique Ring Voucher,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+1108,Lv20 Unique Necklace Voucher,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+1109,Lv30 Unique Necklace Voucher,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+1110,Lv40 Unique Necklace Voucher,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+1111,Lv50 Unique Necklace Voucher,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+1112,Lv60 Unique Necklace Voucher,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
 1115,Grandiose Helm,20,0,equipable_data,0
 1116,Grandiose Armor,22,0,equipable_data,2
 1117,Grandiose Gauntlets,23,0,equipable_data,3
 1118,Grandiose Boots,24,0,equipable_data,4
-1119,Paradise Pouch,31,GiveRandomItems,lua_callback_not_implemented,-1
+1119,Paradise Pouch,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
 1120,Snowdoll Mask,20,0,equipable_data,0
 1121,Pumpkin Mask,20,0,equipable_data,0
 1122,Deathsoul Mask,20,0,equipable_data,0
@@ -1084,13 +1084,13 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 1125,Chaos Clawstone,23,0,equipable_data,3
 1126,Chaos Pawstone,24,0,equipable_data,4
 1127,Chaos Crownstone,20,0,equipable_data,0
-1128,Mini Amplifier of Strive,31,AmplifierItem,lua_callback_not_implemented,-1
+1128,Mini Amplifier of Strive,31,AmplifierItem,amplifier_PORT_APPROX,-1
 1129,Skill - Coin Shower,34,0,non_click_item_or_other_system,-1
 1130,Skill - Fool,34,0,non_click_item_or_other_system,-1
 1131,Skill - Snooty,34,0,non_click_item_or_other_system,-1
 1132,Skill - Dumb,34,0,non_click_item_or_other_system,-1
 1133,Skill - Dumb,34,0,non_click_item_or_other_system,-1
-1134,Chaos Chest,31,ItemUse_FightingBox,lua_callback_not_implemented,-1
+1134,Chaos Chest,31,ItemUse_FightingBox,chaos_chest_D1,-1
 1135,Grenade Lv1,71,0329,lua_callback_not_implemented,-1
 1136,Flash Bomb Lv1,71,0330,lua_callback_not_implemented,-1
 1137,Radiation Lv1,71,0331,lua_callback_not_implemented,-1
@@ -1767,8 +1767,8 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 1811,Ami Hairstyle Book,41,0,non_click_item_or_other_system,-1
 1812,Ancient Generator,41,0,non_click_item_or_other_system,-1
 1813,Ancient Generator Fragment,41,0,non_click_item_or_other_system,-1
-1814,Mystic Chest,31,GiveRandomItems,lua_callback_not_implemented,-1
-1815,Beautiful Chest,31,GiveRandomItems,lua_callback_not_implemented,-1
+1814,Mystic Chest,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+1815,Beautiful Chest,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
 1816,Hairstyle Book 9,41,0,non_click_item_or_other_system,-1
 1817,Hairstyle Book 10,41,0,non_click_item_or_other_system,-1
 1818,Hairstyle Book 11,41,0,non_click_item_or_other_system,-1
@@ -1804,20 +1804,20 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 1848,Bread,31,ItemMedKit,heal_amount_supported,-1
 1849,Cake,31,ItemMedKit,heal_amount_supported,-1
 1850,Parcel,42,0,non_click_item_or_other_system,-1
-1851,Daily Supply,31,GiveRandomItems,lua_callback_not_implemented,-1
-1852,Whammy Chest,31,GiveRandomItems,lua_callback_not_implemented,-1
+1851,Daily Supply,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+1852,Whammy Chest,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
 1853,Cannon Base 00,61,0,equipable_data,0
-1854,Bull Potion,31,ItemUse_PKMNYS,lua_callback_not_implemented,-1
-1855,Battle Potion,31,ItemUse_PKZDYS,lua_callback_not_implemented,-1
-1856,Berserk Potion,31,ItemUse_PKKBYS,lua_callback_not_implemented,-1
-1857,Energy Potion,31,ItemUse_PKJSYS,lua_callback_not_implemented,-1
-1858,Harden Potion,31,ItemUse_PKSFYS,lua_callback_not_implemented,-1
-1859,Accurate Potion,31,ItemUse_PKJZYS,lua_callback_not_implemented,-1
-1860,Blessed Potion,71,0444,lua_callback_not_implemented,-1
+1854,Bull Potion,31,ItemUse_PKMNYS,bull_potion_D1,-1
+1855,Battle Potion,31,ItemUse_PKZDYS,battle_potion_D1,-1
+1856,Berserk Potion,31,ItemUse_PKKBYS,berserk_potion_PORT_APPROX,-1
+1857,Energy Potion,31,ItemUse_PKJSYS,energy_potion_D1,-1
+1858,Harden Potion,31,ItemUse_PKSFYS,harden_potion_D1,-1
+1859,Accurate Potion,31,ItemUse_PKJZYS,accurate_potion_D1,-1
+1860,Blessed Potion,71,0444,blessed_potion_D1,-1
 1861,High Grade Wood Bundle,41,ItemUse_PKMCK,lua_callback_not_implemented,-1
 1863,Cannon Tower 00,62,0,equipable_data,0
 1864,Crystal Ball,42,0,non_click_item_or_other_system,-1
-1872,Fairy Coin Chest,41,ItemUse_YingbiBox,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+1872,Fairy Coin Chest,41,ItemUse_YingbiBox,fairy_coin_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 1873,Cannon Tube 00,63,0,equipable_data,0
 1883,Cannon Logo 00,64,0,equipable_data,0
 1884,Undead Sealed Armor of Revenant,22,0,equipable_data,"2,-2,-2,-2,-2,-2,-2,-2,-2,-2"
@@ -2150,7 +2150,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 2213,Joyful Bunny Cap,20,0,equipable_data,0
 2214,Bunny Baby Cap,20,0,equipable_data,0
 2215,Lucky Bunny Cap,20,0,equipable_data,0
-2216,Book for Regaining Ability,31,ItemUse_XiDianBook,lua_callback_not_implemented,-1
+2216,Book for Regaining Ability,31,ItemUse_XiDianBook,skill_reset_book_PORT_PARTIAL,-1
 2217,Event Commissioner,20,0,equipable_data,0
 2218,Happy Panda Cap,20,0,equipable_data,0
 2219,Mystic Panda Cap,20,0,equipable_data,0
@@ -2158,7 +2158,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 2221,Fish Fairy Cap,20,0,equipable_data,0
 2222,Dragon Cap,20,0,equipable_data,0
 2223,Dragon Lord Cap,20,0,equipable_data,0
-2224,Modern Apparel Chest,31,ItemUse_MOLIBOX,lua_callback_not_implemented,-1
+2224,Modern Apparel Chest,31,ItemUse_MOLIBOX,modern_apparel_chest_PORT_PARTIAL,-1
 2225,Morph Clover,41,0,non_click_item_or_other_system,-1
 2226,Baby Rune,42,0,non_click_item_or_other_system,-1
 2227,Roico Rune,42,0,non_click_item_or_other_system,-1
@@ -2237,10 +2237,10 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 2302,Cooking Blueprint,69,0,non_click_item_or_other_system,-1
 2303,Amber Tear,42,0,non_click_item_or_other_system,-1
 2304,New Year Firework,31,ItemUse_XNLP,lua_callback_not_implemented,-1
-2305,Number Ticket,31,ItemUse_SZF,lua_callback_not_implemented,-1
+2305,Number Ticket,31,ItemUse_SZF,number_ticket_PORT_APPROX,-1
 2306,IPOD Voucher,41,0,non_click_item_or_other_system,-1
-2307,New Year Chest,31,ItemUse_XNBOX,lua_callback_not_implemented,-1
-2312,Auto Ration,57,FairyRation,lua_callback_not_implemented,-1
+2307,New Year Chest,31,ItemUse_XNBOX,new_year_chest_PORT_APPROX,-1
+2312,Auto Ration,57,FairyRation,fairy_ration_auto_PORT_APPROX,-1
 2313,New Lifeskill thread,75,0,equipable_data,9
 2314,Memory Stone,31,ItemUse_ShiTouJi,lua_callback_not_implemented,-1
 2315,Soup of Rebirth,31,ItemUse_CJBOX,lua_callback_not_implemented,-1
@@ -2284,7 +2284,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 2368,Rightful Black Dragon Claw,23,0,equipable_data,3
 2369,Rightful Black Dragon Wings,24,0,equipable_data,4
 2370,Rightful Head of Black Dragon,20,0,equipable_data,0
-2371,Aladdin Parcel,31,ItemUse_ALDXB,lua_callback_not_implemented,-1
+2371,Aladdin Parcel,31,ItemUse_ALDXB,aladdin_parcel_PORT_PARTIAL,-1
 2372,Exploding Lamb Lv1,31,ItemUse_ZBML1,lua_callback_not_implemented,-1
 2373,Exploding Lamb Lv2,31,ItemUse_ZBML2,lua_callback_not_implemented,-1
 2374,Shield of Medusa,41,0,non_click_item_or_other_system,-1
@@ -2346,12 +2346,12 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 2439,Sentry Fragment,42,0,non_click_item_or_other_system,-1
 2440,Lock of Mystic,41,0,non_click_item_or_other_system,-1
 2441,Superglue,42,0,non_click_item_or_other_system,-1
-2442,Sunken Cupboard,31,GiveRandomItems,lua_callback_not_implemented,-1
-2443,Sunken Cupboard,31,GiveRandomItems,lua_callback_not_implemented,-1
+2442,Sunken Cupboard,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+2443,Sunken Cupboard,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
 2444,Heart of Davy Jones,42,0,non_click_item_or_other_system,-1
-2445,Caribbean Tour Ticket,36,Ticket,lua_callback_not_implemented,-1
+2445,Caribbean Tour Ticket,36,Ticket,ticket_destination_PORT_APPROX,-1
 2446,Event Pass (Skeletar Isle),36,0,non_click_item_or_other_system,-1
-2447,Pass to Skeletar Isle,36,Ticket,lua_callback_not_implemented,-1
+2447,Pass to Skeletar Isle,36,Ticket,ticket_destination_PORT_APPROX,-1
 2448,Gunpowder 02,13,0,equipable_data,6
 2449,Shark Meat,42,0,non_click_item_or_other_system,-1
 2450,Shark Roe,42,0,non_click_item_or_other_system,-1
@@ -2395,7 +2395,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 2488,Bone of Mummy,31,0,non_click_item_or_other_system,-1
 2489,Soul of Corpse Soldier,31,0,non_click_item_or_other_system,-1
 2490,Heart of Pharaoh,31,0,non_click_item_or_other_system,-1
-2491,Pass to Naval Base,36,Ticket,lua_callback_not_implemented,-1
+2491,Pass to Naval Base,36,Ticket,ticket_destination_PORT_APPROX,-1
 2492,Map Switching 2,0,0,non_click_item_or_other_system,-1
 2493,Gold,0,0,non_click_item_or_other_system,-1
 2495,Axe,18,0,equipable_data,9
@@ -2543,46 +2543,46 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 2676,Radar Lv1,71,0385,lua_callback_not_implemented,-1
 2677,Chain Bullet Lv1,71,0382,lua_callback_not_implemented,-1
 2678,Water Mine Lv1,31,ItemUse_SL1,lua_callback_not_implemented,-1
-2679,Lv1 Manufacturing Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2680,Lv2 Manufacturing Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2681,Lv3 Manufacturing Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2682,Lv4 Manufacturing Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2683,Lv5 Manufacturing Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2684,Lv6 Manufacturing Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2685,Lv7 Manufacturing Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2686,Lv8 Manufacturing Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2687,Lv9 Manufacturing Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2688,Lv10 Manufacturing Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2689,Lv1 Cooking Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2690,Lv2 Cooking Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2691,Lv3 Cooking Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2692,Lv4 Cooking Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2693,Lv5 Cooking Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2694,Lv6 Cooking Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2695,Lv7 Cooking Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2696,Lv8 Cooking Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2697,Lv9 Cooking Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2698,Lv10 Cooking Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2699,Lv1 Crafting Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2700,Lv2 Crafting Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2701,Lv3 Crafting Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2702,Lv4 Crafting Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2703,Lv5 Crafting Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2704,Lv6 Crafting Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2705,Lv7 Crafting Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2706,Lv8 Crafting Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2707,Lv9 Crafting Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2708,Lv10 Crafting Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2709,Lv1 Analyze Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2710,Lv2 Analyze Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2711,Lv3 Analyze Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2712,Lv4 Analyze Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2713,Lv5 Analyze Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2714,Lv6 Analyze Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2715,Lv7 Analyze Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2716,Lv8 Analyze Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2717,Lv9 Analyze Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
-2718,Lv10 Analyze Guide,34,AddLifeSkill,lua_callback_not_implemented,-1
+2679,Lv1 Manufacturing Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2680,Lv2 Manufacturing Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2681,Lv3 Manufacturing Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2682,Lv4 Manufacturing Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2683,Lv5 Manufacturing Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2684,Lv6 Manufacturing Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2685,Lv7 Manufacturing Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2686,Lv8 Manufacturing Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2687,Lv9 Manufacturing Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2688,Lv10 Manufacturing Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2689,Lv1 Cooking Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2690,Lv2 Cooking Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2691,Lv3 Cooking Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2692,Lv4 Cooking Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2693,Lv5 Cooking Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2694,Lv6 Cooking Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2695,Lv7 Cooking Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2696,Lv8 Cooking Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2697,Lv9 Cooking Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2698,Lv10 Cooking Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2699,Lv1 Crafting Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2700,Lv2 Crafting Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2701,Lv3 Crafting Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2702,Lv4 Crafting Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2703,Lv5 Crafting Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2704,Lv6 Crafting Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2705,Lv7 Crafting Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2706,Lv8 Crafting Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2707,Lv9 Crafting Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2708,Lv10 Crafting Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2709,Lv1 Analyze Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2710,Lv2 Analyze Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2711,Lv3 Analyze Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2712,Lv4 Analyze Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2713,Lv5 Analyze Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2714,Lv6 Analyze Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2715,Lv7 Analyze Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2716,Lv8 Analyze Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2717,Lv9 Analyze Guide,34,AddLifeSkill,life_skill_book_mapped,-1
+2718,Lv10 Analyze Guide,34,AddLifeSkill,life_skill_book_mapped,-1
 2719,Grenade Lv2,71,0342,lua_callback_not_implemented,-1
 2720,Flash Bomb Lv2,71,0343,lua_callback_not_implemented,-1
 2721,Radiation Lv2,71,0344,lua_callback_not_implemented,-1
@@ -2680,7 +2680,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 2813,Chain Bullet Lv5,71,0434,lua_callback_not_implemented,-1
 2814,Water Mine Lv5,31,ItemUse_SL5,lua_callback_not_implemented,-1
 2815,Chilling Icy Crystal,41,0,non_click_item_or_other_system,-1
-2816,Book of Honor Bonus,31,ItemUse_HonorPoint,lua_callback_not_implemented,-1
+2816,Book of Honor Bonus,31,ItemUse_HonorPoint,honor_points_supported,-1
 2817,Hardin's Bind,22,0,equipable_data,2
 2818,Hardin's Touch,23,0,equipable_data,3
 2819,Hardin's Print,24,0,equipable_data,4
@@ -2700,15 +2700,15 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 2833,Styx's Span,23,0,equipable_data,3
 2834,Styx's Wanderer,24,0,equipable_data,4
 2835,Crown of Decedent,20,0,equipable_data,0
-2836,Chest of Hardin,31,ItemUse_Hadisi,lua_callback_not_implemented,-1
-2837,Chest of Darkness,31,ItemUse_Anhei,lua_callback_not_implemented,-1
-2838,Chest of Abaddon,31,ItemUse_Diyu,lua_callback_not_implemented,-1
-2839,Chest of Asura,31,ItemUse_Xiuluo,lua_callback_not_implemented,-1
-2840,Chest of Abyss,31,ItemUse_Youming,lua_callback_not_implemented,-1
-2841,Chest of Styx,31,ItemUse_Minghe,lua_callback_not_implemented,-1
-2842,Carcass of Death,31,ItemUse_Sishen,lua_callback_not_implemented,-1
-2843,Rightful Chest of Black Dragon,31,ItemUse_Zhenheilong,lua_callback_not_implemented,-1
-2844,Pass to Abaddon 4,36,Ticket,lua_callback_not_implemented,-1
+2836,Chest of Hardin,31,ItemUse_Hadisi,fixed_boss_set_chest_supported,-1
+2837,Chest of Darkness,31,ItemUse_Anhei,fixed_boss_set_chest_supported,-1
+2838,Chest of Abaddon,31,ItemUse_Diyu,fixed_boss_set_chest_supported,-1
+2839,Chest of Asura,31,ItemUse_Xiuluo,fixed_boss_set_chest_supported,-1
+2840,Chest of Abyss,31,ItemUse_Youming,fixed_boss_set_chest_supported,-1
+2841,Chest of Styx,31,ItemUse_Minghe,fixed_boss_set_chest_supported,-1
+2842,Carcass of Death,31,ItemUse_Sishen,class_boss_weapon_chest_PORT_APPROX,-1
+2843,Rightful Chest of Black Dragon,31,ItemUse_Zhenheilong,black_dragon_rightful_chest_PORT_APPROX,-1
+2844,Pass to Abaddon 4,36,Ticket,ticket_destination_PORT_APPROX,-1
 2845,Red Rope,41,0,non_click_item_or_other_system,-1
 2846,Melancholy of Phantom Baron,41,0,non_click_item_or_other_system,-1
 2847,Melancholy of Demon Flame,41,0,non_click_item_or_other_system,-1
@@ -2737,45 +2737,45 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 2885,Bear Gloves,31,0,equipable_data,3
 2886,Turket Meat,31,0,non_click_item_or_other_system,-1
 2887,Christmas Greeting Card,31,0,non_click_item_or_other_system,-1
-2888,Turkey Summon Scroll,31,ItemUse_HJZHQ,lua_callback_not_implemented,-1
-2889,Reindeer Summon Scroll,31,ItemUse_MLZHQ,lua_callback_not_implemented,-1
-2890,Snowman Summon Scroll,31,ItemUse_XRZHQ,lua_callback_not_implemented,-1
-2891,Santa Summon Scroll,31,ItemUse_SDZHQ,lua_callback_not_implemented,-1
+2888,Turkey Summon Scroll,31,ItemUse_HJZHQ,holiday_pet_summon_PORT_APPROX,-1
+2889,Reindeer Summon Scroll,31,ItemUse_MLZHQ,holiday_pet_summon_PORT_APPROX,-1
+2890,Snowman Summon Scroll,31,ItemUse_XRZHQ,holiday_pet_summon_PORT_APPROX,-1
+2891,Santa Summon Scroll,31,ItemUse_SDZHQ,holiday_pet_summon_PORT_APPROX,-1
 2892,Dirty Christmas Box,31,0,non_click_item_or_other_system,-1
-2893,Exquisite Christmas case,31,GiveRandomItems,lua_callback_not_implemented,-1
+2893,Exquisite Christmas case,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
 2894,Christmas Rose,31,0,non_click_item_or_other_system,-1
-2895,Tasty Turkey Meat,31,ItemUse_MWHJ,lua_callback_not_implemented,-1
+2895,Tasty Turkey Meat,31,ItemUse_MWHJ,tasty_turkey_exp_D1,-1
 2896,Little Snow Ball,71,0378,lua_callback_not_implemented,-1
-2897,Christmas Surprise Gift,31,ItemUse_SDDLB,lua_callback_not_implemented,-1
-2898,Christmas Dinner,31,ItemUse_SDDC,lua_callback_not_implemented,-1
+2897,Christmas Surprise Gift,31,ItemUse_SDDLB,christmas_gift_D1,-1
+2898,Christmas Dinner,31,ItemUse_SDDC,christmas_dinner_D1,-1
 2899,Christmas Gem Voucher,31,0,non_click_item_or_other_system,-1
-2900,Monster Summon Scroll,31,ItemUse_GWZHQ,lua_callback_not_implemented,-1
+2900,Monster Summon Scroll,31,ItemUse_GWZHQ,posh_christmas_box_D1,-1
 2901,Chilling Frost Crystal,41,0,non_click_item_or_other_system,-1
 2902,Love Amulet of a Princess,70,0,non_click_item_or_other_system,-1
 2903,Love Amulet of a Prince,70,0,non_click_item_or_other_system,-1
-2904,Gift of the Beauty,31,ItemUse_JRDQBox,lua_callback_not_implemented,-1
-2905,Gift of the Hunk,31,ItemUse_CJDQBox,lua_callback_not_implemented,-1
-2906,Wedding Candy,31,GiveRandomItems,lua_callback_not_implemented,-1
-2907,Wedding Gift Parcel,31,ItemUse_HQBOX,lua_callback_not_implemented,-1
+2904,Gift of the Beauty,31,ItemUse_JRDQBox,gift_of_the_beauty_PORT_PARTIAL,-1
+2905,Gift of the Hunk,31,ItemUse_CJDQBox,gift_of_the_hunk_PORT_PARTIAL,-1
+2906,Wedding Candy,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+2907,Wedding Gift Parcel,31,ItemUse_HQBOX,wedding_gift_parcel_D1,-1
 2908,Lucky Piggy Clover,31,0,non_click_item_or_other_system,-1
-2909,Lucky Piggy Chest,31,ItemUse_XYPIGBOX,lua_callback_not_implemented,-1
+2909,Lucky Piggy Chest,31,ItemUse_XYPIGBOX,lucky_piggy_chest_D1,-1
 2910,PKO Auspicious Bag,31,ItemUse_YSB,lua_callback_not_implemented,-1
 2911,Challenge Letter,65,0,non_click_item_or_other_system,-1
 2912,Bawcock Letter,65,0,non_click_item_or_other_system,-1
 2913,Marriage Certificate,41,0,non_click_item_or_other_system,-1
 2914,Marriage Certificate,41,0,non_click_item_or_other_system,-1
 2915,Chest of Gown,31,ItemUse_MarryBox,lua_callback_not_implemented,-1
-2916,Chest of Fate,31,ItemUse_LoveBox,lua_callback_not_implemented,-1
+2916,Chest of Fate,31,ItemUse_LoveBox,chest_of_fate_PORT_APPROX,-1
 2917,Oracle,42,0,non_click_item_or_other_system,-1
 2918,Stone of Meng,42,0,non_click_item_or_other_system,-1
-2919,Death's Burden,31,ItemUse_DathBagA,lua_callback_not_implemented,-1
-2920,Death's Burden,31,ItemUse_DathBagB,lua_callback_not_implemented,-1
-2921,Death's Burden,31,ItemUse_DathBagC,lua_callback_not_implemented,-1
-2922,Death's Burden,31,ItemUse_DathBagD,lua_callback_not_implemented,-1
-2923,Death's Burden,31,ItemUse_DathBagE,lua_callback_not_implemented,-1
-2924,Death's Burden,31,ItemUse_DathBagF,lua_callback_not_implemented,-1
-2925,Death's Burden,31,ItemUse_DathBagG,lua_callback_not_implemented,-1
-2926,Death's Burden,31,ItemUse_DathBagH,lua_callback_not_implemented,-1
+2919,Death's Burden,31,ItemUse_DathBagA,death_burden_D1,-1
+2920,Death's Burden,31,ItemUse_DathBagB,death_burden_D1,-1
+2921,Death's Burden,31,ItemUse_DathBagC,death_burden_D1,-1
+2922,Death's Burden,31,ItemUse_DathBagD,death_burden_D1,-1
+2923,Death's Burden,31,ItemUse_DathBagE,death_burden_D1,-1
+2924,Death's Burden,31,ItemUse_DathBagF,death_burden_D1,-1
+2925,Death's Burden,31,ItemUse_DathBagG,death_burden_D1,-1
+2926,Death's Burden,31,ItemUse_DathBagH,death_burden_D1,-1
 2927,Sealed Soul of Hardin,41,0,non_click_item_or_other_system,-1
 2928,Sealed Soul of Darkness,41,0,non_click_item_or_other_system,-1
 2929,Sealed Soul of Abaddon,41,0,non_click_item_or_other_system,-1
@@ -2800,23 +2800,23 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 2948,Aries Palace Gatherer Emblem,42,0,non_click_item_or_other_system,-1
 2949,Aries Palace Exploration Emblem,42,0,non_click_item_or_other_system,-1
 2950,Aries Palace Boss Emblem,42,0,non_click_item_or_other_system,-1
-2951,Chaos Bonus Book,31,ItemUse_FightingPoint,lua_callback_not_implemented,-1
+2951,Chaos Bonus Book,31,ItemUse_FightingPoint,chaos_points_supported,-1
 2952,Special Operation Card,65,0,non_click_item_or_other_system,-1
-2953,Gift of April's Fool,31,ItemUse_Foolish,lua_callback_not_implemented,-1
+2953,Gift of April's Fool,31,ItemUse_Foolish,foolish_exp_supported,-1
 2954,Proof of Death,65,0,non_click_item_or_other_system,-1
-2955,Aries Captain Apparel Chest,31,ItemUse_CZBox,lua_callback_not_implemented,-1
+2955,Aries Captain Apparel Chest,31,ItemUse_CZBox,fixed_apparel_chest_PORT_APPROX,-1
 2956,Rebirth Crusader Skill Book,34,AddPlayerSkill,skill_book_mapped,-1
 2957,Rebirth Champion Skill Book,34,AddPlayerSkill,skill_book_mapped,-1
 2958,Rebirth Seal Master Skill Book,34,AddPlayerSkill,skill_book_mapped,-1
 2959,Rebirth Cleric Skill Book,34,AddPlayerSkill,skill_book_mapped,-1
 2960,Rebirth Voyager Skill Book,34,AddPlayerSkill,skill_book_mapped,-1
 2961,Rebirth Sharpshooter Skill Book,34,AddPlayerSkill,skill_book_mapped,-1
-2962,Summon Scroll - Aries,31,SummonAries,lua_callback_not_implemented,-1
+2962,Summon Scroll - Aries,31,SummonAries,aries_guardian_D1,-1
 2964,Navy Token,41,0,non_click_item_or_other_system,-1
 2986,Statue Pass,36,ItemUse_moveDX,lua_callback_not_implemented,-1
-2988,Famous Cake,31,ItemUse_NiceCake,lua_callback_not_implemented,-1
-2989,Super Sushi,31,ItemUse_HappyBook,lua_callback_not_implemented,-1
-2990,Scroll of White Sheep Guardian,31,ItemUse_BYSHJZ,lua_callback_not_implemented,-1
+2988,Famous Cake,31,ItemUse_NiceCake,famous_cake_D1,-1
+2989,Super Sushi,31,ItemUse_HappyBook,happy_book_supported,-1
+2990,Scroll of White Sheep Guardian,31,ItemUse_BYSHJZ,white_sheep_guardian_summon_PORT_APPROX,-1
 2991,Oarsman Boots,31,0,equipable_data,4
 2992,Deckman Boots,31,0,equipable_data,4
 2993,Mastman Boots,31,0,equipable_data,4
@@ -2833,12 +2833,12 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 3008,Prawn Shoes,31,0,equipable_data,4
 3009,Pincer Shoes,31,0,equipable_data,4
 3010,Goddess Statue,71,0452,lua_callback_not_implemented,-1
-3011,Lucky Card Chest,31,ItemUse_XingYunBox,lua_callback_not_implemented,-1
-3012,Lizardman Warrior Commander Summon Scroll,31,ItemUse_XYZSTL,lua_callback_not_implemented,-1
+3011,Lucky Card Chest,31,ItemUse_XingYunBox,lucky_card_chest_PORT_APPROX,-1
+3012,Lizardman Warrior Commander Summon Scroll,31,ItemUse_XYZSTL,fixed_summon_scroll_PORT_APPROX,-1
 3013,Evil Tribal Chieftian summon scroll,31,ItemUse_XETZQZ,lua_callback_not_implemented,-1
-3014,Pirate Captain 008 Summoning Scroll,31,ItemUse_HDCZ,lua_callback_not_implemented,-1
-3015,Fox Spirit summon scroll,31,ItemUse_HY,lua_callback_not_implemented,-1
-3016,Black Dragon Phantom summoning scroll,31,ItemUse_HLHT,lua_callback_not_implemented,-1
+3014,Pirate Captain 008 Summoning Scroll,31,ItemUse_HDCZ,fixed_summon_scroll_PORT_APPROX,-1
+3015,Fox Spirit summon scroll,31,ItemUse_HY,fixed_summon_scroll_PORT_APPROX,-1
+3016,Black Dragon Phantom summoning scroll,31,ItemUse_HLHT,fixed_summon_scroll_PORT_APPROX,-1
 3024,Church Visit Ticket,36,Ticket,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 3026,Taurus Protector Seal,42,0,non_click_item_or_other_system,-1
 3027,Gemini Gate Ticket,42,0,non_click_item_or_other_system,-1
@@ -2849,31 +2849,31 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 3032,Taurus Palace Gathering Emblem,42,0,non_click_item_or_other_system,-1
 3033,Taurus Palace Exploring Emblem,42,0,non_click_item_or_other_system,-1
 3034,Taurus Palace BOSS Emblem,42,0,non_click_item_or_other_system,-1
-3035,Taurus Captain Apparel Chest,31,ItemUse_JNCZBox,lua_callback_not_implemented,-1
-3036,Taurus Guardian Scroll,31,ItemUse_JNSHZ,lua_callback_not_implemented,-1
-3037,Warm Dumpling,31,ItemUse_WQZZ,lua_callback_not_implemented,-1
-3039,Level Pushing Machine,31,AmplifierItem,lua_callback_not_implemented,-1
+3035,Taurus Captain Apparel Chest,31,ItemUse_JNCZBox,fixed_apparel_chest_PORT_APPROX,-1
+3036,Taurus Guardian Scroll,31,ItemUse_JNSHZ,fixed_summon_scroll_PORT_APPROX,-1
+3037,Warm Dumpling,31,ItemUse_WQZZ,expired_dumpling_D1,-1
+3039,Level Pushing Machine,31,AmplifierItem,amplifier_PORT_APPROX,-1
 3040,Egg yolk dumpling string,41,0,non_click_item_or_other_system,-1
 3041,Red Bean Dumpling String,41,0,non_click_item_or_other_system,-1
 3042,Sticky rice string,41,0,non_click_item_or_other_system,-1
-3043,Egg Yolk Dumpling,31,ItemUse_DHZ,lua_callback_not_implemented,-1
-3044,Bean Paste Dumpling,31,ItemUse_DSZ,lua_callback_not_implemented,-1
-3045,Sticky Rice Dumpling,31,ItemUse_NMZ,lua_callback_not_implemented,-1
-3046,Power Sail,31,ItemUse_SanJiaoFan,lua_callback_not_implemented,-1
+3043,Egg Yolk Dumpling,31,ItemUse_DHZ,expired_dumpling_D1,-1
+3044,Bean Paste Dumpling,31,ItemUse_DSZ,expired_dumpling_D1,-1
+3045,Sticky Rice Dumpling,31,ItemUse_NMZ,expired_dumpling_D1,-1
+3046,Power Sail,31,ItemUse_SanJiaoFan,boat_speed_sail_D1,-1
 3047,Voodoo Puppet,41,0,non_click_item_or_other_system,-1
-3048,Pass to Thundoria Castle,36,Ticket,lua_callback_not_implemented,-1
-3049,Pass to Thundoria Harbor,36,Ticket,lua_callback_not_implemented,-1
-3050,Pass to Sacred Snow Mountain,36,Ticket,lua_callback_not_implemented,-1
-3051,Pass to Andes Forest Haven,36,Ticket,lua_callback_not_implemented,-1
-3052,Pass to Oasis Haven,36,Ticket,lua_callback_not_implemented,-1
-3053,Pass to Icespire Haven,36,Ticket,lua_callback_not_implemented,-1
-3054,Pass to Lone Tower,36,Ticket,lua_callback_not_implemented,-1
-3055,Pass to Barren Cavern,36,Ticket,lua_callback_not_implemented,-1
-3056,Pass to Abandoned Mine 2,36,Ticket,lua_callback_not_implemented,-1
-3057,Pass to Silver Mine 2,36,Ticket,lua_callback_not_implemented,-1
-3058,Pass to Silver Mine 3,36,Ticket,lua_callback_not_implemented,-1
-3059,Ticket to Lone Tower 2,36,Ticket,lua_callback_not_implemented,-1
-3060,Pass to Lone Tower 3,36,Ticket,lua_callback_not_implemented,-1
+3048,Pass to Thundoria Castle,36,Ticket,ticket_destination_PORT_APPROX,-1
+3049,Pass to Thundoria Harbor,36,Ticket,ticket_destination_PORT_APPROX,-1
+3050,Pass to Sacred Snow Mountain,36,Ticket,ticket_destination_PORT_APPROX,-1
+3051,Pass to Andes Forest Haven,36,Ticket,ticket_destination_PORT_APPROX,-1
+3052,Pass to Oasis Haven,36,Ticket,ticket_destination_PORT_APPROX,-1
+3053,Pass to Icespire Haven,36,Ticket,ticket_destination_PORT_APPROX,-1
+3054,Pass to Lone Tower,36,Ticket,ticket_destination_PORT_APPROX,-1
+3055,Pass to Barren Cavern,36,Ticket,ticket_destination_PORT_APPROX,-1
+3056,Pass to Abandoned Mine 2,36,Ticket,ticket_destination_PORT_APPROX,-1
+3057,Pass to Silver Mine 2,36,Ticket,ticket_destination_PORT_APPROX,-1
+3058,Pass to Silver Mine 3,36,Ticket,ticket_destination_PORT_APPROX,-1
+3059,Ticket to Lone Tower 2,36,Ticket,ticket_destination_PORT_APPROX,-1
+3060,Pass to Lone Tower 3,36,Ticket,ticket_destination_PORT_APPROX,-1
 3061,Bear Shoes,24,0,equipable_data,4
 3062,Scrap of Rotten Meat,31,0,non_click_item_or_other_system,-1
 3063,Tooth of Fox Immortal,31,0,non_click_item_or_other_system,-1
@@ -2882,44 +2882,44 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 3067,Frozen Dragon Scale,31,0,non_click_item_or_other_system,-1
 3068,Talisman of Curse,31,0,non_click_item_or_other_system,-1
 3069,Chunk of Rotten Meat,31,0,non_click_item_or_other_system,-1
-3070,Pass to Lone Tower 4,36,Ticket,lua_callback_not_implemented,-1
-3071,Pass to Lone Tower 5,36,Ticket,lua_callback_not_implemented,-1
-3072,Pass to Lone Tower 6,36,Ticket,lua_callback_not_implemented,-1
-3073,Pass to Abandon Mine 1,36,Ticket,lua_callback_not_implemented,-1
-3074,Refining Catalyst,31,ItemUse_LSDZG,lua_callback_not_implemented,-1
-3075,Composition Catalyst,31,ItemUse_HSDZG,lua_callback_not_implemented,-1
-3076,Pass to Spring Town,36,Ticket,lua_callback_not_implemented,-1
-3077,Honey Chocolate,31,ItemUse_BZ,lua_callback_not_implemented,-1
+3070,Pass to Lone Tower 4,36,Ticket,ticket_destination_PORT_APPROX,-1
+3071,Pass to Lone Tower 5,36,Ticket,ticket_destination_PORT_APPROX,-1
+3072,Pass to Lone Tower 6,36,Ticket,ticket_destination_PORT_APPROX,-1
+3073,Pass to Abandon Mine 1,36,Ticket,ticket_destination_PORT_APPROX,-1
+3074,Refining Catalyst,31,ItemUse_LSDZG,forge_catalyst_D1,-1
+3075,Composition Catalyst,31,ItemUse_HSDZG,combine_catalyst_D1,-1
+3076,Pass to Spring Town,36,Ticket,ticket_destination_PORT_APPROX,-1
+3077,Honey Chocolate,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
 3084,Sigil of Anubis,31,0,non_click_item_or_other_system,-1
 3085,Mask of Mummy King,31,0,non_click_item_or_other_system,-1
-3086,Career Lot,31,ItemUse_SuanmingWork,lua_callback_not_implemented,-1
-3087,Fortune Lot,31,ItemUse_SuanmingMoney,lua_callback_not_implemented,-1
+3086,Career Lot,31,ItemUse_SuanmingWork,career_lot_PORT_APPROX,-1
+3087,Fortune Lot,31,ItemUse_SuanmingMoney,fortune_lot_PORT_APPROX,-1
 3088,28 Inventory Slot,31,InventorySlot,bag_upgrade_supported,-1
 3089,32 Inventory Slot,31,InventorySlot,bag_upgrade_supported,-1
 3090,36 Inventory Slot,31,InventorySlot,bag_upgrade_supported,-1
 3091,40 Inventory Slot,31,InventorySlot,bag_upgrade_supported,-1
 3092,44 Inventory Slot,31,InventorySlot,bag_upgrade_supported,-1
 3093,48 Inventory Slot,31,InventorySlot,bag_upgrade_supported,-1
-3094,Amplifier of Strive,31,AmplifierItem,lua_callback_not_implemented,-1
-3095,Hi-Amplifier of Strive,31,AmplifierItem,lua_callback_not_implemented,-1
-3096,Amplifier of Luck,31,AmplifierItem,lua_callback_not_implemented,-1
-3097,Hi-Amplifier of Luck,31,AmplifierItem,lua_callback_not_implemented,-1
+3094,Amplifier of Strive,31,AmplifierItem,amplifier_PORT_APPROX,-1
+3095,Hi-Amplifier of Strive,31,AmplifierItem,amplifier_PORT_APPROX,-1
+3096,Amplifier of Luck,31,AmplifierItem,amplifier_PORT_APPROX,-1
+3097,Hi-Amplifier of Luck,31,AmplifierItem,amplifier_PORT_APPROX,-1
 3098,Constitution Recovery Flask,31,ItemMedKit,heal_amount_supported,-1
 3099,SP Holy Water,31,ItemMedKit,heal_amount_supported,-1
-3100,Elixir of Lion,31,ItemUse_SPXsyjA,lua_callback_not_implemented,-1
-3101,Elixir of Monkey,31,ItemUse_SPLhyjA,lua_callback_not_implemented,-1
-3102,Elixir of Bull,31,ItemUse_SPMnyjA,lua_callback_not_implemented,-1
-3103,Elixir of Eagle,31,ItemUse_SPYyyjA,lua_callback_not_implemented,-1
-3104,Elixir of Soul,31,ItemUse_SPSlyjA,lua_callback_not_implemented,-1
-3105,Skating Potion,31,ItemUse_MspdYSA,lua_callback_not_implemented,-1
+3100,Elixir of Lion,31,ItemUse_SPXsyjA,attribute_potion_D1,-1
+3101,Elixir of Monkey,31,ItemUse_SPLhyjA,attribute_potion_D1,-1
+3102,Elixir of Bull,31,ItemUse_SPMnyjA,attribute_potion_D1,-1
+3103,Elixir of Eagle,31,ItemUse_SPYyyjA,attribute_potion_D1,-1
+3104,Elixir of Soul,31,ItemUse_SPSlyjA,attribute_potion_D1,-1
+3105,Skating Potion,31,ItemUse_MspdYSA,skating_potion_D1,-1
 3106,Battleship Armor,31,ItemUse_GJZhuangJiaA,lua_callback_not_implemented,-1
-3107,lantern festival hurricane lamp,31,ItemUse_DenglongA,lua_callback_not_implemented,-1
+3107,lantern festival hurricane lamp,31,ItemUse_DenglongA,lantern_defense_D1,-1
 3108,Gold Alloy Pickaxe,19,0,equipable_data,9
-3109,Vial of Strength Reset,31,ItemStat,lua_callback_not_implemented,-1
-3110,Vial of Consitution Reset,31,ItemStat,lua_callback_not_implemented,-1
-3111,Vial of Agility Reset,31,ItemStat,lua_callback_not_implemented,-1
-3112,Vial of Accuracy Reset,31,ItemStat,lua_callback_not_implemented,-1
-3113,Vial of Spirit Reset,31,ItemStat,lua_callback_not_implemented,-1
+3109,Vial of Strength Reset,31,ItemStat,item_stat_rule_PORT_APPROX,-1
+3110,Vial of Consitution Reset,31,ItemStat,item_stat_rule_PORT_APPROX,-1
+3111,Vial of Agility Reset,31,ItemStat,item_stat_rule_PORT_APPROX,-1
+3112,Vial of Accuracy Reset,31,ItemStat,item_stat_rule_PORT_APPROX,-1
+3113,Vial of Spirit Reset,31,ItemStat,item_stat_rule_PORT_APPROX,-1
 3114,Sea Weed Killer,31,ItemUse_Ant_Hzcr,lua_callback_not_implemented,-1
 3115,Transparent Shoes,24,0,equipable_data,4
 3116,Elven Fruit,31,ItemMedKit,heal_amount_supported,-1
@@ -2947,7 +2947,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 3138,Mystery Fruit,31,ItemMedKit,heal_amount_supported,-1
 3139,Agrypnotic,31,ItemMedKit,heal_amount_supported,-1
 3140,Magical Potion,31,ItemMedKit,heal_amount_supported,-1
-3141,Old Ticket,36,Ticket,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+3141,Old Ticket,36,Ticket,ticket_no_destination,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 3142,Return Ticket,31,0,non_click_item_or_other_system,-1
 3143,Revival Clover,31,0,non_click_item_or_other_system,-1
 3144,Revival Flower,31,0,non_click_item_or_other_system,-1
@@ -2958,7 +2958,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 3149,Wakening Salt,31,0,non_click_item_or_other_system,-1
 3150,Tropical Fruit,31,0,non_click_item_or_other_system,-1
 3151,Coconut,31,0,non_click_item_or_other_system,-1
-3152,Pet Food,57,FairyRation,lua_callback_not_implemented,-1
+3152,Pet Food,57,FairyRation,fairy_ration_supported,-1
 3153,Chicken Cutlet,31,0,non_click_item_or_other_system,-1
 3154,Beef Jerky,31,0,non_click_item_or_other_system,-1
 3155,Tombola Box,31,0,non_click_item_or_other_system,-1
@@ -2975,9 +2975,9 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 3166,Mighty Strike,34,AddPlayerSkill,skill_book_mapped,-1
 3167,Howl,34,AddPlayerSkill,skill_book_mapped,-1
 3168,Greatsword Mastery,34,AddPlayerSkill,skill_book_mapped,-1
-3169,Barbaric Crush,34,AddPlayerSkill,skill_book_no_mapping,-1
+3169,Barbaric Crush,34,AddPlayerSkill,skill_book_name_match_PORT_APPROX,-1
 3170,Berserk,34,AddPlayerSkill,skill_book_mapped,-1
-3171,Totem's Worship,34,AddPlayerSkill,skill_book_no_mapping,-1
+3171,Totem's Worship,34,AddPlayerSkill,skill_book_name_match_PORT_APPROX,-1
 3172,Blood Bull,34,AddPlayerSkill,skill_book_mapped,-1
 3173,Primal Rage,34,AddPlayerSkill,skill_book_mapped,-1
 3174,Dual Sword Mastery,34,AddPlayerSkill,skill_book_mapped,-1
@@ -2987,15 +2987,15 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 3178,Backstab,34,0,non_click_item_or_other_system,-1
 3179,Shadow Slash,34,AddPlayerSkill,skill_book_mapped,-1
 3180,Poison Dart,34,AddPlayerSkill,skill_book_mapped,-1
-3181,Numb,34,AddPlayerSkill,skill_book_no_mapping,-1
-3182,Beast Strength,34,AddPlayerSkill,skill_book_no_mapping,-1
-3183,Recuperate,34,AddPlayerSkill,skill_book_no_mapping,-1
-3184,Shield Mastery,34,AddPlayerSkill,skill_book_no_mapping,-1
+3181,Numb,34,AddPlayerSkill,skill_book_name_match_PORT_APPROX,-1
+3182,Beast Strength,34,AddPlayerSkill,skill_book_name_match_PORT_APPROX,-1
+3183,Recuperate,34,AddPlayerSkill,skill_book_name_match_PORT_APPROX,-1
+3184,Shield Mastery,34,AddPlayerSkill,skill_book_name_match_PORT_APPROX,-1
 3185,Shield of Thorns,34,0,non_click_item_or_other_system,-1
 3186,Parry,34,0,non_click_item_or_other_system,-1
 3187,Range Mastery,34,AddPlayerSkill,skill_book_mapped,-1
 3188,Windwalk,34,AddPlayerSkill,skill_book_mapped,-1
-3189,Eagle's Eye,34,AddPlayerSkill,skill_book_no_mapping,-1
+3189,Eagle's Eye,34,AddPlayerSkill,skill_book_name_match_PORT_APPROX,-1
 3190,Dual Shot,34,AddPlayerSkill,skill_book_mapped,-1
 3191,Adds Dodge,34,0,non_click_item_or_other_system,-1
 3192,Firegun Mastery,34,AddPlayerSkill,skill_book_mapped,-1
@@ -3005,9 +3005,9 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 3196,Astro Strike,34,0,non_click_item_or_other_system,-1
 3197,Frozen Arrow,34,AddPlayerSkill,skill_book_mapped,-1
 3198,Magma Bullet,34,AddPlayerSkill,skill_book_mapped,-1
-3199,Penetrating Bullet,34,AddPlayerSkill,skill_book_no_mapping,-1
-3200,Dispersion Bullet,34,AddPlayerSkill,skill_book_no_mapping,-1
-3201,Gunpowder Research,34,AddPlayerSkill,skill_book_no_mapping,-1
+3199,Penetrating Bullet,34,AddPlayerSkill,skill_book_name_match_PORT_APPROX,-1
+3200,Dispersion Bullet,34,AddPlayerSkill,skill_book_name_match_PORT_APPROX,-1
+3201,Gunpowder Research,34,AddPlayerSkill,skill_book_name_match_PORT_APPROX,-1
 3202,Cripple,34,AddPlayerSkill,skill_book_mapped,-1
 3203,Enfeeble,34,AddPlayerSkill,skill_book_mapped,-1
 3204,Headshot,34,AddPlayerSkill,skill_book_mapped,-1
@@ -3019,20 +3019,20 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 3210,Spiritual Fire,34,AddPlayerSkill,skill_book_mapped,-1
 3211,Tempest Boost,34,AddPlayerSkill,skill_book_mapped,-1
 3212,Divine Grace,34,AddPlayerSkill,skill_book_mapped,-1
-3213,Greater Heal,34,AddPlayerSkill,skill_book_no_mapping,-1
-3214,Greater Recover,34,AddPlayerSkill,skill_book_no_mapping,-1
+3213,Greater Heal,34,AddPlayerSkill,skill_book_name_match_PORT_APPROX,-1
+3214,Greater Recover,34,AddPlayerSkill,skill_book_name_match_PORT_APPROX,-1
 3215,Revival,34,AddPlayerSkill,skill_book_mapped,-1
 3216,Tornado Swirl,34,AddPlayerSkill,skill_book_mapped,-1
 3217,Angelic Shield,34,AddPlayerSkill,skill_book_mapped,-1
 3218,Seal of Elder,34,AddPlayerSkill,skill_book_mapped,-1
 3219,Shadow Insignia,34,AddPlayerSkill,skill_book_mapped,-1
 3220,Cursed Fire,34,AddPlayerSkill,skill_book_mapped,-1
-3221,Counterguard,34,AddPlayerSkill,skill_book_no_mapping,-1
+3221,Counterguard,34,AddPlayerSkill,skill_book_name_match_PORT_APPROX,-1
 3222,Abyss Mire,34,AddPlayerSkill,skill_book_mapped,-1
 3223,Energy Shield,34,AddPlayerSkill,skill_book_mapped,-1
 3224,Healing Spring,34,AddPlayerSkill,skill_book_mapped,-1
-3225,Mining,34,AddLifeSkill,lua_callback_not_implemented,-1
-3226,Woodcutting,34,AddLifeSkill,lua_callback_not_implemented,-1
+3225,Mining,34,AddLifeSkill,life_skill_book_mapped,-1
+3226,Woodcutting,34,AddLifeSkill,life_skill_book_mapped,-1
 3227,Diligence,34,AddPlayerSkill,skill_book_mapped,-1
 3228,Current,34,AddPlayerSkill,skill_book_mapped,-1
 3229,Conch Armor,34,AddPlayerSkill,skill_book_mapped,-1
@@ -3046,7 +3046,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 3237,Lightning Curtain,34,AddPlayerSkill,skill_book_mapped,-1
 3238,Break Armor,34,AddPlayerSkill,skill_book_mapped,-1
 3239,Rousing,34,AddPlayerSkill,skill_book_mapped,-1
-3240,Almighty Gem,31,ItemUse_BirthCake,lua_callback_not_implemented,-1
+3240,Almighty Gem,31,ItemUse_BirthCake,birth_cake_PORT_APPROX,-1
 3241,Venom Arrow,34,AddPlayerSkill,skill_book_mapped,-1
 3242,Harden,34,AddPlayerSkill,skill_book_mapped,-1
 3243,Standard warrior study book,1,0,equipable_data,9
@@ -3096,72 +3096,72 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 3291,Golden Apple,31,ItemUse_GoldApple,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 3292,Pappa's Letter,42,0,non_click_item_or_other_system,-1
 3293,Tiger Roar,34,AddPlayerSkill,skill_book_mapped,-1
-3294,Fishing,35,AddLifeSkill,lua_callback_not_implemented,-1
-3295,Salvage,35,AddLifeSkill,lua_callback_not_implemented,-1
-3296,Set Stall,35,AddLifeSkill,lua_callback_not_implemented,-1
+3294,Fishing,35,AddLifeSkill,life_skill_book_mapped,-1
+3295,Salvage,35,AddLifeSkill,life_skill_book_mapped,-1
+3296,Set Stall,35,AddLifeSkill,life_skill_book_mapped,-1
 3297,Taunt,34,AddPlayerSkill,skill_book_mapped,-1
 3298,Roar,34,AddPlayerSkill,skill_book_mapped,-1
-3299,Repair,35,AddLifeSkill,lua_callback_not_implemented,-1
+3299,Repair,35,AddLifeSkill,life_skill_book_mapped,-1
 3300,Intense Magic,34,AddPlayerSkill,skill_book_mapped,-1
 3301,Crystalline Blessing,34,AddPlayerSkill,skill_book_mapped,-1
-3302,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3303,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3304,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3305,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3306,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3307,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3308,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3309,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3310,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3311,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3312,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3313,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3314,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3315,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3316,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3317,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3318,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3319,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3320,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3321,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3322,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3323,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3324,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3325,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3326,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3327,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3328,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3329,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3330,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3331,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3332,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3333,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3334,Black Market Equipment,31,BlackMarket,lua_callback_not_implemented,-1
-3335,Fairy March,31,ItemUse_MarchElf,lua_callback_not_implemented,-1
+3302,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3303,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3304,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3305,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3306,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3307,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3308,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3309,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3310,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3311,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3312,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3313,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3314,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3315,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3316,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3317,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3318,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3319,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3320,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3321,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3322,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3323,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3324,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3325,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3326,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3327,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3328,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3329,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3330,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3331,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3332,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3333,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3334,Black Market Equipment,31,BlackMarket,black_market_table_PORT_APPROX,-1
+3335,Fairy March,31,ItemUse_MarchElf,fairy_march_PORT_APPROX,-1
 3336,Mystic Clover,31,0,non_click_item_or_other_system,-1
 3337,Fairy Soul,41,0,non_click_item_or_other_system,-1
-3338,Birthday Cake,31,ItemUse_BirthCake,lua_callback_not_implemented,-1
-3339,Acceleration Potion,31,ItemUse_MspdYS,lua_callback_not_implemented,-1
-3340,Triangle Sail,31,ItemUse_SanJiaoFan,lua_callback_not_implemented,-1
+3338,Birthday Cake,31,ItemUse_BirthCake,birth_cake_PORT_APPROX,-1
+3339,Acceleration Potion,31,ItemUse_MspdYS,acceleration_potion_D1,-1
+3340,Triangle Sail,31,ItemUse_SanJiaoFan,boat_speed_sail_D1,-1
 3341,High Grade Armor,31,ItemUse_GJZhuangJia,lua_callback_not_implemented,-1
-3342,Lantern,31,ItemUse_Denglong,lua_callback_not_implemented,-1
+3342,Lantern,31,ItemUse_Denglong,lantern_defense_D1,-1
 3343,Rose,31,ItemUse_MeiGui,lua_callback_not_implemented,-1
-3344,Lovers Chocolate,31,ItemUse_BZ,lua_callback_not_implemented,-1
-3345,Firecracker A,31,ItemUse_BZ,lua_callback_not_implemented,-1
-3346,Firecracker B,31,ItemUse_BZ,lua_callback_not_implemented,-1
-3347,Firecracker C,31,ItemUse_BZ,lua_callback_not_implemented,-1
-3348,Firework A,31,ItemUse_BZ,lua_callback_not_implemented,-1
-3349,Firework B,31,ItemUse_BZ,lua_callback_not_implemented,-1
-3350,Firework C,31,ItemUse_BZ,lua_callback_not_implemented,-1
-3351,Royal Salute A,31,ItemUse_BZ,lua_callback_not_implemented,-1
-3352,Royal Salute B,31,ItemUse_BZ,lua_callback_not_implemented,-1
-3353,Royal Salute C,31,ItemUse_BZ,lua_callback_not_implemented,-1
-3354,Heart Shape I,31,ItemUse_BZ,lua_callback_not_implemented,-1
-3355,Heart Shape LOVE,31,ItemUse_BZ,lua_callback_not_implemented,-1
-3356,Heart Shape U,31,ItemUse_BZ,lua_callback_not_implemented,-1
-3357,Heart Shape Â°Â®,31,ItemUse_BZ,lua_callback_not_implemented,-1
-3358,Heart Shape Ä£,31,ItemUse_BZ,lua_callback_not_implemented,-1
-3359,Heart Shape Î,31,ItemUse_BZ,lua_callback_not_implemented,-1
+3344,Lovers Chocolate,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+3345,Firecracker A,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+3346,Firecracker B,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+3347,Firecracker C,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+3348,Firework A,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+3349,Firework B,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+3350,Firework C,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+3351,Royal Salute A,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+3352,Royal Salute B,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+3353,Royal Salute C,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+3354,Heart Shape I,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+3355,Heart Shape LOVE,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+3356,Heart Shape U,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+3357,Heart Shape Â°Â®,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+3358,Heart Shape Ä£,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+3359,Heart Shape Î,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
 3360,Diamond,41,0,non_click_item_or_other_system,-1
 3361,Pearl,41,0,non_click_item_or_other_system,-1
 3362,Black Pearl,41,0,non_click_item_or_other_system,-1
@@ -3202,31 +3202,31 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 3397,Torn Hunter Skill Book,41,0,non_click_item_or_other_system,-1
 3398,Torn Artificer Skill Book,41,0,non_click_item_or_other_system,-1
 3399,Torn Life Skill Book,41,0,non_click_item_or_other_system,-1
-3400,Skeletar Chest of Swordsman,31,GiveRandomItems,lua_callback_not_implemented,-1
-3401,Skeletar Chest of Hunter,31,GiveRandomItems,lua_callback_not_implemented,-1
-3402,Skeletar Chest of Herbalist,31,GiveRandomItems,lua_callback_not_implemented,-1
-3403,Skeletar Chest of Explorer,31,GiveRandomItems,lua_callback_not_implemented,-1
-3404,Incantation Chest of Crusader,31,GiveRandomItems,lua_callback_not_implemented,-1
-3405,Incantation Chest of Champion,31,GiveRandomItems,lua_callback_not_implemented,-1
-3406,Incantation Chest of Sharpshooter,31,GiveRandomItems,lua_callback_not_implemented,-1
-3407,Incantation Chest of Cleric,31,GiveRandomItems,lua_callback_not_implemented,-1
-3408,Incantation Chest of Seal Master,31,GiveRandomItems,lua_callback_not_implemented,-1
-3409,Incantation Chest of Voyager,31,GiveRandomItems,lua_callback_not_implemented,-1
-3410,Evanescence Chest of Crusader,31,GiveRandomItems,lua_callback_not_implemented,-1
-3411,Evanescence Chest of Champion,31,GiveRandomItems,lua_callback_not_implemented,-1
-3412,Evanescence Chest of Sharpshooter,31,GiveRandomItems,lua_callback_not_implemented,-1
-3413,Evanescence Chest of Cleric,31,GiveRandomItems,lua_callback_not_implemented,-1
-3414,Evanescence Chest of Seal Master,31,GiveRandomItems,lua_callback_not_implemented,-1
-3415,Evanescence Chest of Voyager,31,GiveRandomItems,lua_callback_not_implemented,-1
-3416,Enigma Chest of Crusader,31,GiveRandomItems,lua_callback_not_implemented,-1
-3417,Enigma Chest of Champion,31,GiveRandomItems,lua_callback_not_implemented,-1
-3418,Enigma Chest of Sharpshooter,31,GiveRandomItems,lua_callback_not_implemented,-1
-3419,Enigma Chest of Cleric,31,GiveRandomItems,lua_callback_not_implemented,-1
-3420,Enigma Chest of Seal Master,31,GiveRandomItems,lua_callback_not_implemented,-1
-3421,Enigma Chest of Voyager,31,GiveRandomItems,lua_callback_not_implemented,-1
-3422,Chest of Forsaken City,31,GiveRandomItems,lua_callback_not_implemented,-1
-3423,Chest of Dark Swamp,31,GiveRandomItems,lua_callback_not_implemented,-1
-3424,Chest of Demonic World,31,GiveRandomItems,lua_callback_not_implemented,-1
+3400,Skeletar Chest of Swordsman,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3401,Skeletar Chest of Hunter,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3402,Skeletar Chest of Herbalist,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3403,Skeletar Chest of Explorer,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3404,Incantation Chest of Crusader,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3405,Incantation Chest of Champion,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3406,Incantation Chest of Sharpshooter,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3407,Incantation Chest of Cleric,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3408,Incantation Chest of Seal Master,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3409,Incantation Chest of Voyager,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3410,Evanescence Chest of Crusader,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3411,Evanescence Chest of Champion,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3412,Evanescence Chest of Sharpshooter,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3413,Evanescence Chest of Cleric,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3414,Evanescence Chest of Seal Master,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3415,Evanescence Chest of Voyager,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3416,Enigma Chest of Crusader,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3417,Enigma Chest of Champion,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3418,Enigma Chest of Sharpshooter,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3419,Enigma Chest of Cleric,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3420,Enigma Chest of Seal Master,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3421,Enigma Chest of Voyager,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3422,Chest of Forsaken City,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3423,Chest of Dark Swamp,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3424,Chest of Demonic World,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
 3425,Nal Runestone,41,0,non_click_item_or_other_system,-1
 3426,Sol Runestone,41,0,non_click_item_or_other_system,-1
 3427,Ja Runestone,41,0,non_click_item_or_other_system,-1
@@ -3260,7 +3260,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 3455,Ter Runestone,41,0,non_click_item_or_other_system,-1
 3456,Fa Runestone,41,0,non_click_item_or_other_system,-1
 3457,Kal Runestone,41,0,non_click_item_or_other_system,-1
-3458,Chest of Enigma,31,GiveRandomItems,lua_callback_not_implemented,-1
+3458,Chest of Enigma,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
 3459,Water Mine,41,ItemUse_BOMB,lua_callback_not_implemented,-1
 3460,Cake,31,ItemMedKit,heal_amount_supported,-1
 3461,Fruity Mix,31,ItemMedKit,heal_amount_supported,-1
@@ -3612,26 +3612,26 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 3825,Demonic Giant Stick,41,0,non_click_item_or_other_system,-1
 3826,Necklace of Snowman Warlord,41,0,non_click_item_or_other_system,-1
 3827,Spirit Elixir,41,0,non_click_item_or_other_system,-1
-3828,Ticket to Thundoria Castle,36,Ticket,lua_callback_not_implemented,-1
-3829,Ticket to Thundoria Harbor,36,Ticket,lua_callback_not_implemented,-1
-3830,Ticket to Sacred Snow Mountain,36,Ticket,lua_callback_not_implemented,-1
-3831,Ticket to Andes Forest Haven,36,Ticket,lua_callback_not_implemented,-1
-3832,Ticket Oasis Haven,36,Ticket,lua_callback_not_implemented,-1
-3833,Ticket to Icespire Haven,36,Ticket,lua_callback_not_implemented,-1
-3834,Ticket to Lone Tower,36,Ticket,lua_callback_not_implemented,-1
-3835,Ticket to Barren Cavern,36,Ticket,lua_callback_not_implemented,-1
-3836,Ticket to Abandoned Mine 2,36,Ticket,lua_callback_not_implemented,-1
-3837,Ticket to Silver Mine 2,36,Ticket,lua_callback_not_implemented,-1
-3838,Ticket to Silver Mine 3,36,Ticket,lua_callback_not_implemented,-1
-3839,Ticket to Lone Tower 2,36,Ticket,lua_callback_not_implemented,-1
-3840,Ticket to Lone Tower 3,36,Ticket,lua_callback_not_implemented,-1
-3841,Ticket to Lone Tower 4,36,Ticket,lua_callback_not_implemented,-1
-3842,Ticket to Lone Tower 5,36,Ticket,lua_callback_not_implemented,-1
-3843,Ticket to Lone Tower 6,36,Ticket,lua_callback_not_implemented,-1
-3844,Heaven's Berry,31,AmplifierItem,lua_callback_not_implemented,-1
-3845,Charmed Berry,31,AmplifierItem,lua_callback_not_implemented,-1
+3828,Ticket to Thundoria Castle,36,Ticket,ticket_destination_PORT_APPROX,-1
+3829,Ticket to Thundoria Harbor,36,Ticket,ticket_destination_PORT_APPROX,-1
+3830,Ticket to Sacred Snow Mountain,36,Ticket,ticket_destination_PORT_APPROX,-1
+3831,Ticket to Andes Forest Haven,36,Ticket,ticket_destination_PORT_APPROX,-1
+3832,Ticket Oasis Haven,36,Ticket,ticket_destination_PORT_APPROX,-1
+3833,Ticket to Icespire Haven,36,Ticket,ticket_destination_PORT_APPROX,-1
+3834,Ticket to Lone Tower,36,Ticket,ticket_destination_PORT_APPROX,-1
+3835,Ticket to Barren Cavern,36,Ticket,ticket_destination_PORT_APPROX,-1
+3836,Ticket to Abandoned Mine 2,36,Ticket,ticket_destination_PORT_APPROX,-1
+3837,Ticket to Silver Mine 2,36,Ticket,ticket_destination_PORT_APPROX,-1
+3838,Ticket to Silver Mine 3,36,Ticket,ticket_destination_PORT_APPROX,-1
+3839,Ticket to Lone Tower 2,36,Ticket,ticket_destination_PORT_APPROX,-1
+3840,Ticket to Lone Tower 3,36,Ticket,ticket_destination_PORT_APPROX,-1
+3841,Ticket to Lone Tower 4,36,Ticket,ticket_destination_PORT_APPROX,-1
+3842,Ticket to Lone Tower 5,36,Ticket,ticket_destination_PORT_APPROX,-1
+3843,Ticket to Lone Tower 6,36,Ticket,ticket_destination_PORT_APPROX,-1
+3844,Heaven's Berry,31,AmplifierItem,amplifier_PORT_APPROX,-1
+3845,Charmed Berry,31,AmplifierItem,amplifier_PORT_APPROX,-1
 3846,Voodoo Doll,41,0,non_click_item_or_other_system,-1
-3847,Ticket to Abandon Mine 1,36,Ticket,lua_callback_not_implemented,-1
+3847,Ticket to Abandon Mine 1,36,Ticket,ticket_destination_PORT_APPROX,-1
 3848,Constitution Recovery Vial,31,ItemMedKit,heal_amount_supported,-1
 3849,Medal of Valor,46,0,non_click_item_or_other_system,-1
 3850,Card A,41,0,non_click_item_or_other_system,-1
@@ -3664,42 +3664,42 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 3877,Lv 1 Refining Gem Voucher,41,0,non_click_item_or_other_system,-1
 3878,Lv 2 Refining Gem Voucher,41,0,non_click_item_or_other_system,-1
 3879,Special Mystic Fruit,31,0,non_click_item_or_other_system,-1
-3880,Super Mystic Fruit,31,AmplifierItem,lua_callback_not_implemented,-1
-3881,Special Lucky Fruit,31,AmplifierItem,lua_callback_not_implemented,-1
-3882,Super Lucky Fruit,31,AmplifierItem,lua_callback_not_implemented,-1
-3883,Blue Forging Fruit,31,ItemUse_LSDZG,lua_callback_not_implemented,-1
-3884,Red Combining Fruit,31,ItemUse_HSDZG,lua_callback_not_implemented,-1
+3880,Super Mystic Fruit,31,AmplifierItem,amplifier_PORT_APPROX,-1
+3881,Special Lucky Fruit,31,AmplifierItem,amplifier_PORT_APPROX,-1
+3882,Super Lucky Fruit,31,AmplifierItem,amplifier_PORT_APPROX,-1
+3883,Blue Forging Fruit,31,ItemUse_LSDZG,forge_catalyst_D1,-1
+3884,Red Combining Fruit,31,ItemUse_HSDZG,combine_catalyst_D1,-1
 3885,Refining Gem Voucher,41,0,non_click_item_or_other_system,-1
 3886,Gem Voucher,41,0,non_click_item_or_other_system,-1
 3887,Christmas Cap Voucher,41,0,non_click_item_or_other_system,-1
-3888,Lost Christmas Cap,31,ItemUse_DSSDM,lua_callback_not_implemented,-1
+3888,Lost Christmas Cap,31,ItemUse_DSSDM,lost_christmas_cap_D1,-1
 3889,Lost Christmas Case,41,0,non_click_item_or_other_system,-1
 3890,A red colored case,41,0,non_click_item_or_other_system,-1
 3891,Yellow Christmas Case,41,0,non_click_item_or_other_system,-1
 3892,Blue Christmas Case,41,0,non_click_item_or_other_system,-1
 3893,A cyan colored case,41,0,non_click_item_or_other_system,-1
 3894,A orange colored case,41,0,non_click_item_or_other_system,-1
-3895,Christmas Sock,31,GiveRandomItems,lua_callback_not_implemented,-1
-3896,Malicious Horn,31,ItemUse_XEZJ,lua_callback_not_implemented,-1
+3895,Christmas Sock,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3896,Malicious Horn,31,ItemUse_XEZJ,malicious_horn_PORT_APPROX,-1
 3897,Malicious Eye,41,0,non_click_item_or_other_system,-1
-3898,A gift box,31,GiveRandomItems,lua_callback_not_implemented,-1
+3898,A gift box,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
 3899,Christmas Lollipop,31,ItemMedKit,heal_amount_supported,-1
 3900,Christmas Cap,20,0,equipable_data,0
-3901,Lucky Packet,31,ItemUse_HYBOX,lua_callback_not_implemented,-1
-3902,Fortune Packet,31,GiveRandomItems,lua_callback_not_implemented,-1
-3903,Prosperous Packet,31,GiveRandomItems,lua_callback_not_implemented,-1
+3901,Lucky Packet,31,ItemUse_HYBOX,lucky_packet_PORT_APPROX,-1
+3902,Fortune Packet,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3903,Prosperous Packet,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
 3904,Red Paper,41,0,non_click_item_or_other_system,-1
-3905,Dark Wishing Stone,31,GiveRandomItems,lua_callback_not_implemented,-1
-3906,Sparkling Wishing Stone,31,GiveRandomItems,lua_callback_not_implemented,-1
+3905,Dark Wishing Stone,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
+3906,Sparkling Wishing Stone,31,GiveRandomItems,random_reward_table_PORT_APPROX,-1
 3907,Welding Catalyst,41,0,non_click_item_or_other_system,-1
 3908,Alloy Pickaxe,19,0,equipable_data,9
-3909,Gyoza,31,ItemMedKit,heal_amount_supported,-1
+3909,Gyoza,31,ItemMedKit,heal_percentage_supported,-1
 3910,Super Candy Stick,31,ItemMedKit,heal_amount_supported,-1
 3911,Bamboo Stick,41,0,non_click_item_or_other_system,-1
 3912,Exceptional Apparatus,41,0,non_click_item_or_other_system,-1
 3913,Rare Metal,41,0,non_click_item_or_other_system,-1
 3914,Army Gunpowder,41,0,non_click_item_or_other_system,-1
-3915,Mooncake,31,ItemUse_YB,lua_callback_not_implemented,-1
+3915,Mooncake,31,ItemUse_YB,mooncake_exp_D1,-1
 3916,Coconut Wine,41,0,non_click_item_or_other_system,-1
 3917,Special Strawberry Biscuit,42,0,non_click_item_or_other_system,-1
 3918,Demonic Fruit of Acidity,41,0,non_click_item_or_other_system,-1
@@ -3803,16 +3803,16 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 4016,Pearlie Ratfish,31,0,non_click_item_or_other_system,-1
 4017,Starry Wood,31,0,non_click_item_or_other_system,-1
 4018,Man-Eating Shark,31,0,non_click_item_or_other_system,-1
-4019,Codfish Steamboat,31,ItemMedKit,heal_amount_supported,-1
-4020,Sturgeon Fish with Bamboo,31,ItemMedKit,heal_amount_supported,-1
-4021,Savory Bubble Fish,31,ItemMedKit,heal_amount_supported,-1
-4022,Sturgeon Soup,31,ItemMedKit,heal_amount_supported,-1
-4023,Fried Oyster Soup,31,ItemMedKit,heal_amount_supported,-1
-4024,Prawn Dumpling,31,ItemMedKit,heal_amount_supported,-1
-4025,Tigerfish Bone Crisp,31,ItemMedKit,heal_amount_supported,-1
-4026,Ratfish Rice,31,ItemMedKit,heal_amount_supported,-1
-4027,China Clay,31,ItemMedKit,heal_amount_supported,-1
-4028,BBQ Shark Fin,31,ItemMedKit,heal_amount_supported,-1
+4019,Codfish Steamboat,31,ItemMedKit,heal_state_supported,-1
+4020,Sturgeon Fish with Bamboo,31,ItemMedKit,heal_state_supported,-1
+4021,Savory Bubble Fish,31,ItemMedKit,heal_state_supported,-1
+4022,Sturgeon Soup,31,ItemMedKit,heal_state_supported,-1
+4023,Fried Oyster Soup,31,ItemMedKit,heal_state_supported,-1
+4024,Prawn Dumpling,31,ItemMedKit,heal_state_supported,-1
+4025,Tigerfish Bone Crisp,31,ItemMedKit,heal_state_supported,-1
+4026,Ratfish Rice,31,ItemMedKit,heal_state_supported,-1
+4027,China Clay,31,ItemMedKit,heal_state_supported,-1
+4028,BBQ Shark Fin,31,ItemMedKit,heal_state_supported,-1
 4029,Iron Ore Fragment,41,0,non_click_item_or_other_system,-1
 4030,Copper Ore Eolith,41,0,non_click_item_or_other_system,-1
 4031,Crystal Eolith,41,0,non_click_item_or_other_system,-1
@@ -4048,16 +4048,16 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 4261,Arista,31,ItemUse_ShuiMangSW,lua_callback_not_implemented,-1
 4262,Talisman of Ghost,31,0,non_click_item_or_other_system,-1
 4263,Fruit Residue,42,0,non_click_item_or_other_system,-1
-4264,Sunny Emote,31,ItemUse_BZ,lua_callback_not_implemented,-1
-4265,Misty Emote,31,ItemUse_BZ,lua_callback_not_implemented,-1
-4266,Snowy Emote,31,ItemUse_BZ,lua_callback_not_implemented,-1
-4267,Starry Emote,31,ItemUse_BZ,lua_callback_not_implemented,-1
-4268,Rainy Emote,31,ItemUse_BZ,lua_callback_not_implemented,-1
-4269,Cloudy Emote,31,ItemUse_BZ,lua_callback_not_implemented,-1
-4270,Rainbow Emote,31,ItemUse_BZ,lua_callback_not_implemented,-1
-4271,Angel Emote,31,ItemUse_BZ,lua_callback_not_implemented,-1
-4272,Demon Emote,31,ItemUse_BZ,lua_callback_not_implemented,-1
-4273,Skeleton Emote,31,ItemUse_BZ,lua_callback_not_implemented,-1
+4264,Sunny Emote,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+4265,Misty Emote,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+4266,Snowy Emote,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+4267,Starry Emote,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+4268,Rainy Emote,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+4269,Cloudy Emote,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+4270,Rainbow Emote,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+4271,Angel Emote,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+4272,Demon Emote,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
+4273,Skeleton Emote,31,ItemUse_BZ,historical_noop_item_callback_D1,-1
 4274,Light Ice-covered Sword,1,0,equipable_data,"9,6,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 4275,Heavy Ice-covered Sword,2,0,equipable_data,"9,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 4276,Ice-covered Snow Spike,7,0,equipable_data,"9,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2"
@@ -4323,7 +4323,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 4548,Energy Crystal,41,0,non_click_item_or_other_system,-1
 4549,Pig Iron,41,0,non_click_item_or_other_system,-1
 4550,Crystal,41,0,non_click_item_or_other_system,-1
-4551,Fish Meat,41,ItemUse_Fish,lua_callback_not_implemented,-1
+4551,Fish Meat,41,ItemUse_Fish,boat_food_SP_PORT_APPROX,-1
 4552,Frost Crystal,41,0,non_click_item_or_other_system,-1
 4553,Refreshing Coconut Wine,41,0,non_click_item_or_other_system,-1
 4554,Bagpipe,41,0,non_click_item_or_other_system,-1
@@ -4374,9 +4374,9 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 4599,High Grade Battleship Component,41,0,non_click_item_or_other_system,-1
 4600,Imitation Royal Tableware,41,0,non_click_item_or_other_system,-1
 4601,Hamburger,41,0,non_click_item_or_other_system,-1
-4602,Ticket to Argent,36,Ticket,lua_callback_not_implemented,-1
-4603,Ticket to Shaitan,36,Ticket,lua_callback_not_implemented,-1
-4604,Ticket to Icicle,36,Ticket,lua_callback_not_implemented,-1
+4602,Ticket to Argent,36,Ticket,ticket_destination_PORT_APPROX,-1
+4603,Ticket to Shaitan,36,Ticket,ticket_destination_PORT_APPROX,-1
+4604,Ticket to Icicle,36,Ticket,ticket_destination_PORT_APPROX,-1
 4605,Commerce Permit,45,0,non_click_item_or_other_system,-1
 4606,Black Dye,41,0,non_click_item_or_other_system,-1
 4607,Black Colorant,41,0,non_click_item_or_other_system,-1
@@ -5467,7 +5467,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 5993,Templar's Gloves-Lance,23,0,equipable_data,"22,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 5994,Templar's Shoes-Lance,24,0,equipable_data,"23,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6016,Fine Refining Stone,50,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6019,Fine Magic Token Fruit,31,ItemUse_PartyFruit,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6019,Fine Magic Token Fruit,31,ItemUse_PartyFruit,party_exp_fruit_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6028,Pirate Compass,42,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6037,Hold Hands,41,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6042,Ship-Building Certificate,41,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
@@ -5623,14 +5623,14 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 6347,Evil SwordÂ¡Â¤Soul Eating,1,0,equipable_data,"9,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6348,Ancient Coins,41,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6349,Pirate Treasure Box,41,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6350,Pirate Weapon Box Level 40,31,Corsairs_WeaponChest2,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6351,Pirate Weapon Box Level 45,31,Corsairs_WeaponChest2,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6352,Pirate Weapon Box Level 50,31,Corsairs_WeaponChest2,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6353,Pirate Weapon Box Level 55,31,Corsairs_WeaponChest2,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6354,Pirate Weapon Box Level 60,31,Corsairs_WeaponChest2,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6355,Pirate Weapon Box Level 65,31,Corsairs_WeaponChest2,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6356,Pirate Weapon Box Level 70,31,Corsairs_WeaponChest2,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6357,Pirate Weapon Box Level 75,31,Corsairs_WeaponChest2,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6350,Pirate Weapon Box Level 40,31,Corsairs_WeaponChest2,corsairs_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6351,Pirate Weapon Box Level 45,31,Corsairs_WeaponChest2,corsairs_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6352,Pirate Weapon Box Level 50,31,Corsairs_WeaponChest2,corsairs_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6353,Pirate Weapon Box Level 55,31,Corsairs_WeaponChest2,corsairs_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6354,Pirate Weapon Box Level 60,31,Corsairs_WeaponChest2,corsairs_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6355,Pirate Weapon Box Level 65,31,Corsairs_WeaponChest2,corsairs_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6356,Pirate Weapon Box Level 70,31,Corsairs_WeaponChest2,corsairs_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6357,Pirate Weapon Box Level 75,31,Corsairs_WeaponChest2,corsairs_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6358,Pirate Fortune Box,41,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6359,Box of Fate,41,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6370,Time Sand,65,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
@@ -5656,7 +5656,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 6404,Swiftness Potion,31,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6405,Magic Lucky Fruit,31,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6406,Magic Blessing Fruit,31,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6407,Steam Bun,31,ItemMedKit,heal_amount_supported,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6407,Steam Bun,31,ItemMedKit,heal_state_supported,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6408,SP Holy Water,31,ItemMedKit,heal_amount_supported,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6409,Return Skill,36,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6410,Wishing Stone,31,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
@@ -5676,14 +5676,14 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 6445,Halloween Ticket,41,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6446,Speedup Sail,31,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6447,Coral Recharger,41,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6456,Pet Spellbook - Dumb,34,AddFunnySkill,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6457,Pet Spellbook - Bra,34,AddFunnySkill,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6458,Pet Spellbook - Briefs,34,AddFunnySkill,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6459,Pet Spellbook - Snooty,34,AddFunnySkill,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6460,Pet Spellbook - Trickster,34,AddFunnySkill,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6461,Pet Spellbook - Stupid,34,AddFunnySkill,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6462,Pet Spellbook - Defecate,34,AddFunnySkill,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6463,Pet Spellbook - Coin Shower,34,AddFunnySkill,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6456,Pet Spellbook - Dumb,34,AddFunnySkill,fairy_funny_book_D1,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6457,Pet Spellbook - Bra,34,AddFunnySkill,fairy_funny_book_D1,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6458,Pet Spellbook - Briefs,34,AddFunnySkill,fairy_funny_book_D1,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6459,Pet Spellbook - Snooty,34,AddFunnySkill,fairy_funny_book_D1,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6460,Pet Spellbook - Trickster,34,AddFunnySkill,fairy_funny_book_D1,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6461,Pet Spellbook - Stupid,34,AddFunnySkill,fairy_funny_book_D1,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6462,Pet Spellbook - Defecate,34,AddFunnySkill,fairy_funny_book_D1,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6463,Pet Spellbook - Coin Shower,34,AddFunnySkill,fairy_funny_book_D1,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6464,Magical Clover,41,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6465,Chill Crystal,41,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6466,Noble Lion Costume,22,0,equipable_data,"21,-2,-2,-2,-2,-2,-2,-2,-2,-2"
@@ -5742,9 +5742,9 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 6587,Fortune Coin Pouch,31,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6588,Ox Year Coin,41,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6589,Normal Dumpling,31,ItemMedKit,heal_amount_supported,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6590,Fresh Meat Dumpling,31,ItemMedKit,heal_amount_supported,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6591,Seafood Dumpling,31,ItemMedKit,heal_amount_supported,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6592,Mix Dumpling,31,ItemMedKit,heal_amount_supported,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6590,Fresh Meat Dumpling,31,ItemMedKit,heal_percentage_supported,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6591,Seafood Dumpling,31,ItemMedKit,heal_percentage_supported,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6592,Mix Dumpling,31,ItemMedKit,heal_percentage_supported,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6593,Dumpling Recipe,41,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6610,Garner's Feast,31,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6611,GM's Necklace,25,0,equipable_data,"5,-2,-2,-2,-2,-2,-2,-2,-2,-2"
@@ -5784,8 +5784,8 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 6838,Bing's Dodging,49,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6839,Feng's Defense,49,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6840,Shark's Strengthening,49,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6841,Great Fairy Ration,57,FairyRation,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-6842,Great Auto Ration,57,FairyRation,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6841,Great Fairy Ration,57,FairyRation,fairy_ration_supported,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+6842,Great Auto Ration,57,FairyRation,fairy_ration_auto_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6847,Beginner Spirit of Light,77,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6848,Intermediate Spirit of Light,77,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 6849,Expert Spirit of Light,77,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
@@ -5817,11 +5817,11 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 6960,Love Crystal,41,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 7001,Honorary Crown of Kings,20,0,equipable_data,"0,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 7002,Arthurs King Faith,20,0,equipable_data,"0,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-7003,Improved Strength Fruit,58,FairyFruitImprvd,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-7004,Improved Agility Fruit,58,FairyFruitImprvd,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-7005,Improved Accuracy Fruit,58,FairyFruitImprvd,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-7006,Improved Constitution Fruit,58,FairyFruitImprvd,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-7007,Improved Spirit Fruit,58,FairyFruitImprvd,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+7003,Improved Strength Fruit,58,FairyFruitImprvd,fairy_fruit_PORT_PARTIAL,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+7004,Improved Agility Fruit,58,FairyFruitImprvd,fairy_fruit_PORT_PARTIAL,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+7005,Improved Accuracy Fruit,58,FairyFruitImprvd,fairy_fruit_PORT_PARTIAL,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+7006,Improved Constitution Fruit,58,FairyFruitImprvd,fairy_fruit_PORT_PARTIAL,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+7007,Improved Spirit Fruit,58,FairyFruitImprvd,fairy_fruit_PORT_PARTIAL,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 7008,Phyllis Jedi Head,20,0,equipable_data,"19,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 7009,Phyllis Jedi Body,22,0,equipable_data,"21,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 7010,Phyllis Jedi Glove,23,0,equipable_data,"22,-2,-2,-2,-2,-2,-2,-2,-2,-2"
@@ -5866,8 +5866,8 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 7112,Great Gem of Wind,49,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 7125,Angela,59,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 7126,Angela Junior,59,0,non_click_item_or_other_system,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-7127,Egg of Angela,67,ItemUse_Egg,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-7131,Egg of Angela Junior,67,ItemUse_Egg,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+7127,Egg of Angela,67,ItemUse_Egg,fairy_egg_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+7131,Egg of Angela Junior,67,ItemUse_Egg,fairy_egg_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 7294,Lv55 Champion Belt,82,0,equipable_data,12
 7295,Lv55 Champion Bracelet,81,0,equipable_data,"10,11"
 7296,Lv55 Champion Handguard,83,0,equipable_data,13
@@ -6200,7 +6200,7 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 8903,Centurion Necklace,25,0,equipable_data,"5,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 8904,Captain Necklace,25,0,equipable_data,"5,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 8905,God Slayer Necklace,25,0,equipable_data,"5,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-8909,Constellation Blueprint,31,Blueprint,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+8909,Constellation Blueprint,31,Blueprint,blueprint_generator_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 8943,Carsise Iron Man - Robe,22,0,equipable_data,"2,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 8944,Aladdin Hat,20,0,equipable_data,0
 8945,Aladdin Robe,22,0,equipable_data,"21,-2,-2,-2,-2,-2,-2,-2,-2,-2"
@@ -6319,26 +6319,26 @@ id,name_latin1,type,iteminfo_callback,offline_status,equip_slots
 9513,Elephant King Mount,90,0,equipable_data,18
 9514,Baby Rockets Mount,90,0,equipable_data,18
 9515,Squirrel Mount,90,0,equipable_data,18
-9600,Mystery Box,31,MysteryBox,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+9600,Mystery Box,31,MysteryBox,random_reward_table_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 9601,Magical Feather,66,ItemUse_FlyWings,lua_callback_not_implemented,-1
 9602,Apparel Converter,41,ApparelConverter,lua_callback_not_implemented,-1
-9603,Admiral Cloak Chest,31,ItemUse_Admiral,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+9603,Admiral Cloak Chest,31,ItemUse_Admiral,admiral_cloak_chest_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 9604,Admiral Cloak,88,0,equipable_data,15
-9605,Admiral Cloak Upgrade,66,Cloak_Upgrade,lua_callback_not_implemented,-1
+9605,Admiral Cloak Upgrade,66,Cloak_Upgrade,admiral_cloak_upgrade_D1,-1
 9606,Set of Incantation Equipment,31,Corsairs_Forsaken,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 9607,Set of Evanescence Equipment,31,Corsairs_DarkSwamp,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 9608,Set of Enigma Equipment,31,Corsairs_Demonic,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-9609,Book of Erasure A,34,FairySkillRemoval,lua_callback_not_implemented,-1
-9610,Book of Erasure B,34,FairySkillRemoval,lua_callback_not_implemented,-1
-9611,Book of Erasure C,34,FairySkillRemoval,lua_callback_not_implemented,-1
-9612,Jades Voucher,31,GemVouchers,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-9613,Broken Gem Voucher,31,GemVouchers,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-9614,Cracked Gem Voucher,31,GemVouchers,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-9615,Advanced Gem Voucher,31,GemVouchers,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-9616,Unique Gem Voucher,31,GemVouchers,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-9617,Black Dragon Gem Voucher,31,GemVouchers,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+9609,Book of Erasure A,34,FairySkillRemoval,fairy_skill_removal_D1,-1
+9610,Book of Erasure B,34,FairySkillRemoval,fairy_skill_removal_D1,-1
+9611,Book of Erasure C,34,FairySkillRemoval,fairy_skill_removal_D1,-1
+9612,Jades Voucher,31,GemVouchers,gem_voucher_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+9613,Broken Gem Voucher,31,GemVouchers,gem_voucher_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+9614,Cracked Gem Voucher,31,GemVouchers,gem_voucher_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+9615,Advanced Gem Voucher,31,GemVouchers,gem_voucher_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+9616,Unique Gem Voucher,31,GemVouchers,gem_voucher_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+9617,Black Dragon Gem Voucher,31,GemVouchers,gem_voucher_PORT_APPROX,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 9618,Chest of Incantation,31,ChestYmazes,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 9619,Chest of Evanescence,31,ChestYmazes,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 9620,Chest of Enigma,31,ChestYmazes,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
-9621,Null Experience Stone,36,ExpCheckSys_Toggle,lua_callback_not_implemented,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
+9621,Null Experience Stone,36,ExpCheckSys_Toggle,monster_exp_toggle_D1,"-1,-2,-2,-2,-2,-2,-2,-2,-2,-2"
 32767,Locked Slot,41,0,equipable_data,"9,6"

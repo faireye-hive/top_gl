@@ -70,6 +70,8 @@ std::size_t countVerts(const EffectSystem& sys,const std::string& texture){
     return total;
 }
 int main(){
+    unsetenv("TOP_HISTORICAL_CMPSTRIP_LIFECYCLE");
+    REQUIRE(legacy_direct_strip::lifecycleEnabled());
     const auto tmp=fs::temp_directory_path()/("sk215_"+std::to_string(getpid()));
     fs::create_directories(tmp/"effect");fs::create_directories(tmp/"scripts/table");
     fs::create_directories(tmp/"texture/effect");
@@ -82,6 +84,21 @@ int main(){
     REQUIRE(legacy_direct_strip::decodeTail(raw("swordlight02.par"),r.document.consumed,r.document.version,strips));
     REQUIRE(strips.size()==1&&strips[0].maxLength==100&&strips[0].dummyA==0&&strips[0].dummyB==1);
     REQUIRE(strips[0].srcBlend==5&&strips[0].dstBlend==2&&std::abs(strips[0].life-.5f)<1e-5f);
+    // DX9 CMPStrip::FrameMove samples only when its timer is strictly greater
+    // than _fStep, including when the former option is absent.
+    unsetenv("TOP_HISTORICAL_CMPSTRIP_STRICT_STEP");
+    legacy_direct_strip::Trail defaultBoundary;
+    REQUIRE(legacy_direct_strip::append(defaultBoundary,strips[0],0.f,transform(0,0,0),transform(0,1,0)));
+    REQUIRE(!legacy_direct_strip::append(defaultBoundary,strips[0],strips[0].step,
+        transform(1,0,0),transform(1,1,0)));
+    setenv("TOP_HISTORICAL_CMPSTRIP_STRICT_STEP","1",1);
+    legacy_direct_strip::Trail dx9Boundary;
+    REQUIRE(legacy_direct_strip::append(dx9Boundary,strips[0],0.f,transform(0,0,0),transform(0,1,0)));
+    REQUIRE(!legacy_direct_strip::append(dx9Boundary,strips[0],strips[0].step,
+        transform(1,0,0),transform(1,1,0)));
+    REQUIRE(legacy_direct_strip::append(dx9Boundary,strips[0],strips[0].step+.0001f,
+        transform(2,0,0),transform(2,1,0)));
+    unsetenv("TOP_HISTORICAL_CMPSTRIP_STRICT_STEP");
     auto bad=par_audit::parse(raw("bad.par"));REQUIRE(bad.ok);
     REQUIRE(!legacy_direct_strip::decodeTail(raw("bad.par"),bad.document.consumed,bad.document.version,strips));
     // World endpoints are DX row-vector XYZ: z is the vertical component.
@@ -96,6 +113,44 @@ int main(){
     REQUIRE(mesh[0].u==0&&mesh[1].v==0&&mesh[2].u==1&&mesh[0].a<mesh[2].a);
     REQUIRE(legacy_direct_strip::append(trail,d,.6f,transform(3,2,3),transform(3,4,3)));
     mesh.clear();legacy_direct_strip::emit(trail,d,.6f,mesh);REQUIRE(mesh.empty());
+    // DX9 keeps expired pairs in the vertex buffer until maxLength is reached;
+    // a non-loop strip then disables rendering instead of sliding the history.
+    setenv("TOP_HISTORICAL_CMPSTRIP_LIFECYCLE","1",1);
+    legacy_direct_strip::Definition bounded{4,0,1,{{1,1,1,1}},.1f,.01f,"glow.tga",5,2};
+    legacy_direct_strip::Trail boundedTrail;
+    REQUIRE(legacy_direct_strip::append(boundedTrail,bounded,0.f,
+        transform(0,0,0),transform(0,1,0)));
+    REQUIRE(legacy_direct_strip::append(boundedTrail,bounded,.02f,
+        transform(1,0,0),transform(1,1,0)));
+    REQUIRE(boundedTrail.pairs.size()==2&&boundedTrail.capacityVertices==4);
+    REQUIRE(!legacy_direct_strip::append(boundedTrail,bounded,.04f,
+        transform(2,0,0),transform(2,1,0)));
+    REQUIRE(boundedTrail.stopped&&boundedTrail.pairs.size()==2);
+    mesh.clear();legacy_direct_strip::emit(boundedTrail,bounded,.04f,mesh);
+    REQUIRE(mesh.empty());
+    // The original loop path expands capacity in increments of 100 vertices.
+    legacy_direct_strip::Definition looping{2,0,1,{{1,1,1,1}},.1f,.01f,"glow.tga",5,2};
+    legacy_direct_strip::Trail loopingTrail;
+    REQUIRE(legacy_direct_strip::append(loopingTrail,looping,0.f,
+        transform(0,0,0),transform(0,1,0),true));
+    REQUIRE(legacy_direct_strip::append(loopingTrail,looping,.02f,
+        transform(1,0,0),transform(1,1,0),true));
+    REQUIRE(legacy_direct_strip::append(loopingTrail,looping,.04f,
+        transform(2,0,0),transform(2,1,0),true));
+    REQUIRE(!loopingTrail.stopped&&loopingTrail.capacityVertices==102&&
+            loopingTrail.pairs.size()==3);
+    legacy_direct_strip::Definition aging{20,0,1,{{1,1,1,1}},.05f,.01f,"glow.tga",5,2};
+    legacy_direct_strip::Trail agingTrail;
+    REQUIRE(legacy_direct_strip::append(agingTrail,aging,0.f,
+        transform(0,0,0),transform(0,1,0)));
+    REQUIRE(legacy_direct_strip::append(agingTrail,aging,.02f,
+        transform(1,0,0),transform(1,1,0)));
+    REQUIRE(legacy_direct_strip::append(agingTrail,aging,.10f,
+        transform(2,0,0),transform(2,1,0)));
+    REQUIRE(agingTrail.pairs.size()==3); // faded DX9 vertices still consume capacity
+    mesh.clear();legacy_direct_strip::emit(agingTrail,aging,.10f,mesh);
+    REQUIRE(mesh.size()==12&&mesh.front().a==0.f); // DX9 still submits transparent old geometry
+    unsetenv("TOP_HISTORICAL_CMPSTRIP_LIFECYCLE");
     {std::ofstream f(tmp/"texture/effect/swordlight02.tga.png");f<<"fixture";}
     {std::ofstream f(tmp/"texture/effect/glow.tga.png");f<<"fixture";}
     effFile(tmp/"effect/glow.eff");

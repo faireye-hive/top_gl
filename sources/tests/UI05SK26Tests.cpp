@@ -10,7 +10,7 @@ int main() {
     assert(::unsetenv("TOP_HISTORICAL_DEST_ALPHA")==0);
     assert(top::historic_blend::opaqueDestination());
     assert(::setenv("TOP_HISTORICAL_DEST_ALPHA","framebuffer",1)==0);
-    assert(!top::historic_blend::opaqueDestination());
+    assert(top::historic_blend::opaqueDestination());
     assert(::unsetenv("TOP_HISTORICAL_DEST_ALPHA")==0);
     assert(top::historic_blend::effective(5,7).source == 5);
     // D3DBLEND constants are not 1-to-1 with OpenGL enum values.
@@ -22,8 +22,8 @@ int main() {
     assert(!valid(5,11)); // not allowed as destination
     assert(!valid(-1,2) && !valid(0,2) && !valid(12,2));
     assert(::setenv("TOP_HISTORICAL_BLEND","0",1)==0);
-    assert(top::historic_blend::effective(5,6).source == 0);
-    assert(!top::historic_blend::opaqueDestination());
+    assert(top::historic_blend::effective(5,6).source == 5);
+    assert(top::historic_blend::opaqueDestination());
     assert(::setenv("TOP_HISTORICAL_BLEND","1",1)==0);
     const auto conventional=top::historic_blend::effective(5,6);
     assert(conventional.source==5 && conventional.destination==6);

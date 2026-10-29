@@ -10,6 +10,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <cstdlib>
 
 namespace top { namespace legacy_direct_strip {
 struct Definition {
@@ -66,24 +67,45 @@ struct Pair {
 struct Trail {
     std::vector<Pair> pairs;
     float lastSample=-1.f;
+    std::size_t capacityVertices=0;
+    bool stopped=false;
 };
+inline constexpr bool strictStepEnabled() { return true; }
+inline constexpr bool lifecycleEnabled() { return true; }
 inline std::array<float,3> endpoint(const std::array<float,16>& m){
     // Source is DX9 row-vector X,Y,Z (Z-up); client GL is X,Z,Y.
     return {{m[12],m[14],m[13]}};
 }
 inline bool append(Trail& trail,const Definition& d,float at,
-                   const std::array<float,16>& ma,const std::array<float,16>& mb) {
-    if(!std::isfinite(at)||at<0.f||(trail.lastSample>=0.f&&at-trail.lastSample+1e-6f<d.step))return false;
+                   const std::array<float,16>& ma,const std::array<float,16>& mb,
+                   bool loop=false) {
+    if(!std::isfinite(at)||at<0.f)return false;
+    const bool historicalLifecycle=lifecycleEnabled();
+    if(historicalLifecycle&&trail.stopped)return false;
+    if(trail.lastSample>=0.f){
+        const float elapsed=at-trail.lastSample;
+        if(strictStepEnabled() ? elapsed<=d.step : elapsed+1e-6f<d.step)return false;
+    }
+    if(historicalLifecycle){
+        if(trail.capacityVertices==0)trail.capacityVertices=static_cast<std::size_t>(d.maxLength);
+        if(trail.pairs.size()*2u>=trail.capacityVertices){
+            if(!loop){trail.stopped=true;return false;}
+            trail.capacityVertices+=100u;
+            if(trail.capacityVertices>2000u){trail.stopped=true;return false;}
+        }
+    }
     const auto a=endpoint(ma),b=endpoint(mb);
     if(!std::all_of(a.begin(),a.end(),[](float x){return std::isfinite(x);})||
        !std::all_of(b.begin(),b.end(),[](float x){return std::isfinite(x);}))return false;
     trail.pairs.push_back({a,b,at});trail.lastSample=at;
-    const std::size_t limit=static_cast<std::size_t>(d.maxLength/2);
-    if(trail.pairs.size()>limit)trail.pairs.erase(trail.pairs.begin(),
-                                                trail.pairs.begin()+(trail.pairs.size()-limit));
-    // Unlike a static ribbon, the historical strip ages each pair individually.
-    while(!trail.pairs.empty()&&at-trail.pairs.front().time>=d.life)
-        trail.pairs.erase(trail.pairs.begin());
+    if(!historicalLifecycle){
+        const std::size_t limit=static_cast<std::size_t>(d.maxLength/2);
+        if(trail.pairs.size()>limit)trail.pairs.erase(trail.pairs.begin(),
+                                                    trail.pairs.begin()+(trail.pairs.size()-limit));
+        // Legacy GL mode uses a rolling trail and discards expired pairs.
+        while(!trail.pairs.empty()&&at-trail.pairs.front().time>=d.life)
+            trail.pairs.erase(trail.pairs.begin());
+    }
     return true;
 }
 inline MeshVertex vertex(const std::array<float,3>& p,const Definition& d,float age,float u,float v){
@@ -93,12 +115,13 @@ inline MeshVertex vertex(const std::array<float,3>& p,const Definition& d,float 
     out.u=u;out.v=v;return out;
 }
 inline void emit(const Trail& trail,const Definition& d,float now,std::vector<MeshVertex>& verts){
+    if(lifecycleEnabled()&&trail.stopped)return;
     if(trail.pairs.size()<2)return;
     // CMPStrip::GetTrack increments U by 1 at each pair; V=1/0 at dummy A/B.
     for(std::size_t j=1;j<trail.pairs.size();++j){
         const auto& a=trail.pairs[j-1];const auto& b=trail.pairs[j];
         const float older=std::max(0.f,now-a.time),newer=std::max(0.f,now-b.time);
-        if(older>=d.life||newer>=d.life)continue;
+        if(!lifecycleEnabled()&&(older>=d.life||newer>=d.life))continue;
         const auto a0=vertex(a.a,d,older,static_cast<float>(j-1),1.f);
         const auto a1=vertex(a.b,d,older,static_cast<float>(j-1),0.f);
         const auto b0=vertex(b.a,d,newer,static_cast<float>(j),1.f);

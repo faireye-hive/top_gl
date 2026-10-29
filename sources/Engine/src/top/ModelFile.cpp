@@ -306,6 +306,10 @@ bool readMatrixAnimation(Cursor& file, std::size_t animPos, std::size_t animSize
     for (auto& row : uvSize) for (std::uint32_t& size : row) size = anim.u32();
     for (auto& row : imageSize) for (std::uint32_t& size : row) size = anim.u32();
     if (!anim.ok || boneSize > anim.size - anim.pos) return false;
+    if(boneSize>0) {
+        geom.embeddedBoneVersion=version;
+        geom.embeddedBoneData.assign(anim.data+anim.pos,anim.data+anim.pos+boneSize);
+    }
     anim.skip(boneSize);
     if (matrixSize > anim.size - anim.pos || (matrixSize > 0 && matrixSize < 4)) return false;
     if (matrixSize > 0) {

@@ -1,5 +1,6 @@
 #include "top/MapFile.h"
 #include "top/TerrainMesh.h"
+#include "top/HistoricalRange2Ground.h"
 
 #include <cmath>
 #include <cstdint>
@@ -170,11 +171,90 @@ void testLimitsAndPartialSections() {
     require(floor && floor->verts.size() == 2 * 6, "secao parcial so emite tiles internos");
     const auto* water = batch(mesh, 7);
     require(water, "secao parcial ainda tem mar");
+    bool sawOutside = false;
     for (const auto& v : water->verts) {
-        if (v.x >= 10.f || v.z >= 9.f) require(near(v.a, 0.f), "amostra externa nao vira mar padrao");
+        if (v.x >= 10.f || v.z >= 9.f) {
+            sawOutside = true;
+            require(near(v.a, 207.f / 255.f),
+                    "MPMap::GetTile devolve seabed padrao -2 m fora do mapa, sem furo no alpha");
+        }
     }
+    require(sawOutside, "fixture de secao parcial precisa cruzar a borda");
     map.close();
     require(!map.at(0, 0).valid && !map.sailableAt(0.f, 0.f), "mapa fechado nao vira oceano");
+}
+
+void testRange2SubgridHeight() {
+    Fixture fixture;
+    auto bytes = header(16, 8, {28, 0});
+    for (int y = 0; y < 8; ++y) {
+        for (int x = 0; x < 8; ++x) {
+            std::vector<std::uint8_t> tile(15, 0);
+            if (x == 1 && y == 2) tile[11] = 20;       // +1.00 m
+            if (x == 2 && y == 2) tile[11] = 64 | 10;  // -0.50 m
+            if (x == 3 && y == 2) tile[11] = 128 | 30;// +1.50 m and blocked
+            bytes.insert(bytes.end(), tile.begin(), tile.end());
+        }
+    }
+    fixture.save(bytes);
+    top::MapFile map;
+    require(map.open(fixture.path), "abrir mapa sintetico RANGE2");
+    require(near(map.range2GroundHeightAt(1, 2), 1.f), "btBlock low six bits decode 5 cm levels");
+    require(near(map.range2GroundHeightAt(2, 2), -.5f), "btBlock sign bit decodes negative height");
+    require(near(map.range2GroundHeightAt(3, 2), 1.5f), "blocked bit does not change encoded height");
+    require(near(map.range2GroundHeightAt(8, 2), 0.f), "empty section has default subgrid height zero");
+    require(near(map.range2GroundHeightAt(-1, 2), 0.f), "out of map subgrid sample is zero");
+
+    unsetenv("TOP_HISTORICAL_RANGE2_SUBGRID_HEIGHT");
+    require(near(top::historical_range2_ground::sample(map, 1, 2), 1.f),
+            "normal RANGE2 sampler uses the authored subgrid");
+    setenv("TOP_HISTORICAL_RANGE2_SUBGRID_HEIGHT", "1", 1);
+    require(near(top::historical_range2_ground::sample(map, 1, 2), 1.f),
+            "opt-in RANGE2 sampler selects original subgrid height");
+    setenv("TOP_HISTORICAL_RANGE2_SUBGRID_HEIGHT", "0", 1);
+    require(near(top::historical_range2_ground::sample(map, 1, 2), 1.f),
+            "retired variable cannot replace the original subgrid");
+    unsetenv("TOP_HISTORICAL_RANGE2_SUBGRID_HEIGHT");
+    map.close();
+}
+
+void testShadeTileAndSubgridHeight() {
+    Fixture fixture;
+    auto bytes = header(16, 8, {28, 0});
+    for (int y = 0; y < 8; ++y) {
+        for (int x = 0; x < 8; ++x) {
+            std::vector<std::uint8_t> tile(15, 0);
+            tile[7] = 10; // cHeight = +1 m
+            if (x == 2 && y == 2) {
+                tile[11] = 40;        // q0 = +2 m, unblocked
+                tile[12] = 128 | 50;  // q1 = +2.5 m, blocked
+                tile[13] = 64 | 20;   // q2 = -1 m
+                tile[14] = 30;        // q3 = +1.5 m
+            }
+            if (x == 3 && y == 2) tile[7] = 5; // +0.5 m, edge's tile height
+            bytes.insert(bytes.end(), tile.begin(), tile.end());
+        }
+    }
+    fixture.save(bytes);
+    top::MapFile map;
+    require(map.open(fixture.path), "abrir mapa sintetico SHADE");
+    require(near(map.shadeGroundHeightAt(2.f, 2.f, false, false), 2.f),
+            "SHADE usa maior altura de quadrante desobstruido");
+    require(near(map.shadeGroundHeightAt(2.5f, 2.f, false, false), 1.f),
+            "quadrante bloqueado mantem altura base do tile");
+    require(near(map.shadeGroundHeightAt(2.f, 2.5f, false, false), 1.f),
+            "quadrante abaixo do tile mantem altura base");
+    require(near(map.shadeGroundHeightAt(2.5f, 2.5f, false, false), 1.5f),
+            "quadrante diagonal acima do tile e usado");
+    require(near(map.shadeGroundHeightAt(3.f, 2.f, true, false), .5f),
+            "borda direita amostra quadrante anterior mas conserva tile atual");
+    require(near(map.shadeGroundHeightAt(2.f, 3.f, false, true), 1.f),
+            "borda inferior desloca a amostra de subgrade");
+    require(near(map.shadeGroundHeightAt(8.f, 2.f, false, false), 0.f),
+            "secao vazia usa subgrade zero sobre tile submarino");
+    require(near(map.shadeGroundHeightAt(-1.f, 2.f, false, false), 0.f),
+            "coordenada externa mantem fallback zero do mapa DX9");
+    map.close();
 }
 
 void testCorruptAndReadFailure() {
@@ -230,6 +310,8 @@ int main() {
         testCoastAndNavigation();
         testLimitsAndPartialSections();
         testCorruptAndReadFailure();
+        testRange2SubgridHeight();
+        testShadeTileAndSubgridHeight();
         std::cout << "Sea terrain parity: empty sea, coast, bounds and corrupt/read-failure cases OK\n";
     } catch (const std::exception& e) {
         std::cerr << "Sea terrain parity failed: " << e.what() << '\n';

@@ -40,6 +40,7 @@ struct SkillVisual {
     int ground = 0;
     int water = 0;
     int firstAction = 0; // first historical Play Action; useful for visual captures
+    int targetDummy = -1; // also used by STAttack for the projectile destination, even without a target effect
     int actionKeyFrame = -3;
     std::vector<SkillVisualChannel> channels;
 
@@ -139,8 +140,9 @@ public:
             visual.ground = parseId(cols[65]);
             visual.water = parseId(cols[66]);
             const int hitKey = parseInt(cols[64], -3);
+            visual.targetDummy=parseInt(cols[62],-1);
             if (visual.target > 0) visual.channels.push_back({SkillVisualChannelKind::Target,
-                visual.target, hitKey, parseInt(cols[62], -1)});
+                visual.target, hitKey, visual.targetDummy});
             if (visual.ground > 0) visual.channels.push_back({SkillVisualChannelKind::Ground,
                 visual.ground, hitKey});
             if (visual.water > 0) visual.channels.push_back({SkillVisualChannelKind::Water,

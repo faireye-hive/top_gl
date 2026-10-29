@@ -4,6 +4,12 @@
 #include <cstdint>
 
 namespace top::item_instantiation {
+namespace {
+bool tiChunEvent(HistoricalEvent event) {
+    const int id=static_cast<int>(event);
+    return id==2||(id>=12&&id<=20);
+}
+}
 
 Result initialize(Origin origin, int maxDurability, int maxEnergy,
                   bool tradable, long expiration) {
@@ -26,10 +32,23 @@ Result initialize(Origin origin, int maxDurability, int maxEnergy,
 GeneratedQuality resolveQuality(HistoricalEvent event, int qualityRoll,
                                 int attributeCountRoll, int itemType) {
     const int rawEvent = static_cast<int>(event);
+    if (itemType < 0 || (!tiChunEvent(event) &&
+        (qualityRoll < 1 || qualityRoll > 100 || attributeCountRoll < 1 || attributeCountRoll > 100)))
+        return {};
+    if (rawEvent==2) return {0,0,true};
+    if (rawEvent>=12&&rawEvent<=20) return {rawEvent-11,6,true};
+    if (rawEvent == static_cast<int>(HistoricalEvent::QuestAward2)) {
+        int quality = qualityRoll <= 1 ? 4 : qualityRoll <= 5 ? 3 :
+                      qualityRoll <= 20 ? 2 : qualityRoll <= 80 ? 1 : 0;
+        int count = attributeCountRoll <= 10 ? 2 : attributeCountRoll <= 30 ? 1 : 0;
+        // AttrCalculate.lua clamps a multi-stat roll to quality - 1, but
+        // retains at least one stat when quality is zero or one.
+        if (count >= 2 && itemType != 46)
+            count = std::max(1, std::min(quality - 1, count));
+        return {quality, count, true};
+    }
     if ((rawEvent != static_cast<int>(HistoricalEvent::PlayerXsBox) &&
-         rawEvent != static_cast<int>(HistoricalEvent::QuestAwardScBox)) ||
-        qualityRoll < 1 || qualityRoll > 100 || attributeCountRoll < 1 ||
-        attributeCountRoll > 100 || itemType < 0)
+         rawEvent != static_cast<int>(HistoricalEvent::QuestAwardScBox)))
         return {};
 
     // Item_Mission_11/95 have 100 at quality-table index 7, yielding
@@ -46,7 +65,23 @@ GeneratedQuality resolveQuality(HistoricalEvent event, int qualityRoll,
 GeneratedAffix resolveAffix(HistoricalEvent event, int itemType, int itemLevel,
                             int quality, int attributeCount, int selectionRoll) {
     const int rawEvent = static_cast<int>(event);
-    if ((rawEvent != static_cast<int>(HistoricalEvent::PlayerXsBox) &&
+    if (rawEvent==2) return {0,{},0,true,false};
+    if(rawEvent>=12&&rawEvent<=20) {
+        if(itemType<1||itemLevel<0||quality<1||quality>9||attributeCount!=6)return {};
+        if(itemLevel<=10&&itemType!=46)return {0,{},0,true,false};
+        // TiChun's Lua path forces the random group for these armor types.
+        std::array<GeneratedAffix::Attribute,3> attrs{};
+        int group=0,count=0;
+        const int percent=quality*10;
+        auto set=[&](int id){attrs[static_cast<std::size_t>(count++)]={id,percent};};
+        if(itemType==20){group=6;set(38);}                      // VAL_MXSP
+        else if(itemType==22){group=21;set(37);set(43);}        // VAL_MXHP, VAL_HREC
+        else if(itemType==23){group=60;set(35);set(34);set(41);} // MXATK, MNATK, CRT
+        else if(itemType==24){group=61;set(45);set(38);set(44);} // MSPD, MXSP, SREC
+        return {group,attrs,count,true,count>0};
+    }
+    if ((rawEvent != static_cast<int>(HistoricalEvent::QuestAward2) &&
+         rawEvent != static_cast<int>(HistoricalEvent::PlayerXsBox) &&
          rawEvent != static_cast<int>(HistoricalEvent::QuestAwardScBox)) ||
         itemType < 1 || itemLevel < 0 || quality < 0 || quality > 10 ||
         attributeCount < 0 || attributeCount > 3)
@@ -59,7 +94,7 @@ GeneratedAffix resolveAffix(HistoricalEvent event, int itemType, int itemLevel,
     const bool supportedType = (itemType >= 1 && itemType <= 4) || itemType == 7 ||
         itemType == 9 || itemType == 11 || itemType == 20 || itemType == 22 ||
         itemType == 23 || itemType == 24 || itemType == 25 || itemType == 26 ||
-        itemType == 27 || itemType == 46;
+        itemType == 27 || itemType == 29 || itemType == 46;
     if (!supportedType || (attributeCount == 3 && itemType != 46)) return {};
 
     static constexpr int oneWeights[] = {10, 10, 10, 5, 10};
@@ -138,6 +173,14 @@ equipment_stats::Bonus affixBonusDelta(const GeneratedAffix& affix,
                 case 28: return rangeDelta(minimum.dex, maximum.dex); // DEX
                 case 29: return rangeDelta(minimum.con, maximum.con); // CON
                 case 30: return rangeDelta(minimum.sta, maximum.sta); // STA
+                case 34: return rangeDelta(minimum.minAttack, maximum.minAttack); // MNATK
+                case 35: return rangeDelta(minimum.maxAttack, maximum.maxAttack); // MXATK
+                case 37: return rangeDelta(minimum.hp, maximum.hp); // MXHP
+                case 38: return rangeDelta(minimum.sp, maximum.sp); // MXSP
+                case 41: return rangeDelta(minimum.critical, maximum.critical); // CRT
+                case 43: return rangeDelta(minimum.hpRegen, maximum.hpRegen); // HREC
+                case 44: return rangeDelta(minimum.spRegen, maximum.spRegen); // SREC
+                case 45: return rangeDelta(minimum.moveSpeed, maximum.moveSpeed); // MSPD
                 default: return 0;
             }
         }();
@@ -147,6 +190,14 @@ equipment_stats::Bonus affixBonusDelta(const GeneratedAffix& affix,
             case 28: delta.dex += itemDelta; break;
             case 29: delta.con += itemDelta; break;
             case 30: delta.sta += itemDelta; break;
+            case 34: delta.minAttack += itemDelta; break;
+            case 35: delta.maxAttack += itemDelta; break;
+            case 37: delta.hp += itemDelta; break;
+            case 38: delta.sp += itemDelta; break;
+            case 41: delta.critical += itemDelta; break;
+            case 43: delta.hpRegen += itemDelta; break;
+            case 44: delta.spRegen += itemDelta; break;
+            case 45: delta.moveSpeed += itemDelta; break;
             default: break;
         }
     }
@@ -159,7 +210,8 @@ GeneratedInstance materialize(HistoricalEvent event, int itemType, int itemLevel
                               int durabilityMinimum, int durabilityMaximum,
                               int energyMinimum, int energyMaximum) {
     const bool generatedWeaponType=(itemType>=1 && itemType<=4) || itemType==7 || itemType==9;
-    if (uid <= 0 || uid > 1000000000 || (!generatedWeaponType && itemType != 22)) return {};
+    const bool tiChunOutput=tiChunEvent(event)&&itemType>0;
+    if (uid <= 0 || uid > 1000000000 || (!tiChunOutput&&!generatedWeaponType&&itemType!=22)) return {};
 
     // SplitMix32: não depende do estado global de rand(), da ordem em que o
     // mapa foi carregado, nem de um servidor. O UID gravado torna o resultado

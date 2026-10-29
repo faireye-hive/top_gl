@@ -20,7 +20,9 @@ struct System {
     uint16_t frames = 0;
     std::vector<float> sizes, rotations, colors;
     float life = 0, velocity = 0, step = 0, delay = 0, play = 0, pathVelocity = 0;
-    bool modelRange = false, hasPath = false;
+    bool modelRange = false, hasPath = false, hasShadeFlag = false;
+    bool mediayEff = false;
+    bool modelDirection = false; // v14 _bModelDir controls full dummy binding
     int32_t pathPoints = 0;
     // Material state authored in the file (read, never clamped). EffectSystem's
     // loadParticles discards these; the blend audit reports them.
@@ -128,7 +130,10 @@ inline Result parse(const std::vector<unsigned char>& bytes) {
                     return fail("truncated_path_segments");
             }
         }
-        if (d.version>9) { if (!r.get(flag)) return fail("truncated_v10_flag"); s.shade=(flag!=0); }
+        if (d.version>9) {
+            if (!r.get(flag)) return fail("truncated_v10_flag");
+            s.shade=(flag!=0);s.hasShadeFlag=true;
+        }
         if (d.version>10 && !r.name(s.hitEffect)) return fail("truncated_v11_extra");
         if (d.version>11 && s.modelRange) {
             uint16_t count=0;
@@ -136,8 +141,14 @@ inline Result parse(const std::vector<unsigned char>& bytes) {
                 return fail("truncated_model_range_points");
         }
         if (d.version>12 && !r.skip(4)) return fail("truncated_v13_extra");
-        if (d.version>13 && !r.skip(1)) return fail("truncated_v14_extra");
-        if (d.version>14 && !r.skip(1)) return fail("truncated_v15_extra");
+        if (d.version>13) {
+            if (!r.get(flag)) return fail("truncated_v14_extra");
+            s.modelDirection=(flag!=0);
+        }
+        if (d.version>14) {
+            if (!r.get(flag)) return fail("truncated_v15_mediay_eff");
+            s.mediayEff=(flag!=0);
+        }
         if (!s.modelRange) s.modelRangeName.clear(); // ignored bytes in older files may contain garbage
         if (!finite(s.sizes) || !finite(s.rotations) || !finite(s.colors) ||
             !finite(s.range) || !finite(s.direction) || !finite(s.acceleration) ||

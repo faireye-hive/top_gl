@@ -141,6 +141,32 @@ std::string Play::missionLockReason(int id,int minLevel,int maxLevel,const Missi
             return "Exige item "+std::to_string(item.id)+" x"+std::to_string(item.count);
     return {};
 }
+
+bool Play::hasActiveHistoricalMission(int missionId) const {
+    if (missionId <= 0) return false;
+    const auto* progress = findHistoricalMission(missionId);
+    return progress && progress->active;
+}
+
+bool Play::hasHistoricalRecord(int recordId) const {
+    if (recordId <= 0) return false;
+    if (historicalRecords_.count(recordId)) return true;
+    const auto found = missionsByRecord_.find(recordId);
+    if (found != missionsByRecord_.end()) {
+        for (int missionId : found->second) {
+            const auto* progress = findHistoricalMission(missionId);
+            if (progress && progress->complete) return true;
+        }
+    }
+    // Compatibility with old saves whose mission ID was stored directly.
+    const auto* progress = findHistoricalMission(recordId);
+    return progress && progress->complete;
+}
+
+bool Play::hasNewcomerHealingEntitlement() const {
+    return player_.level < 6 && hasHistoricalRecord(500);
+}
+
 bool Play::hasWelcomeMission() const {
     const auto* m=findHistoricalMission(1);
     return m && m->active;

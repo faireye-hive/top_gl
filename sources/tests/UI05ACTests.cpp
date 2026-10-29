@@ -55,6 +55,21 @@ int main() {
     assert(bench.mode()==ForgeWorkbenchUI::Mode::Socket);
     assert((bench.indices(ui.inventory)==std::array<int,3>({-1,-1,-1})));
     bench.close();assert(!bench.visible());
+    bench.open(8u);
+    assert(!bench.modeAllowed(0)&&!bench.modeAllowed(1)&&!bench.modeAllowed(2)&&bench.modeAllowed(3));
+    assert(bench.mode()==ForgeWorkbenchUI::Mode::Production);
+    assert(bench.hit(int(b.x+269),int(b.y+45),1280,720)==0); // painel de producao nao altera as abas da forja
+    assert(bench.hit(int(b.x+32),int(b.y+260),1280,720)==5);
+    bench.setPreview(true,1,90,"Produto: Teste\nMateriais: 501x2 502x1 503x1\nMoedas fada: 1");
+    UIRenderer productionShapes(1280,720);HudDrawList productionLabels;
+    bench.draw(productionShapes,productionLabels,1280,720,ui.inventory);
+    bool productionMaterialsShown=false,productionTitleShown=false;
+    for(const auto& label:productionLabels.labels) {
+        if(label.value.find("501x2 502x1 503x1")!=std::string::npos)productionMaterialsShown=true;
+        if(label.value.find("Substance Generator")!=std::string::npos)productionTitleShown=true;
+    }
+    assert(!productionShapes.empty()&&productionMaterialsShown&&productionTitleShown);
+    bench.close();
     const auto small=ForgeWorkbenchUI::bounds(640,480);
     bench.toggle();
     assert(bench.contains(int(small.x+25),int(small.y+50),640,480));

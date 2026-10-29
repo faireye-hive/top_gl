@@ -22,10 +22,15 @@ int main() {
     auto a=at(3,0,5,.05f,2.f,0.f,-1.f,7u);
     auto b=at(3,4,5,.05f,2.f,0.f,-1.f,7u);
     REQUIRE(a.alive && b.alive && a.age==b.age && a.life!=b.life);
+    float longest=0.f;
+    for(int slot=0;slot<5;++slot)longest=std::max(longest,at(3,slot,5,0.f,2.f,0.f,-1.f,7u).life);
     bool sawDead=false;
-    for(int t=10;t<190;t+=5) {
-        auto s=at(3,0,5,t*.01f,2.f,0.f,-1.f,7u);
-        if(!s.alive) sawDead=true;
+    for(int slot=0;slot<5;++slot) {
+        const float life=at(3,slot,5,0.f,2.f,0.f,-1.f,7u).life;
+        if(life<longest) {
+            REQUIRE(!at(3,slot,5,(life+longest)*.5f,2.f,0.f,-1.f,7u).alive);
+            sawDead=true;
+        }
     }
     REQUIRE(sawDead);
     REQUIRE(at(3,0,5,4.f,2.f,0.f,-1.f,7u).generation>0);

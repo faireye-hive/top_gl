@@ -16,6 +16,10 @@
 
 #include <cstdint>
 #include <array>
+#include <memory>
+#include <future>
+#include <chrono>
+#include <unordered_set>
 #include <string>
 #include "top/QuestPresentation.h"
 #include <unordered_map>
@@ -83,6 +87,33 @@ public:
     ~ActorSkin();
     bool open(const std::string& clientRoot, const std::string& mapName = "garner",
               const std::vector<MonsterSlot>& monsters = {}, int playerId = 1);
+    // PERF-01: retain world actor models, animation clocks and player/boat/UI.
+    // A new character type is loaded only once; known types reuse existing meshes.
+    bool updatePopulation(const std::vector<MonsterSlot>& monsters);
+    struct PopulationUpdateStats {
+        int retained = 0;
+        int created = 0;
+        int newTypes = 0;
+        int cachedTypes = 0;
+    };
+    const PopulationUpdateStats& lastPopulationUpdate() const { return lastPopulationUpdate_; }
+
+    // PERF-02: decode *historical* monster .lab/.lgo on a worker owning a
+    // completely separate ActorSkin. The render thread alone owns live bodies.
+    enum class PrefetchState { Ready, Pending, Fallback };
+    struct PrefetchStats {
+        int requested = 0;
+        int loaded = 0;
+        int failed = 0;
+        double elapsedMs = 0.;
+    };
+    // Poll is nonblocking; returns true only when a worker finished.
+    bool pollPopulationPrefetch();
+    int beginPopulationPrefetch(const std::vector<MonsterSlot>& candidates, int maxTypes = 3);
+    PrefetchState ensurePopulationPrefetched(const std::vector<MonsterSlot>& required);
+    const PrefetchStats& lastPrefetchStats() const { return lastPrefetchStats_; }
+
+
     // O mesmo giro de CSceneObj / CCharacter::SetYaw. Dois pontos fixos.
     static bool selfTest();
     void setPlayer(float x, float y, float yawRad, float height, bool moving, float dt);
@@ -94,13 +125,19 @@ public:
     void setPlayerWeaponsDrawn(bool drawn);
     void ensurePlaced(MapFile& map);
     int monsterCount() const;
+    // Add a model row for a transient historical summon. Returns its monster slot.
+    int appendMonsterModel(int id, bool duplicate = false);
     int playerId() const { return playerId_; }
     // Tempos extraidos do pose 7 de CharacterAction.tx (30 quadros/s).
     // SK2.13-A: dummy transforms from the SAME .lab frame used by actor rendering.
     // D3DX row-vector order, XYZ=game X/Y/up. No terrain-height guess.
     std::unordered_map<int, std::array<float, 16>> playerDummyWorldMatrices() const;
+    // Runtime dummies for one non-passive monster slot, sampled from its current .lab pose.
+    std::unordered_map<int, std::array<float, 16>> monsterDummyWorldMatrices(int index) const;
+    std::array<float, 3> monsterWorldRoot(int index) const; // GL world X/height/Y.
     // World matrices of the primary equipped weapon's OWN dummy IDs.
     std::unordered_map<int, std::array<float, 16>> playerItemDummyWorldMatrices() const;
+    std::unordered_map<int, std::array<float, 16>> actorItemDummyWorldMatrices(int index) const;
     float playerAttackWindup() const;
     float playerAttackDuration() const;
     float playerActionDuration(int actionBase) const;
@@ -127,6 +164,8 @@ public:
     void setTeleportChoices(std::vector<std::string> choices);
     void setNpcDialogOptions(std::vector<std::string> options, bool tutorialMode, bool hasMissions);
     int npcDialogOptionHit(int x, int y, int screenW, int screenH) const;
+    int npcDialogOptionPageHit(int x, int y, int screenW, int screenH) const;
+    void changeNpcDialogOptionPage(int delta);
     int npcTutorialGuideHit(int x, int y, int screenW, int screenH) const;
     int npcTutorialFooterHit(int x, int y, int screenW, int screenH) const;
     int teleportHit(int x, int y, int screenW, int screenH) const;
@@ -172,16 +211,18 @@ public:
     bool boatMode() const { return boatMode_; }
     int boatId() const { return boatId_; }
     float boatSeaHeight() const { return boatSeaHeight_; }
+    float boatMoveSpeed() const { return boatMoveSpeed_; }
     void toggleBoatWindow();
     void closeBoatWindow();
     // -1 fora, 0 fecha, 1..17 seleciona o casco historico.
     int boatHit(int x, int y, int screenW, int screenH) const;
     using SkillView = ui::SkillView;
-    void setSkillView(std::vector<SkillView> skills, int points);
+    void setSkillView(std::vector<SkillView> skills, int points, bool testMode = false);
     void setShortcutIcons(std::array<std::string, 8> icons);
     void setSkillDragIcon(const std::string& icon, int x, int y, bool active);
     // 05-AC: bancada visual, sem mutacao de itens. Play valida/consome os materiais.
     void toggleForgeWorkbench(int screenW,int screenH);
+    void toggleProductionWorkbench(int screenW,int screenH);
     void openForgeWorkbench(int screenW,int screenH,unsigned allowedModes);
     bool forgeWorkbenchOpen() const { return ui_.forge.visible(); }
     int forgeWorkbenchHit(int x,int y,int w,int h) const;
@@ -197,11 +238,16 @@ public:
     void showShopInventory(int width);
     int skillHit(int x, int y, int screenW) const;
     int skillUpgradeHit(int x, int y, int screenW) const;
+    bool skillTestModeHit(int x, int y, int screenW) const;
+    int skillPageHit(int x, int y, int screenW) const;
+    void changeSkillPage(int delta);
     bool skillWheel(int x, int y, int screenW, int delta);
     void setSkills(std::vector<std::string> lines);
     void setQuests(std::vector<std::string> lines);
     // -1 fora, 0 conteudo, 1 fechar, 2 arrastar pela barra superior.
     int skillWindowHit(int x, int y, int screenW) const;
+    void showSkillPanel();
+    void hideSkillPanel();
     int questWindowHit(int x, int y) const;
     void beginSkillDrag(int x, int y, int screenW);
     void dragSkill(int x, int y, bool down, int screenW, int screenH);
@@ -254,6 +300,7 @@ private:
     std::string root_;
     std::string mapName_ = "garner";
     int playerId_ = 1;
+    std::vector<MonsterSlot> roster_;
     ActorReport report_;
     std::vector<ActorBatch> batches_;
     std::vector<ActorBatch> hud_;
@@ -308,8 +355,23 @@ private:
     bool boatMode_ = false;
     int boatId_ = 1;
     float boatSeaHeight_ = 0.f;
+    float boatMoveSpeed_ = 0.f;
     struct Body;
     std::vector<Body> bodies_;
+    // PERF-01: bounded per-map cache of parsed historical .lab/.lgo by type.
+    // shared_ptr supports Body's out-of-line definition; no GL resources here.
+    std::unordered_map<int, std::shared_ptr<Body>> cachedPopulationTypes_;
+    PopulationUpdateStats lastPopulationUpdate_;
+    // A future from std::async joins on destruction/map change: no worker can
+    // access an ActorSkin after its owner is destroyed. Worker never uses GL.
+    std::future<std::unique_ptr<ActorSkin>> populationPreload_;
+    std::vector<int> populationPreloadIds_;
+    std::unordered_set<int> populationPreloadFailures_;
+    PrefetchStats lastPrefetchStats_;
+    std::chrono::steady_clock::time_point populationPreloadStart_{};
+    bool hasPopulationType(int id) const;
+
+
     bool openMinimap();
     void paintMinimap();
     Image miniImageCopy(int tx, int ty);

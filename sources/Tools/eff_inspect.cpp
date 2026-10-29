@@ -41,6 +41,15 @@ int main(int argc, char** argv) {
                       << " texturas-anim=" << part.frames.size()
                       << " mesh-nativo=" << (!part.billboard && top::legacy_mesh::recognized(part.model))
                       << " quadros-param=" << part.animatedParams.size() << "\n";
+            if (!part.keys.empty()) {
+                auto low = part.keys.front().position, high = low;
+                for (const auto& key : part.keys) for (int axis = 0; axis < 3; ++axis) {
+                    low[axis] = std::min(low[axis], key.position[axis]);
+                    high[axis] = std::max(high[axis], key.position[axis]);
+                }
+                std::cout << "    posicao-min=" << low[0] << ',' << low[1] << ',' << low[2]
+                          << " posicao-max=" << high[0] << ',' << high[1] << ',' << high[2] << '\n';
+            }
         }
         std::cout << "Recursos em campos identificados: " << effect.verifiedResources.size() << "\n";
         for (const auto& ref : effect.verifiedResources) std::cout << "  " << ref << '\n';

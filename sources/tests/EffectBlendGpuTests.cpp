@@ -39,10 +39,11 @@ int main() {
         const int offset=(32*64+32)*3;
         return std::array<int,3>{pixels[offset],pixels[offset+1],pixels[offset+2]};
     };
-    ::setenv("TOP_HISTORICAL_BLEND","0",1);
-    auto legacy=render({0,0,0,255},5,7);
+    // Explicit {0,0} exercises the renderer's legacy batch contract. Since
+    // SK2.18-L, an environment variable no longer disables valid DX9 pairs.
+    auto legacy=render({0,0,0,255},0,0);
     if(legacy[0]>2||legacy[1]>2||legacy[2]>2){std::cerr<<"legacy reproduction failed\n";return 1;}
-    ::unsetenv("TOP_HISTORICAL_BLEND");
+    ::setenv("TOP_HISTORICAL_BLEND","0",1);
     auto historic=render({0,0,0,255},5,7);
     for(int c=0;c<3;++c)if(std::abs(historic[c]-(c+1)*51)>2){std::cerr<<"black glow background changed destination\n";return 1;}
     // These 19 pairs occur in current assets. Compare RGB against D3D's
@@ -64,9 +65,8 @@ int main() {
     // discard incorrectly kept the background, ignoring the authored factor.
     const auto zero=render({255,255,255,0},5,1);
     if(zero[0]>2||zero[1]>2||zero[2]>2){std::cerr<<"historical shader still discards alpha zero\n";return 1;}
-    // Reproduce the second failure even with correct 5/7 factors: an RGBA
-    // framebuffer loses destination alpha after a normal half-alpha shadow.
-    // With the RGB-backbuffer policy, a black glow must preserve the shaded RGB.
+    // The opaque backbuffer policy must preserve shaded RGB, including when
+    // obsolete environment options request the former framebuffer-alpha path.
     auto layered=[&](bool raw) {
         if(raw)::setenv("TOP_HISTORICAL_DEST_ALPHA","framebuffer",1);
         else ::unsetenv("TOP_HISTORICAL_DEST_ALPHA");
@@ -78,13 +78,14 @@ int main() {
         const int offset=(32*64+32)*3;
         const std::array<int,3> before={pixels[offset],pixels[offset+1],pixels[offset+2]};
         std::uint8_t rgba[4]{};glReadPixels(32,32,1,1,GL_RGBA,GL_UNSIGNED_BYTE,rgba);
-        if(!raw && rgba[3]!=255)std::exit(1);
+        if(rgba[3]!=255)std::exit(1);
         device.draw(v,6,identity,8,b,0,5,7);
         device.readPixels(pixels.data(),64,64);
         const int difference=before[2]-pixels[offset+2];
-        if(raw ? difference<10 : std::abs(difference)>2)std::exit(1);
+        if(std::abs(difference)>2)std::exit(1);
     };
     layered(true);layered(false);
+    ::unsetenv("TOP_HISTORICAL_BLEND");
     device.shutdown();window.close();
     std::cout<<"GPU: legacy black rectangle reproduced; historical background preserved; 19 blend pairs, alpha-zero composition and shadow/DESTALPHA buffer regression passed\n";
 }
